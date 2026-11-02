@@ -51,15 +51,19 @@ This repository holds the last two of the three:
 
 | | `psss-engine/` | `psss-original/` |
 |---|---|---|
-| What it is | **the current engine** — use this one | the JavaScript version it was migrated from |
+| What it is | **the current engine** — use this one | Andreas Kardin's JavaScript version, **verbatim** |
 | Built with | TypeScript, WebGL2, Vite | plain JavaScript, Canvas2D |
-| Status | active | **read-only**, frozen at the state the migration started from |
+| Status | active | **read-only**, never edited |
 
-Everything below is about `psss-engine/`. ⚠️ **`psss-original/` is NOT the upstream project**: it is
-the JavaScript implementation **as it stood in this project when the rewrite began** — the original plus
-substantial further work done here on the JavaScript version, and it is the tree the migration
-specifications were extracted from. It is frozen and never edited. `psss-original/README.md` states
-exactly what differs and where the original author's own code is; `NOTICE` carries the attribution.
+Everything below is about `psss-engine/`. **`psss-original/` is the original author's own code and
+nothing else:** all ten files of upstream commit `2934077` (18 September 2023, still the upstream tip),
+his own README and licence copy included, every one of them hash-identical to its upstream counterpart.
+Open it to read PSSS as he wrote it; `NOTICE` carries the attribution.
+
+ℹ️ There was an intermediate step between the two columns — further work done here on the *JavaScript*
+version (attractors, preset breeding, a preview grid, a control surface), and that is what the rewrite's
+specifications were actually extracted from. It is kept separate rather than published, so that
+`psss-original/` can mean exactly one thing.
 
 ### The three documents you are most likely to want
 
@@ -78,7 +82,7 @@ exactly what differs and where the original author's own code is; `NOTICE` carri
 | Path | What it is |
 |---|---|
 | `psss-engine/` | The current engine. See §1.2. |
-| `psss-original/` | The JavaScript version this engine was migrated from — the original **plus** the JavaScript-era work done here. Read-only; see its own `README.md`. |
+| `psss-original/` | Andreas Kardin's JavaScript implementation, **verbatim** — upstream commit `2934077`, all ten files hash-identical, his own `README.md` included. Read-only, never edited. |
 | `psss-engine-v2_how_to_use_it.md` | The user manual. |
 | `psss-engine-v2_how_it_works.md` | The technical reference. |
 | `manual-images/` | Screenshots used by the user manual. See §6. |
@@ -353,7 +357,7 @@ compositions by Jan Zehn.
 
 **The second**, roughly two decades later, was the author's own **JavaScript rewrite** for the browser,
 published as source: three files, no build step, drawing into a 2D canvas. That is the `psss-original/`
-directory in this repository, and it is the version this engine was built from.
+directory in this repository, verbatim, and it is the version this engine descends from.
 
 **The third** is this engine: the same mathematics and the same presets, drawn by the graphics card
 instead of the processor, with the trail, the warp chain, the materials and the grading built on top. The

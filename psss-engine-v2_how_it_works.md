@@ -3534,7 +3534,7 @@ changed** — diff each against the default constants programmatically.
 | One preset | the Lab header's **Export** | a single preset object, plain JSON | `<Preset Name>_YYYYMMDD_HHMMSS.json` |
 | The whole library | the preview grid's **Export All** | `g_psss_presets={ "Name": {…}, … }` | `psss_presets.json` — **no stamp** |
 | The reels | the Reel tab's **Export Reels** | `g_psss_reels={ version, reels, mainReelName }` | `psss_reels.json` — **no stamp** |
-| The legacy library (from `psss-original/`, the migrated-and-extended JS version, not upstream) | nothing — inherited, read-only | v1 keys (`ParticleCount`, `Waves`, …) | `psss_presets.json` in `psss-original/` and `public/` |
+| The legacy library (from `psss-original/`, the original JavaScript version verbatim) | nothing — inherited, read-only | v1 keys (`ParticleCount`, `Waves`, …) | `psss_presets.json` in `psss-original/` and `public/` |
 
 The timestamp is **local wall-clock time**, `YYYYMMDD_HHMMSS`, not UTC: it exists so two exports of one
 preset can be told apart at a glance, which only works if it reads as the time the button was pressed.
