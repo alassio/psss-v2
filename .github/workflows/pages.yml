@@ -1,0 +1,78 @@
+# Pages — publish the browser demo (Phase 29.7)
+#
+# ⚠️ DO NOT ADD A VITE `base` OVERRIDE. vite.config.ts sets `base: './'`, which already satisfies BOTH
+# a Pages subpath and the `file://` route, and that file's header documents why. Setting
+# `base: '/psss-v2/'` would break `file://` and the screensaver payload — and it would do it as a blank
+# page with a clean console.
+#
+# ⚠️ A PAGES URL IS A FOURTH ROUTE, beside the dev server, `vite preview` and `file://`. A confirmation
+# on one of the others is not evidence about this one.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'psss-engine/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: psss-engine/package-lock.json
+
+      - run: npm ci
+        working-directory: psss-engine
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - run: npm run build
+        working-directory: psss-engine
+
+      # The deployment is FOUR files and two of them are JS by content, not JSON. The preset file is
+      # FATAL if missing; the reel file is OPTIONAL — absent means a warning and the bundled built-in
+      # reels play. Never make them symmetric.
+      - name: Assert the deployment's four files
+        working-directory: psss-engine
+        run: |
+          set -e
+          test -f dist/index.html        || { echo "FAIL dist/index.html";       exit 1; }
+          test -f dist/psss_presets.json || { echo "FAIL dist/psss_presets.json"; exit 1; }
+          ls dist/*.js >/dev/null        || { echo "FAIL no bundle in dist/";    exit 1; }
+          if [ -f dist/psss_reels.json ]; then echo "ok  psss_reels.json present";
+          else echo "note psss_reels.json absent — built-in reels will play"; fi
+          grep -q 'g_psss_presets' dist/psss_presets.json \
+            || { echo "FAIL psss_presets.json is not the deployment assignment format"; exit 1; }
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: psss-engine/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,52 @@
+{
+  "name": "psss-engine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && node scripts/export-library.mjs",
+    "build:screensaver": "node scripts/build-screensaver.mjs",
+    "docs:pdf": "node scripts/docs-to-pdf.mjs",
+    "package:dist": "node scripts/package-dist.mjs",
+    "build:all": "npm run build && npm run build:screensaver && npm run docs:pdf && npm run package:dist",
+    "preview": "vite preview",
+    "check:gl": "node checks/glslcheck.mjs && node checks/samplercheck.mjs && node checks/vaocheck.mjs && node checks/lencheck.mjs && node checks/blendcheck.mjs && node checks/cullcheck.mjs",
+    "check:dead": "node checks/deadcheck.mjs",
+    "check:aesthetic": "node checks/aestheticcheck.mjs",
+    "check:field": "node checks/fieldcheck.mjs",
+    "check:shape": "node checks/shapecheck.mjs",
+    "check:track": "node checks/trackcheck.mjs",
+    "check:name": "node checks/namecheck.mjs",
+    "check:tip": "node checks/tipcheck.mjs",
+    "check:composer": "node checks/composercheck.mjs",
+    "check:reel": "node checks/reelcheck.mjs",
+    "check:coverage": "node checks/coveragecheck.mjs",
+    "check:palette": "node checks/palettecheck.mjs",
+    "check:facet": "node checks/facetcheck.mjs",
+    "check:mixer": "node checks/mixercheck.mjs",
+    "check:slider": "node checks/slidercheck.mjs",
+    "check:splat": "node checks/splatcheck.mjs",
+    "check:deform": "node checks/deformcheck.mjs",
+    "check:demos": "node checks/democheck.mjs",
+    "check:ui": "node checks/uicheck.mjs",
+    "verify": "tsc --noEmit && npm run check:gl && npm run check:dead && npm run check:aesthetic && npm run check:field && npm run check:shape && npm run check:track && npm run check:name && npm run check:tip && npm run check:composer && npm run check:reel && npm run check:coverage && npm run check:palette && npm run check:facet && npm run check:mixer && npm run check:slider && npm run check:splat && npm run check:deform",
+    "check:specs": "tsc --noEmit -p tests/tsconfig.json",
+    "verify:browser": "playwright test",
+    "release:web": "npm run build && npm run docs:pdf && npm run package:dist -- --web"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "marked": "^16.4.2",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  }
+}

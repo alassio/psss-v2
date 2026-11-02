@@ -1,0 +1,1071 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+    body * {
+      font-family: sans-serif;
+      /* font-size: small; */
+      color: lightgray;
+    }
+
+    input,
+    select,
+    select option {
+      color: black;
+      background-color: lightgray;
+      width: 8em;
+    }
+
+    button {
+      color: black;
+      background-color: lightgray;
+    }
+
+    select#lstParticlePresets {
+      width: 16em
+    }
+
+    #pnlPreviewAll {
+      display: none;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      padding: 12px 0;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .preview-tile {
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.15s;
+    }
+
+    .preview-tile:hover {
+      transform: scale(1.05);
+    }
+
+    .preview-tile canvas {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #111;
+      display: block;
+    }
+
+    .preview-tile .tile-label {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: #ccc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .lab-thumb {
+      width: 75px;
+      height: 56px;
+      cursor: pointer;
+      border: 1px solid #555;
+      border-radius: 3px;
+      object-fit: cover;
+      flex-shrink: 0;
+      transition: border-color 0.15s;
+    }
+
+    .lab-thumb:hover {
+      border-color: #fff;
+    }
+
+    .lab-tab-bar {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 8px;
+    }
+
+    .lab-tab {
+      flex: 1;
+      padding: 4px 0;
+      font-size: 10px;
+      border: 1px solid #555;
+      border-radius: 3px;
+      background: #222;
+      color: #888;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .lab-tab.active {
+      background: #444;
+      color: #fff;
+      border-color: #888;
+    }
+
+    .lab-tab:hover {
+      background: #333;
+    }
+
+    .lab-sync-btn {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: #333;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .lab-sync-btn:hover {
+      background: #444;
+      color: #fff;
+    }
+
+    .archetype-btn {
+      padding: 4px 2px;
+      font-size: 9px;
+      border: 1px solid #555;
+      border-radius: 3px;
+      background: #222;
+      color: #888;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .archetype-btn.active {
+      background: #444;
+      color: #fff;
+      border-color: #f80;
+    }
+
+    .archetype-btn:hover {
+      background: #333;
+    }
+
+    .archetype-slider-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 3px;
+      gap: 4px;
+    }
+
+    .archetype-slider-row .arch-label {
+      font-size: 10px;
+      color: #999;
+      width: 75px;
+      flex-shrink: 0;
+    }
+
+    .archetype-slider-row input[type="range"] {
+      flex: 1;
+      height: 14px;
+    }
+
+    .archetype-slider-row .arch-val {
+      font-size: 9px;
+      color: #666;
+      width: 28px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    #pnlEvoGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 6px;
+    }
+
+    .evo-tile {
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .evo-tile canvas {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #111;
+      border: 2px solid transparent;
+      border-radius: 3px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .evo-tile.selected canvas {
+      border-color: #f80;
+      box-shadow: 0 0 8px #f80;
+    }
+
+    .evo-label {
+      display: block;
+      font-size: 10px;
+      color: #888;
+      margin-top: 2px;
+    }
+  </style>
+
+  <title>Particle Systems Screen Saver Engine - Javascript</title>
+</head>
+
+<body style="background-color: black;color: white;">
+  <div class="container">
+    <h1>Particle Systems Screen Saver Engine - Javascript</h1>
+    <p><small>Published under <a href="LICENSE" target="_blank">GNU GENERAL PUBLIC LICENSE v3</a>. 
+      Details about the project in <a href="README.md" target="_blank">README.md</a> and source in <a href="https://github.com/mephzara/psss_js" target="_blank">Github repository</a></small></p>
+    <label for="lstParticlePresets">Choose preset</label>
+    <select name="lstParticlePresets" id="lstParticlePresets"></select>
+    <button id="cmdToggleSettings" name="cmdToggleSettings">Edit</button>
+    <button id="cmdPreviewAll" name="cmdPreviewAll">Preview All</button>
+    <button id="cmdVisualFx" name="cmdVisualFx">Visual FX</button>
+    <button id="cmdLab" name="cmdLab">Lab</button>
+    <button id="cmdImportPreset" name="cmdImportPreset" style="margin-left: 12px;">Import Preset</button>
+    <button id="cmdExportPresets" name="cmdExportPresets">Export Presets</button>
+    <input type="file" id="fileImportPreset" accept=".json" style="display:none">
+    <hr />
+    <div id="pnlLabWrapper" style="display: flex; align-items: flex-start;">
+      <div id="pnlMainView" style="flex: 1; min-width: 0;">
+        <canvas class="world" id="world" style="cursor: crosshair;width: 100%;" width="1024" height="768"></canvas>
+        <small>Click on anim to toggle fullscreen</small>
+      </div>
+      <div id="pnlEvoGrid" style="display: none; flex: 1; min-width: 0;">
+        <div class="evo-tile" data-idx="0"><canvas width="256" height="192"></canvas><span class="evo-label">A</span></div>
+        <div class="evo-tile" data-idx="1"><canvas width="256" height="192"></canvas><span class="evo-label">B</span></div>
+        <div class="evo-tile" data-idx="2"><canvas width="256" height="192"></canvas><span class="evo-label">C</span></div>
+        <div class="evo-tile" data-idx="3"><canvas width="256" height="192"></canvas><span class="evo-label">D</span></div>
+        <div class="evo-tile" data-idx="4"><canvas width="256" height="192"></canvas><span class="evo-label">E</span></div>
+        <div class="evo-tile" data-idx="5"><canvas width="256" height="192"></canvas><span class="evo-label">F</span></div>
+        <div class="evo-tile" data-idx="6"><canvas width="256" height="192"></canvas><span class="evo-label">G</span></div>
+        <div class="evo-tile" data-idx="7"><canvas width="256" height="192"></canvas><span class="evo-label">H</span></div>
+        <div class="evo-tile" data-idx="8"><canvas width="256" height="192"></canvas><span class="evo-label">I</span></div>
+      </div>
+      <div id="pnlLabControls" style="display: none; width: 280px; flex-shrink: 0; padding: 10px; border: 1px solid #444; background: #1a1a1a; border-radius: 4px; margin-left: 12px;">
+        <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span id="lblLabDirty" style="display: none; font-size: 10px; color: #f80; font-style: italic;">randomized</span>
+        </div>
+        <div class="lab-tab-bar">
+          <button class="lab-tab active" data-tab="mixer">Mixer</button>
+          <button class="lab-tab" data-tab="randomizer">Randomizer</button>
+          <button class="lab-tab" data-tab="styles">Styles</button>
+          <button class="lab-tab" data-tab="evolution">Evolve</button>
+          <button class="lab-tab" data-tab="fractal">Fractal</button>
+        </div>
+        <!-- Tab: Mixer -->
+        <div class="lab-tab-content" id="tabMixer">
+          <div style="margin-bottom: 4px;">
+            <button id="cmdSyncMixer" class="lab-sync-btn">Sync from current</button>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <label for="selLabDeckA" style="font-size: 11px; color: #888;">Deck A</label>
+            <select id="selLabDeckA" style="width: 100%; font-size: 11px;"></select>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <input type="range" id="rngLabCrossfade" min="0" max="1.0" step="0.01" value="0" style="width: 100%;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666;">
+              <span>A</span><span id="lblLabCrossfade">0%</span><span>B</span>
+            </div>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <label for="selLabDeckB" style="font-size: 11px; color: #888;">Deck B</label>
+            <select id="selLabDeckB" style="width: 100%; font-size: 11px;"></select>
+          </div>
+          <div style="margin-bottom: 6px; font-size: 11px; color: #aaa;">
+            <span style="display: block; margin-bottom: 3px;">Lock:</span>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkLabLockShape"> Shape</label>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkLabLockColor"> Color</label><br>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkLabLockMotion"> Motion</label>
+            <label><input type="checkbox" id="chkLabLockTransmap"> TransMap</label>
+          </div>
+        </div>
+        <!-- Tab: Randomizer -->
+        <div class="lab-tab-content" id="tabRandomizer" style="display:none;">
+          <div style="margin-bottom: 4px;">
+            <button id="cmdSyncRandomizer" class="lab-sync-btn">Sync from current</button>
+          </div>
+          <div style="margin-bottom: 6px; font-size: 11px; color: #aaa;">
+            <span style="display: block; margin-bottom: 3px;">Lock:</span>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkRandLockShape"> Shape</label>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkRandLockColor"> Color</label><br>
+            <label style="margin-right: 6px;"><input type="checkbox" id="chkRandLockMotion"> Motion</label>
+            <label><input type="checkbox" id="chkRandLockTransmap"> TransMap</label>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <button id="cmdLabRandSubtle" style="font-size: 11px;">Subtle</button>
+            <button id="cmdLabRandMedium" style="font-size: 11px;">Medium</button>
+            <button id="cmdLabRandWild" style="font-size: 11px;">Wild</button>
+          </div>
+        </div>
+        <!-- Tab: Slider Board -->
+        <!-- Tab: Styles (Archetype Templates) -->
+        <div class="lab-tab-content" id="tabStyles" style="display:none;">
+          <div style="margin-bottom: 4px;">
+            <button id="cmdSyncStyles" class="lab-sync-btn">Sync from current</button>
+          </div>
+          <div id="pnlArchetypeSelector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-bottom: 6px;">
+            <button class="archetype-btn" data-idx="0">Flowing Ribbon</button>
+            <button class="archetype-btn" data-idx="1">Organic Cloud</button>
+            <button class="archetype-btn" data-idx="2">Vortex Tunnel</button>
+            <button class="archetype-btn" data-idx="3">Geometric</button>
+            <button class="archetype-btn" data-idx="4">Warped Surface</button>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <label for="selArchetypeBase" style="font-size: 10px; color: #888;">Base preset:</label>
+            <select id="selArchetypeBase" style="width: 100%; font-size: 11px;"></select>
+          </div>
+          <div id="pnlArchetypeSliders"></div>
+          <div style="margin-top: 6px;">
+            <button id="cmdSendToMixer" style="font-size: 10px;">Send to Mixer</button>
+            <button id="cmdSendToEvolution" style="font-size: 10px; margin-left: 4px;">Send to Evolution</button>
+          </div>
+        </div>
+        <!-- Tab: Evolution -->
+        <div class="lab-tab-content" id="tabEvolution" style="display:none;">
+          <div style="margin-bottom: 6px;">
+            <button id="cmdEvoSeedCurrent" class="lab-sync-btn">Seed from current</button>
+            <button id="cmdEvoSurprise" style="font-size: 10px; margin-left: 4px;">Surprise Me</button>
+          </div>
+          <div style="margin-bottom: 6px;">
+            <button id="cmdEvoBreed" style="font-size: 11px;" disabled>Breed</button>
+            <button id="cmdEvoReset" style="font-size: 11px; margin-left: 4px;">Reset</button>
+          </div>
+          <div style="font-size: 10px; color: #aaa; margin-bottom: 4px;">
+            Generation: <span id="lblEvoGeneration">0</span>
+          </div>
+          <div style="font-size: 10px; color: #aaa; margin-bottom: 4px;">
+            Selected: <span id="lblEvoSelected">0</span> / 3
+          </div>
+          <div style="font-size: 10px; color: #666; min-height: 24px;">
+            <span id="lblEvoLineage"></span>
+          </div>
+        </div>
+        <!-- Tab: Fractal -->
+        <div class="lab-tab-content" id="tabFractal" style="display:none;">
+          <div style="margin-bottom: 6px;">
+            <label style="font-size: 11px; display: block; margin-bottom: 2px;">Attractor Type</label>
+            <select id="selFractalType" style="width: 100%; font-size: 11px;">
+              <option value="clifford">Clifford</option>
+              <option value="dejong">de Jong</option>
+              <option value="lorenz2d">Lorenz</option>
+              <option value="rossler">Rössler</option>
+              <option value="thomas">Thomas</option>
+              <option value="halvorsen">Halvorsen</option>
+              <option value="aizawa">Aizawa</option>
+              <option value="nosehoover">Nosé-Hoover</option>
+              <option value="julia">Julia</option>
+              <option value="mandelbrot">Mandelbrot</option>
+            </select>
+          </div>
+          <div id="pnlMandelbrotPreset" style="margin-bottom: 6px; display: none;">
+            <label style="font-size: 10px; color: #aaa; display: block; margin-bottom: 2px;">Mandelbrot Region</label>
+            <select id="selMandelbrotPreset" style="width: 100%; font-size: 11px;">
+              <option value="full">Full Set</option>
+              <option value="seahorse">Seahorse Valley</option>
+              <option value="elephant">Elephant Valley</option>
+              <option value="antenna">Antenna Tip</option>
+              <option value="spirals">Double Spiral</option>
+              <option value="minibrot">Mini-brot</option>
+              <option value="needle">Needle</option>
+              <option value="scepter">Scepter Valley</option>
+              <option value="lightning">Lightning</option>
+              <option value="starfish">Starfish</option>
+              <option value="galaxy">Spiral Galaxy</option>
+            </select>
+          </div>
+          <div id="pnlJuliaPreset" style="margin-bottom: 6px; display: none;">
+            <label style="font-size: 10px; color: #aaa; display: block; margin-bottom: 2px;">Julia Preset</label>
+            <select id="selJuliaPreset" style="width: 100%; font-size: 11px;">
+              <option value="dendrite">Dendrite</option>
+              <option value="spiral">Spiral Galaxy</option>
+              <option value="seahorse">Sea-Horse</option>
+              <option value="rabbit">Douady Rabbit</option>
+              <option value="dust">Fractal Dust</option>
+              <option value="sanmarco">San Marco</option>
+              <option value="lightning">Lightning</option>
+              <option value="siegel">Siegel Disk</option>
+              <option value="pinwheel">Pinwheel</option>
+              <option value="snowflake">Snowflake</option>
+              <option value="electric">Electric</option>
+              <option value="swirl">Swirl</option>
+              <option value="firework">Firework</option>
+              <option value="neuron">Neuron</option>
+              <option value="basilica">Basilica</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 4px;">
+            <label style="font-size: 10px; color: #aaa;">a: <span id="lblFracA">-1.40</span></label>
+            <input type="range" id="rngFracA" min="-3.0" max="3.0" step="0.01" value="-1.4" style="width:100%;">
+          </div>
+          <div style="margin-bottom: 4px;">
+            <label style="font-size: 10px; color: #aaa;">b: <span id="lblFracB">1.60</span></label>
+            <input type="range" id="rngFracB" min="-3.0" max="3.0" step="0.01" value="1.6" style="width:100%;">
+          </div>
+          <div id="pnlFracSliderC" style="margin-bottom: 4px;">
+            <label style="font-size: 10px; color: #aaa;">c: <span id="lblFracC">1.00</span></label>
+            <input type="range" id="rngFracC" min="-3.0" max="3.0" step="0.01" value="1.0" style="width:100%;">
+          </div>
+          <div id="pnlFracSliderD" style="margin-bottom: 4px;">
+            <label style="font-size: 10px; color: #aaa;">d: <span id="lblFracD">0.70</span></label>
+            <input type="range" id="rngFracD" min="-3.0" max="3.0" step="0.01" value="0.7" style="width:100%;">
+          </div>
+          <div style="margin-bottom: 6px; margin-top: 8px;">
+            <label style="font-size: 10px; color: #aaa;">Blend: <span id="lblFracBlend">0%</span></label>
+            <input type="range" id="rngFracBlend" min="0" max="100" step="1" value="0" style="width:100%;">
+          </div>
+          <div style="margin-top: 8px;">
+            <button id="cmdFracRandomize" style="font-size: 11px;">Randomize Attractor</button>
+          </div>
+          <div style="margin-top: 6px;">
+            <button id="cmdFracToEvolution" style="font-size: 11px;">Send to Evolution</button>
+          </div>
+        </div>
+        <!-- Shared: Snapshot/Export/History -->
+        <hr style="border-color: #333; margin: 6px 0;">
+        <div style="margin-bottom: 6px;">
+          <button id="cmdLabSnapshot" style="font-size: 11px;">Snapshot</button>
+          <button id="cmdLabExport" style="font-size: 11px;">Export Preset</button>
+        </div>
+        <div id="pnlLabHistory" style="display: flex; gap: 4px; overflow-x: auto; padding: 4px 0; min-height: 36px; flex-wrap: wrap;">
+        </div>
+      </div>
+      <div id="pnlVisualFx" style="display: none; width: 280px; flex-shrink: 0; padding: 10px; border: 1px solid #444; background: #1a1a1a; border-radius: 4px; margin-left: 12px;">
+        <div style="margin-bottom: 8px;">
+          <strong style="color: #aaa; font-size: 13px;">Visual FX</strong>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <input type="checkbox" id="chkFxGlow" checked>
+          <label for="chkFxGlow" style="font-size: 11px;">Soft Glow</label>
+          <input type="range" id="rngFxGlow" min="0.5" max="3.0" step="0.1" value="2.0" style="width:100%; margin-top: 2px;">
+          <span id="lblFxGlow" style="font-size: 10px; color: #888;">2.0</span>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <input type="checkbox" id="chkFxDepthSize">
+          <label for="chkFxDepthSize" style="font-size: 11px;">Depth Size</label>
+          <input type="range" id="rngFxDepthSize" min="0" max="2.0" step="0.1" value="0.5" style="width:100%; margin-top: 2px;">
+          <span id="lblFxDepthSize" style="font-size: 10px; color: #888;">0.5</span>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <input type="checkbox" id="chkFxStreaks">
+          <label for="chkFxStreaks" style="font-size: 11px;">Velocity Streaks</label>
+          <input type="range" id="rngFxStreaks" min="0" max="2.0" step="0.1" value="0.5" style="width:100%; margin-top: 2px;">
+          <span id="lblFxStreaks" style="font-size: 10px; color: #888;">0.5</span>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <input type="checkbox" id="chkFxSpeedCorr">
+          <label for="chkFxSpeedCorr" style="font-size: 11px;" title="Harmonizes wave motion to real-time (fixes speed differences between renderers)">Speed Correction</label>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <input type="checkbox" id="chkFxSpeedFactor" checked>
+          <label for="chkFxSpeedFactor" style="font-size: 11px;">Speed Factor</label>
+          <input type="range" id="rngFxSpeedFactor" min="0.1" max="5.0" step="0.1" value="1.0" style="width:100%; margin-top: 2px;">
+          <span id="lblFxSpeedFactor" style="font-size: 10px; color: #888;">1.0</span>
+        </div>
+        <hr style="border-color: #333; margin: 6px 0;">
+        <div style="margin-bottom: 6px;">
+          <label for="selFxPalette" style="font-size: 11px; display: block; margin-bottom: 2px;">Color Palette</label>
+          <select id="selFxPalette" style="width: 100%; font-size: 11px;">
+            <option value="none">None</option>
+            <option value="fire">Fire</option>
+            <option value="ocean">Ocean</option>
+            <option value="aurora">Aurora</option>
+            <option value="neon">Neon</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="sunset">Sunset</option>
+            <option value="toxic">Toxic</option>
+            <option value="thermal">Thermal</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="ice">Ice</option>
+            <option value="ember">Ember</option>
+            <option value="galaxy">Galaxy</option>
+            <option value="candy">Candy</option>
+          </select>
+        </div>
+        <div>
+          <label for="selFxPaletteMap" style="font-size: 11px; display: block; margin-bottom: 2px;">Palette Mapping</label>
+          <select id="selFxPaletteMap" style="width: 100%; font-size: 11px;">
+            <option value="depth">Depth</option>
+            <option value="phase">Phase</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="margin: 8px 0;">
+      <label for="rngFps">FPS:</label>
+      <input type="range" id="rngFps" name="rngFps" min="1" max="120" value="60" style="width: 200px; vertical-align: middle;">
+      <span id="lblFps">60</span>
+    </div>
+    <div id="pnlPreviewAll" style="display: none;"></div>
+    <hr />
+    <div id="pnlSettings" style="display: inline-block;">
+      <div>
+        <label for="txtParticleCount">Count</label><input type="number" id="txtParticleCount" name="txtParticleCount"
+          min="1" max="500000" step="100">
+        <label for="txtBlur">Blur</label><input type="number" id="txtBlur" name="txtBlur" min="0" max="100" step="0.1">
+        <label for="txtBrightness">Brightness</label><input type="number" id="txtBrightness" name="txtBrightness"
+          min="0" max="1" step="0.02">
+      </div>
+      <hr />
+      <div>
+        <table>
+          <tr>
+            <th colspan="3">Angle</th>
+            <th colspan="3">Rotation</th>
+          </tr>
+          <tr>
+            <td><input class="txtAngle" type="number" id="txtAngle_1" name="txtAngle_1" min="0" max="359" step="1"></td>
+            <td><input class="txtAngle" type="number" id="txtAngle_2" name="txtAngle_2" min="0" max="359" step="1"></td>
+            <td><input class="txtAngle" type="number" id="txtAngle_3" name="txtAngle_3" min="0" max="359" step="1"></td>
+            <td><input class="txtRotation" type="number" id="txtRotation_1" name="txtRotation_1" min="0" max="359"
+                step="1"></td>
+            <td><input class="txtRotation" type="number" id="txtRotation_2" name="txtRotation_2" min="0" max="359"
+                step="1"></td>
+            <td><input class="txtRotation" type="number" id="txtRotation_3" name="txtRotation_3" min="0" max="359"
+                step="1"></td>
+          </tr>
+        </table>
+      </div>
+      <hr />
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="4">Color Wave</th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>Red</th>
+            <th>Green</th>
+            <th>Blue</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input class="colorBase" type="number" id="txtColorBase_1" name="txtColorBase_1" min="0" max="100"
+                step="1"></td>
+            <td><input class="colorBase" type="number" id="txtColorBase_2" name="txtColorBase_2" min="0" max="100"
+                step="1"></td>
+            <td><input class="colorBase" type="number" id="txtColorBase_3" name="txtColorBase_3" min="0" max="100"
+                step="1"></td>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input class="colorAmp" type="number" id="txtColorAmp_1" name="txtColorAmp_1" min="0" max="100"
+                step="1">
+            </td>
+            <td><input class="colorAmp" type="number" id="txtColorAmp_2" name="txtColorAmp_2" min="0" max="100"
+                step="1">
+            </td>
+            <td><input class="colorAmp" type="number" id="txtColorAmp_3" name="txtColorAmp_3" min="0" max="100"
+                step="1">
+            </td>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input class="colorFreq" type="number" id="txtColorFreq_1" name="txtColorFreq_1" min="0" max="100"
+                step="0.1"></td>
+            <td><input class="colorFreq" type="number" id="txtColorFreq_2" name="txtColorFreq_2" min="0" max="100"
+                step="0.1"></td>
+            <td><input class="colorFreq" type="number" id="txtColorFreq_3" name="txtColorFreq_3" min="0" max="100"
+                step="0.1"></td>
+          </tr>
+          <tr>
+            <th>Shift</th>
+            <td><input class="colorShift" type="number" id="txtShift_1" name="txtShift_1" min="0" max="100" step="0.01">
+            </td>
+            <td><input class="colorShift" type="number" id="txtShift_2" name="txtShift_2" min="0" max="100" step="0.01">
+            </td>
+            <td><input class="colorShift" type="number" id="txtShift_3" name="txtShift_3" min="0" max="100" step="0.01">
+            </td>
+          </tr>
+        </table>
+      </div>
+      <hr />
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">X-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_1_X" name="txtWavePhase_1_X" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_1_X" name="cmdWaveZero_1_X">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_1_X" name="txtWaveBaseAM_1_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_1_X" name="txtWaveBaseFM_1_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_1_X" name="txtWaveAmpAM_1_X" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_1_X" name="txtWaveAmpFM_1_X" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_1_X" name="txtWaveFreqAM_1_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_1_X" name="txtWaveFreqFM_1_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Y-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_1_Y" name="txtWavePhase_1_Y" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_1_Y" name="cmdWaveZero_1_Y">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_1_Y" name="txtWaveBaseAM_1_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_1_Y" name="txtWaveBaseFM_1_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_1_Y" name="txtWaveAmpAM_1_Y" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_1_Y" name="txtWaveAmpFM_1_Y" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_1_Y" name="txtWaveFreqAM_1_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_1_Y" name="txtWaveFreqFM_1_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Z-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_1_Z" name="txtWavePhase_1_Z" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_1_Z" name="cmdWaveZero_1_Z">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_1_Z" name="txtWaveBaseAM_1_Z" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_1_Z" name="txtWaveBaseFM_1_Z" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_1_Z" name="txtWaveAmpAM_1_Z" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_1_Z" name="txtWaveAmpFM_1_Z" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_1_Z" name="txtWaveFreqAM_1_Z" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_1_Z" name="txtWaveFreqFM_1_Z" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <hr />
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">X-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_2_X" name="txtWavePhase_2_X" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_2_X" name="cmdWaveZero_2_X">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_2_X" name="txtWaveBaseAM_2_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_2_X" name="txtWaveBaseFM_2_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_2_X" name="txtWaveAmpAM_2_X" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_2_X" name="txtWaveAmpFM_2_X" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_2_X" name="txtWaveFreqAM_2_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_2_X" name="txtWaveFreqFM_2_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Y-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_2_Y" name="txtWavePhase_2_Y" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_2_Y" name="cmdWaveZero_2_Y">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_2_Y" name="txtWaveBaseAM_2_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_2_Y" name="txtWaveBaseFM_2_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_2_Y" name="txtWaveAmpAM_2_Y" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_2_Y" name="txtWaveAmpFM_2_Y" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_2_Y" name="txtWaveFreqAM_2_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_2_Y" name="txtWaveFreqFM_2_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Z-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_2_Z" name="txtWavePhase_2_Z" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_2_Z" name="cmdWaveZero_2_Z">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_2_Z" name="txtWaveBaseAM_2_Z" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_2_Z" name="txtWaveBaseFM_2_Z" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_2_Z" name="txtWaveAmpAM_2_Z" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_2_Z" name="txtWaveAmpFM_2_Z" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_2_Z" name="txtWaveFreqAM_2_Z" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_2_Z" name="txtWaveFreqFM_2_Z" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <hr />
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">X-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_3_X" name="txtWavePhase_3_X" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_3_X" name="cmdWaveZero_3_X">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_3_X" name="txtWaveBaseAM_3_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_3_X" name="txtWaveBaseFM_3_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_3_X" name="txtWaveAmpAM_3_X" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_3_X" name="txtWaveAmpFM_3_X" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_3_X" name="txtWaveFreqAM_3_X" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_3_X" name="txtWaveFreqFM_3_X" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Y-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_3_Y" name="txtWavePhase_3_Y" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_3_Y" name="cmdWaveZero_3_Y">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" class="waveBaseAM" id="txtWaveBaseAM_3_Y" name="txtWaveBaseAM_3_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveBaseFM" id="txtWaveBaseFM_3_Y" name="txtWaveBaseFM_3_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" class="waveAmpAM" id="txtWaveAmpAM_3_Y" name="txtWaveAmpAM_3_Y" min="0" max="100"
+                step="1"></td>
+            <td><input type="number" class="waveAmpFM" id="txtWaveAmpFM_3_Y" name="txtWaveAmpFM_3_Y" min="0" max="100"
+                step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" class="waveFreqAM" id="txtWaveFreqAM_3_Y" name="txtWaveFreqAM_3_Y" min="0"
+                max="100" step="1"></td>
+            <td><input type="number" class="waveFreqFM" id="txtWaveFreqFM_3_Y" name="txtWaveFreqFM_3_Y" min="0"
+                max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <div style="display: inline-block;">
+        <table>
+          <tr>
+            <th colspan="3">Z-Axis</th>
+          </tr>
+          <tr>
+            <th>Phase</th>
+            <td><input type="number" class="wavePhase" id="txtWavePhase_3_Z" name="txtWavePhase_3_Z" min="0" max="100"
+                step="1"></td>
+            <th><button class="cmdWaveZero" id="cmdWaveZero_3_Z" name="cmdWaveZero_3_Z">Zero</button></th>
+          </tr>
+          <tr>
+            <th>&nbsp;</th>
+            <th>AM</th>
+            <th>FM</th>
+          </tr>
+          <tr>
+            <th>Base</th>
+            <td><input type="number" id="txtWaveBaseAM_3_Z" name="txtWaveBaseAM_3_Z" min="0" max="100" step="1"></td>
+            <td><input type="number" id="txtWaveBaseFM_3_Z" name="txtWaveBaseFM_3_Z" min="0" max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Amp</th>
+            <td><input type="number" id="txtWaveAmpAM_3_Z" name="txtWaveAmpAM_3_Z" min="0" max="100" step="1"></td>
+            <td><input type="number" id="txtWaveAmpFM_3_Z" name="txtWaveAmpFM_3_Z" min="0" max="100" step="1"></th>
+          </tr>
+          <tr>
+            <th>Freq</th>
+            <td><input type="number" id="txtWaveFreqAM_3_Z" name="txtWaveFreqAM_3_Z" min="0" max="100" step="1"></td>
+            <td><input type="number" id="txtWaveFreqFM_3_Z" name="txtWaveFreqFM_3_Z" min="0" max="100" step="1"></th>
+          </tr>
+        </table>
+      </div>
+      <hr />
+      <div>
+        <div>
+          <label for="lstTransMapStyle">TransMap Style</label>
+          <select name="lstTransMapStyle" id="lstTransMapStyle">
+            <option value="0">Wave Shift</option>
+            <option value="1">Wave Zoom</option>
+            <option value="2">Wave Zoom Overlay</option>
+            <option value="3">Wave Zoom Combined</option>
+          </select>
+
+          <label for="chkTransMapFilter">Use TransMap</label><input type="checkbox" id="chkTransMapFilter"
+            name="chkTransMapFilter" checked>
+          <label for="chkTransMapMode">TransMap Apply before</label><input type="checkbox" id="chkTransMapMode"
+            name="chkTransMapMode" checked>
+        </div>
+        <br />
+        <div style="display: inline-block;">
+          <table>
+            <tr>
+              <th>Center</th>
+              <td colspan="4">
+                <input type="number" id="txtTransMapCenterX" name="txtTransMapCenterX" min="0" max="100" step="1">
+                <input type="number" id="txtTransMapCenterY" name="txtTransMapCenterY" min="0" max="100" step="1">
+              </td>
+            </tr>
+            <tr>
+              <th>X-Amp</th>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_1_1" name="txtXAmp_1_1" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_1_2" name="txtXAmp_1_2" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_1_3" name="txtXAmp_1_3" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_1_4" name="txtXAmp_1_4" min="-100" max="100"
+                  step="0.1"></td>
+            </tr>
+            <tr>
+              <th>X-Freq</th>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_1_1" name="txtXFreq_1_1" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_1_2" name="txtXFreq_1_2" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_1_3" name="txtXFreq_1_3" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_1_4" name="txtXFreq_1_4" min="0" max="100"
+                  step="1"></td>
+            </tr>
+            <tr>
+              <th>Y-Amp</th>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_1_1" name="txtYAmp_1_1" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_1_2" name="txtYAmp_1_2" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_1_3" name="txtYAmp_1_3" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_1_4" name="txtYAmp_1_4" min="-100" max="100"
+                  step="0.1"></td>
+            </tr>
+            <tr>
+              <th>Y-Freq</th>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_1_1" name="txtYFreq_1_1" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_1_2" name="txtYFreq_1_2" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_1_3" name="txtYFreq_1_3" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_1_4" name="txtYFreq_1_4" min="0" max="100"
+                  step="1"></td>
+            </tr>
+          </table>
+        </div>
+        <div style="display: inline-block;">
+          <table>
+            <tr>
+              <th>X-Amp</th>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_2_1" name="txtXAmp_2_1" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_2_2" name="txtXAmp_2_2" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_2_3" name="txtXAmp_2_3" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransXAmp" id="txtXAmp_2_4" name="txtXAmp_2_4" min="-100" max="100"
+                  step="0.1"></td>
+            </tr>
+            <tr>
+              <th>X-Freq</th>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_2_1" name="txtXFreq_2_1" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_2_2" name="txtXFreq_2_2" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_2_3" name="txtXFreq_2_3" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransXFreq" id="txtXFreq_2_4" name="txtXFreq_2_4" min="0" max="100"
+                  step="1"></td>
+            </tr>
+            <tr>
+              <th>Y-Amp</th>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_2_1" name="txtYAmp_2_1" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_2_2" name="txtYAmp_2_2" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_2_3" name="txtYAmp_2_3" min="-100" max="100"
+                  step="0.1"></td>
+              <td><input type="number" class="txtTransYAmp" id="txtYAmp_2_4" name="txtYAmp_2_4" min="-100" max="100"
+                  step="0.1"></td>
+            </tr>
+            <tr>
+              <th>Y-Freq</th>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_2_1" name="txtYFreq_2_1" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_2_2" name="txtYFreq_2_2" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_2_3" name="txtYFreq_2_3" min="0" max="100"
+                  step="1"></td>
+              <td><input type="number" class="txtTransYFreq" id="txtYFreq_2_4" name="txtYFreq_2_4" min="0" max="100"
+                  step="1"></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <hr />
+    </div>    
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+    integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js"
+    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js"
+    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+    crossorigin="anonymous"></script>
+  <script src="psss_presets.json"></script>
+  <script src="psss.js"></script>
+
+</body>
+
+</html>

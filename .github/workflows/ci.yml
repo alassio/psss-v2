@@ -1,0 +1,57 @@
+# CI — the consistency gate (Phase 29.6)
+#
+# `npm run verify` is `tsc --noEmit` plus every static checker in psss-engine/checks/. All of them are
+# pure Node: no browser, no .NET, no GPU. That is why this workflow is cheap and is the one that runs
+# on every push.
+#
+# ⚠️ NODE 22 IS PINNED AND IT IS NOT A PREFERENCE. reelcheck imports reel-model.ts directly under
+# Node's type stripping. Node 20 has none, so check:reel dies with ERR_UNKNOWN_FILE_EXTENSION — green
+# locally, red here, for a reason the log misattributes to the checker.
+#
+# ⚠️ verify:browser IS DELIBERATELY ABSENT. See browser-tests.yml.
+
+name: verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: psss-engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: psss-engine/package-lock.json
+
+      # ⚠️ The Playwright browser download is skipped here on purpose: nothing in `verify` needs a
+      # browser, and downloading one would triple the run for no assertion.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Delete any stray temporary checkers
+        run: rm -f checks/_tmp_*
+
+      - name: verify  (tsc --noEmit + every checker in checks/)
+        run: npm run verify
+
+      - name: check:specs  (tsc over the Playwright specs)
+        # ⚠️ Invisible to `verify` because tsconfig.json is "include": ["src"]. It is a separate gate.
+        run: npm run check:specs
+
+      - name: build  (proves the deployment still builds)
+        run: npm run build

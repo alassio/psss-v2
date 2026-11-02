@@ -1,0 +1,59 @@
+PSSS — Particle Systems Screen Saver
+====================================
+
+This repository contains a modified and substantially extended version of PSSS.
+
+
+The original work
+-----------------
+
+PSSS — Particle Systems Screen Saver — was created by Andreas Kardin, who
+publishes as *mephzara*: the idea, the name, the mathematics and the original
+implementation are his.
+
+    Original source   https://github.com/mephzara/psss_js
+    Original demo     http://mephzara.com/misc/psss_js/
+
+`psss-original/` holds that JavaScript implementation as it stood when the
+TypeScript rewrite began, together with its own copy of the licence. It is kept
+read-only and is never edited by the work in `psss-engine/`.
+
+It is a SNAPSHOT rather than a copy of the upstream tip, and the difference is
+stated here rather than left for a reader to discover. `LICENSE` and
+`psss_presets.json` are byte-identical to the original; `psss.js` (1591 -> 5078
+lines) and `index.html` (622 -> 1070 lines) carry substantial further work done
+on the JavaScript version in this project before the rewrite began.
+
+The sharing has not been one-directional, so a difference between this snapshot
+and the upstream repository is not evidence of a single direction of copying:
+this extended JavaScript demo was shared with the original author, and the
+upstream repository may since have taken parts of it up. The upstream repository
+linked above is the author's own current state and is the place to look for it.
+
+
+Modifications
+-------------
+
+This version adds a second, independent implementation of PSSS in
+`psss-engine/` — TypeScript and WebGL2 in place of JavaScript and a 2D canvas —
+together with a preset library, a control surface, a Windows screensaver host
+and the two reference documents in the repository root.
+
+    Modifications copyright (C) 2025-2026 Rico Cozzio
+
+The preset format of the original is preserved, so an original preset still
+loads. `psss-original/` is frozen: nothing in `psss-engine/` writes to it, and
+no further change is made to it.
+
+
+Licence
+-------
+
+PSSS is free software licensed under the GNU General Public License version 3.
+This modified version is distributed under the same licence, as that licence
+requires; see `LICENSE` in this directory for the full text.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.

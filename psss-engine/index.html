@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PSSS Engine</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+      /*
+       * ══════════════════════════════════════════════════════════════════════════════════════════
+       * THE SCREENSAVER'S BOOT CURTAIN (v8 Phase 20 — a DEFECT FIX, reported by the owner on the
+       * first real `psss.scr /s` run, 2026-09-16: *"first the screen is black, then for half a
+       * second the screen is split into two panes (right panel a bit more bright) but both panes do
+       * not contain anything"*).
+       * ══════════════════════════════════════════════════════════════════════════════════════════
+       *
+       * `setPanelMode('fullscreen')` is called by `startPresentation()`, which runs at the END of
+       * boot — so between the first paint and the autostart the ordinary editor layout is on screen:
+       * `.app-layout` at `1fr 1fr` with `.right-panel` at `#0a0a0a` behind a `#222` border. Empty,
+       * because nothing has populated it yet, and about half a second long, because that is what the
+       * engine's boot costs. On a screensaver that is the whole window.
+       *
+       * ⚠️ **IT MUST LIVE IN THIS FILE AND NOT IN `src/ui/layout.css`, WHICH IS WHERE EVERY OTHER
+       * LAYOUT RULE LIVES.** `layout.css` is injected by the module graph, i.e. by the same script
+       * whose boot is the thing being covered — it is applied early enough to have STYLED the flash
+       * the owner saw, so a rule added there would arrive in time for this defect but would still
+       * leave the un-styled instant before it uncovered. A rule in the head applies to the first
+       * paint by construction. `layout.css` carries a pointer comment back to here.
+       *
+       * ⚠️ **THE CURTAIN IS LIFTED BY `main.ts`, NOT BY A SECOND READING OF THE QUERY STRING**, and
+       * that is the whole reason it is a class rather than `?screensaver=1` styled directly. The
+       * decision *"does this load present or show the editor"* has ONE owner — the autostart block's
+       * `autostart` const, where `?reel=0` beats the mode — and `?screensaver=1&reel=0` deliberately
+       * loads screensaver mode WITHOUT playback, so it must end up showing the editor. Re-deriving
+       * that precedence here would put the same rule in two places with no compiler between them,
+       * and the failure would be a permanently black debug page. Search `psss-screensaver-boot`:
+       * there are exactly two sites, this one and the one that removes it.
+       *
+       * ⚠️ **Specificity is load-bearing and was checked rather than assumed.** These selectors are
+       * (0,2,1) — two classes plus the `html` type — so they beat `layout.css`'s `.app-layout`
+       * (0,1,0), its `max-width: 999px` copy, AND `.app-layout.fullscreen` (0,2,0), regardless of
+       * source order. Order cannot be relied on here: `layout.css` is injected into the head LATER
+       * than this block. Both declarations agree with the `.fullscreen` ones on purpose, so the lift
+       * is a no-op on the presenting path.
+       */
+      html.psss-screensaver-boot .app-layout { grid-template-columns: 1fr 0fr; grid-template-rows: 1fr; }
+      html.psss-screensaver-boot .right-panel { display: none; }
+    </style>
+    <script>
+      /*
+       * Set before the body is parsed, so there is no frame in which the editor layout exists.
+       * ⚠️ **The test is character-for-character `main.ts`'s own** (`new URLSearchParams(...).get(
+       * 'screensaver') === '1'`) — a hand-rolled regex here would be a second, subtly different
+       * parser for one parameter.
+       */
+      if (new URLSearchParams(window.location.search).get('screensaver') === '1') {
+        document.documentElement.classList.add('psss-screensaver-boot');
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app-layout" class="app-layout">
+      <div class="left-panel">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div id="right-panel" class="right-panel"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,49 @@
+# Playwright — MANUAL DISPATCH ONLY (Phase 29.D11)
+#
+# ⚠️ THIS IS NOT IN THE PUSH CI, AND THAT IS A DECISION RATHER THAN AN OMISSION. The suite has never
+# been run green in full at its pinned configuration. A suite that makes every commit red teaches the
+# reader to ignore the badge, which is the one outcome that makes CI worthless.
+#
+# ⚠️ `retries` STAYS 0. A retried flake reads exactly like a pass, and a skipped mutation reads exactly
+# like a caught one — so a suite that retries cannot tell you which it did.
+#
+# Move this into ci.yml only after a full green run at this configuration, and say when that happened.
+
+name: browser-tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: psss-engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: psss-engine/package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      # The engine needs WebGL2. A headless software rasteriser is enough for the DOM-reaching specs;
+      # anything that asserts on PIXELS should be read as a claim about the rasteriser until proven
+      # otherwise.
+      - run: npm run verify:browser
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: psss-engine/.playwright
+          retention-days: 7

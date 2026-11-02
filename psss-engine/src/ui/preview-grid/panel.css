@@ -1,0 +1,507 @@
+.preview-grid-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #111;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.pg-search-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pg-search {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #eee;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pg-search:focus {
+  border-color: #7ec8e3;
+}
+
+.pg-search::placeholder {
+  color: #666;
+}
+
+.pg-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 16px;
+  color: #888;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s;
+}
+
+.pg-search-clear:hover {
+  color: #fff;
+  background: #444;
+}
+
+/* Sort control — sits between the search box and the action buttons, since it is a view over the same list. */
+.pg-sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.pg-sort-label {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.pg-sort-select {
+  padding: 5px 6px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #222;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.pg-sort-select:hover {
+  background: #333;
+  border-color: #7ec8e3;
+  color: #fff;
+}
+
+.pg-sort-select:focus {
+  border-color: #7ec8e3;
+}
+
+.pg-mode-btn {
+  padding: 5px 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #222;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.pg-mode-btn:hover {
+  background: #333;
+  border-color: #7ec8e3;
+  color: #fff;
+}
+
+.pg-suggestions {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  right: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.pg-suggestion-item {
+  padding: 6px 10px;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid #222;
+}
+
+.pg-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.pg-suggestion-item:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.pg-grid-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
+.pg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.pg-tile {
+  display: flex;
+  flex-direction: column;
+  background: #111;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pg-tile:hover {
+  border-color: #444;
+}
+
+.pg-tile.active-tile {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 8px rgba(126, 200, 227, 0.4);
+}
+
+.pg-tile-canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  display: block;
+  background: #000;
+}
+
+.pg-tile-label {
+  padding: 4px 6px;
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #0a0a0a;
+}
+
+/* Rename mode. The search box IS the rename field, so it has to LOOK different for the duration — otherwise
+   the only signal that typing no longer filters the grid is the button caption. */
+.pg-search-renaming {
+  border-color: #7ec8e3;
+  background: #12242b;
+  color: #fff;
+}
+
+/* Flashed when Save had to offer a version-suffixed name. The suffixed name stays in the field awaiting a
+   second, deliberate Save — this is what stops that substitution being silent. */
+.pg-search-renaming-conflict {
+  animation: pg-rename-conflict 0.9s ease-out;
+}
+
+@keyframes pg-rename-conflict {
+  0% { border-color: #e3b07e; background: #2e2418; }
+  100% { border-color: #7ec8e3; background: #12242b; }
+}
+
+/* The Rename button in its Save state, so the mode is visible from the button as well as the field. */
+/* The grid header's Play button — the one emphasised control in the chrome (owner, 2026-10-10).
+   It is deliberately the only blue-filled button here: the deployment no longer plays by itself, so
+   this is the action a first-time viewer is meant to find without being told. */
+.pg-play-btn {
+  border-color: #7ec8e3;
+  background: #1f6feb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.pg-play-btn:hover {
+  background: #388bfd;
+  border-color: #a9dcf0;
+  color: #fff;
+}
+
+.pg-mode-btn-active {
+  border-color: #7ec8e3;
+  background: #1d3a44;
+  color: #fff;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+   v8 Phase 22 — the facet filter: the header button, the summary row, the drawer, the empty state.
+
+   ⚠️ The summary row and the drawer are in NORMAL FLOW between the header and the grid, so opening the
+   drawer PUSHES the tiles down (22.D5) rather than covering them. `.pg-suggestions` stays above both on
+   its own `z-index`, which is why the search dropdown still overlays an open drawer.
+   ════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.pg-filter-btn {
+  flex-shrink: 0;
+}
+
+/* Active-with-a-count, distinct from Rename's `pg-mode-btn-active` (which means "this mode is open"): the
+   button can be on with the drawer shut, and that state has to read differently from an open drawer. */
+.pg-filter-btn-on {
+  border-color: #e3b07e;
+  color: #fff;
+}
+
+.pg-filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #151515;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.pg-filter-summary-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.pg-filter-tag {
+  padding: 3px 8px;
+  border: 1px solid #4a6b78;
+  border-radius: 10px;
+  background: #1d3a44;
+  color: #cfeaf4;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pg-filter-tag:hover {
+  background: #26505f;
+  color: #fff;
+}
+
+/* An EXCLUDED chip has to be legible as such at a glance in the summary row, where the `−` prefix is the
+   only other signal and is one character wide. */
+.pg-filter-tag[data-state="exclude"] {
+  border-color: #8a4a4a;
+  background: #3a1d1d;
+  color: #f4cfcf;
+}
+
+.pg-filter-tag-search {
+  border-color: #6b6b4a;
+  background: #35351d;
+  color: #f0f0cf;
+}
+
+.pg-filter-clear,
+.pg-filter-count {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pg-filter-clear {
+  padding: 3px 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #222;
+  color: #bbb;
+  cursor: pointer;
+}
+
+.pg-filter-clear:hover {
+  background: #333;
+  color: #fff;
+  border-color: #7ec8e3;
+}
+
+.pg-filter-count {
+  color: #888;
+}
+
+.pg-filter-drawer {
+  flex-shrink: 0;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 8px 12px 10px;
+  background: #131313;
+  border-bottom: 1px solid #333;
+}
+
+.pg-fd-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.pg-fd-semantics {
+  flex: 1;
+  font-size: 11px;
+  color: #8fb8c4;
+  font-style: italic;
+}
+
+.pg-fd-search {
+  width: 160px;
+  padding: 4px 8px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #eee;
+  font-size: 12px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.pg-fd-search:focus {
+  border-color: #7ec8e3;
+}
+
+.pg-fd-group {
+  border-top: 1px solid #262626;
+  padding: 4px 0;
+}
+
+.pg-fd-group-head {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  list-style: revert;
+}
+
+.pg-fd-group-title {
+  font-size: 12px;
+  color: #ddd;
+  font-weight: 600;
+}
+
+/* What a COLLAPSED group contains (22.0) — hidden once the group is open, where the chips say it better. */
+.pg-fd-group-hint {
+  font-size: 10px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pg-fd-group[open] > .pg-fd-group-head > .pg-fd-group-hint {
+  display: none;
+}
+
+.pg-fd-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0 2px 14px;
+  flex-wrap: wrap;
+}
+
+.pg-fd-row-label {
+  font-size: 11px;
+  color: #999;
+  min-width: 96px;
+  flex-shrink: 0;
+}
+
+.pg-fd-row-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.pg-fd-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid #444;
+  border-radius: 10px;
+  background: #1c1c1c;
+  color: #bbb;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.pg-fd-chip:hover {
+  border-color: #7ec8e3;
+  color: #fff;
+}
+
+.pg-fd-chip[data-state="include"] {
+  border-color: #7ec8e3;
+  background: #1d3a44;
+  color: #fff;
+}
+
+.pg-fd-chip[data-state="exclude"] {
+  border-color: #c87e7e;
+  background: #3a1d1d;
+  color: #fff;
+}
+
+.pg-fd-chip-count {
+  font-size: 10px;
+  color: #777;
+}
+
+.pg-fd-chip[data-state="include"] .pg-fd-chip-count,
+.pg-fd-chip[data-state="exclude"] .pg-fd-chip-count {
+  color: #cfe6ee;
+}
+
+/* 22.D7: a zero-count chip is GREYED BUT CLICKABLE — never `disabled`, so its tooltip still works and the
+   zero itself stays readable as information about the library. */
+.pg-fd-chip-zero {
+  opacity: 0.45;
+}
+
+.pg-filter-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #999;
+}
+
+.pg-filter-empty-head {
+  font-size: 14px;
+  color: #ddd;
+  padding-bottom: 8px;
+}
+
+.pg-filter-empty-line {
+  font-size: 12px;
+  color: #999;
+  padding-bottom: 10px;
+  line-height: 1.5;
+}
+
+.pg-filter-empty-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}

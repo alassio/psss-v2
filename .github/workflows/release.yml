@@ -1,0 +1,111 @@
+# Release — the full artefact set, plus the cross-platform path's only exercise (Phase 29.8 / 29.8a)
+#
+# TWO jobs, and only ONE of them attaches assets.
+#
+#   windows  — the OFFICIAL release. `build:all` = build -> build:screensaver -> docs:pdf ->
+#              package:dist, producing the .scr, both PDFs and the stamped distribution zip.
+#   ubuntu   — `release:web`, which exists to keep the documented non-Windows path TRUE. Its output is
+#              a by-product and is deliberately NOT uploaded as a release asset.
+#
+# ⚠️ TWO JOBS BOTH UPLOADING AN ARCHIVE IS HOW TWO ARTEFACTS COME TO CLAIM TO BE THE RELEASE. The
+# ubuntu job must stay asset-free.
+#
+# ⚠️ THE WINDOWS JOB'S PREMISE IS UNVERIFIED UNTIL IT HAS RUN. build:screensaver runs
+# screensaver/build.bat, which prepends the VS Installer directory to PATH and calls vcvars64 before
+# `dotnet publish` — a bare `dotnet publish` fails as MSB3073 with vswhere's stderr folded in. So this
+# needs a Windows runner WITH Visual Studio, not merely the .NET SDK. `windows-latest` is BELIEVED to
+# carry VS 2022. Prove it with a run; do not reason about it.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: full release (.scr + PDFs + zip)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: psss-engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: psss-engine/package-lock.json
+
+      - run: npm ci
+
+      # docs:pdf renders through the Chromium that @playwright/test carries. It is NOT optional here.
+      - run: npx playwright install chromium
+
+      - name: Show the toolchain this job actually got
+        run: |
+          node --version
+          dotnet --list-sdks
+        shell: bash
+
+      - run: npm run build:all
+
+      - name: Collect the artefacts
+        shell: bash
+        run: |
+          set -e
+          ls -l ../psss-engine-v2-distribution_*.zip
+          ls -l ../psss-engine-v2_how_it_works.pdf ../psss-engine-v2_how_to_use_it.pdf
+          ls -l dist/screensaver/psss.scr
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            psss-engine-v2-distribution_*.zip
+            psss-engine-v2_how_it_works.pdf
+            psss-engine-v2_how_to_use_it.pdf
+            psss-engine/dist/screensaver/psss.scr
+
+  web:
+    name: release:web on ubuntu (verification only, NO assets)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: psss-engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: psss-engine/package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      # GNU tar cannot create zip archives. bsdtar can, and package-dist.mjs asserts the binary's
+      # banner says bsdtar — which is exactly the gate that catches GNU tar masquerading.
+      - name: Install bsdtar
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+        working-directory: .
+
+      - run: npm run release:web
+
+      - name: Assert the web archive exists and carries NO screensaver
+        shell: bash
+        run: |
+          set -e
+          z=$(ls ../psss-engine-v2-distribution_*_web.zip)
+          echo "built $z"
+          if bsdtar -tf "$z" | grep -q 'dist/screensaver'; then
+            echo "FAIL — a web archive must not contain dist/screensaver"; exit 1
+          fi
+          echo "ok — no dist/screensaver in the web archive"

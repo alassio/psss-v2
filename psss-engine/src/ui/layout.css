@@ -1,0 +1,86 @@
+/*
+ * ⚠️ THIS IS NOT THE ONLY FILE THAT SIZES THE TWO PANES. `index.html`'s head carries a
+ * `html.psss-screensaver-boot` override — the screensaver's boot curtain, which keeps the editor
+ * layout off screen between the first paint and the reel autostart (a defect the owner saw as a
+ * half-second two-pane flash on the first `psss.scr /s` run). It is deliberately NOT here, because
+ * this stylesheet is injected by the very module graph whose boot it has to cover; the reasoning is
+ * in that file, and `main.ts`'s autostart block removes the class. Its selectors are (0,2,1) and so
+ * outrank everything below, source order notwithstanding.
+ */
+.app-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #000;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+ * ⚠️ BOTH AXES, AND COLLAPSING ONLY THE COLUMNS WAS A HALF-BLACK PRESENTATION FOR EVERY
+ * WINDOW UNDER 1000 px. Measured 2026-09-15 at 608x448: the `max-width: 999px` block below
+ * sets `grid-template-rows: 1fr 1fr`, this rule is MORE SPECIFIC than it (0,2,0 vs 0,1,0) so
+ * it wins regardless of source order — but it only ever spoke about columns, so the two rows
+ * survived. The right panel is `display: none` here, so nothing occupies row 2: the canvas
+ * got row 1 alone, i.e. HALF THE WINDOW HEIGHT, while its drawing buffer stayed full size.
+ * The frame was therefore squashed to half height AND the bottom half of the window was
+ * black.
+ *
+ * ⚠️ IT IS SILENT IN THE ONE DIRECTION THAT MATTERS: nothing throws, the console is clean,
+ * the GL frame is correct, and above 1000 px — every development window and this machine's
+ * own 2880 px screen — the defect does not exist at all. It is reached by the deployed page
+ * in a narrow or half-screen browser window, and by a screensaver on a monitor narrower than
+ * 1000 CSS px (a 1280x1024 panel at 150 % scaling is 853). That is the engine's own
+ * "enumerate the reachable-but-unused configurations" rule: a configuration nothing here
+ * selects hid a black-frame defect until something picked it.
+ *
+ * `1fr` rather than `none`: identical above the breakpoint (a single implicit row already
+ * stretches to the `100vh` height) and explicit below it, so the rule states one row instead
+ * of depending on the cascade to have removed the second. Accepted cost: `transition` covers
+ * `grid-template-columns` only, so below the breakpoint the row collapse snaps while the
+ * columns animate.
+ */
+.app-layout.fullscreen {
+  grid-template-columns: 1fr 0fr;
+  grid-template-rows: 1fr;
+}
+
+.left-panel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.left-panel canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.right-panel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0a;
+  border-left: 1px solid #222;
+}
+
+.app-layout.fullscreen .right-panel {
+  display: none;
+}
+
+@media (max-width: 999px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .right-panel {
+    border-left: none;
+    border-top: 1px solid #222;
+  }
+}

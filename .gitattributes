@@ -1,0 +1,27 @@
+# Line-ending and diff policy for the public repository.
+#
+# This file is PUBLIC-ONLY (publish/manifest.mjs OVERLAY). It is not placed in the working tree,
+# because `eol=lf` there would normalise the two pure-CRLF engineering documents if either were ever
+# tracked — and their CRLF purity is an invariant those documents are maintained under.
+#
+# The published set measured uniformly LF, so this pins what is already true rather than converting
+# anything.
+
+* text=auto eol=lf
+
+# Binary: never normalise, never diff as text.
+*.png  binary
+*.pdf  binary
+*.scr  binary
+*.zip  binary
+*.ico  binary
+
+# Windows-native sources keep CRLF: a .bat with LF endings can fail in cmd.exe, and the screensaver
+# build depends on build.bat running.
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Generated/vendored: keep them out of language statistics and collapse them in reviews.
+psss-original/**     linguist-vendored
+manual-images/**     linguist-documentation
+psss-engine/public/psss_presets.json  linguist-generated

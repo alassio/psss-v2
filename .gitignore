@@ -1,1 +1,25 @@
 /.vscode/launch.json.bak
+
+# Build artefacts of `npm run build:all`'s last two steps, both written to the repository root and both
+# regenerable (`npm run docs:pdf`, `npm run package:dist`). The archives are ~24 MB each and are never
+# overwritten — the name carries the build time — so without this rule a few builds would leave a
+# hundred megabytes of untracked files in a tracked directory. NOT backup items either, for the same
+# reason `dist/` is not: they are regenerated, and the markdown they come from IS backed up.
+psss-engine-v2-distribution_*.zip
+psss-engine-v2_how_it_works.pdf
+psss-engine-v2_how_to_use_it.pdf
+psss_research_v2.pdf
+
+# The .NET screensaver host's build output, and the web bundle the build copies in beside its sources.
+# `bin/` + `obj/` are ~133 MB and `bin/` also holds a duplicate of the `.scr` that `dist/screensaver/`
+# already carries; `Payload/` is regenerated from `dist/` by `build:screensaver`, so committing it
+# would ship the engine twice. All of it comes back from `npm run build:all`.
+psss-engine/screensaver/bin/
+psss-engine/screensaver/obj/
+psss-engine/screensaver/Payload/
+
+# The screensaver probe's captured screenshots — run artefacts beside PowerShell scripts that ARE
+# source, which is why this is a file pattern and not the directory.
+psss-engine/screensaver/probe/shot-*.png
+psss-engine/screensaver/probe/_t.png
+

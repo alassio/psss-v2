@@ -1,0 +1,1720 @@
+.synthesis-lab {
+  width: 100%;
+  height: 100%;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sl-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: #16213e;
+  border-bottom: 1px solid #2a2a4a;
+  gap: 8px;
+}
+
+.sl-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.sl-btn {
+  padding: 4px 10px;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  background: #2a2a4a;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.sl-btn:hover {
+  background: #3a3a6a;
+  color: #fff;
+}
+
+.sl-tab-bar {
+  display: flex;
+  background: #16213e;
+  border-bottom: 1px solid #2a2a4a;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.sl-tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s, border-bottom 0.15s;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.sl-tab-btn:hover {
+  color: #bbb;
+}
+
+.sl-tab-btn.active {
+  color: #7ec8e3;
+  border-bottom-color: #7ec8e3;
+}
+
+.sl-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content:not([style*="display: none"]) {
+  display: block;
+}
+
+/* Tab description */
+.sl-tab-desc {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.5;
+  margin: 0 0 14px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #222;
+}
+
+/* Shared control styles */
+.sl-section {
+  margin-bottom: 16px;
+}
+
+.sl-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.sl-slider-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+.sl-slider-label {
+  width: 80px;
+  font-size: 12px;
+  color: #aaa;
+  flex-shrink: 0;
+}
+
+.sl-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: #333;
+  outline: none;
+}
+
+.sl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7ec8e3;
+  cursor: pointer;
+}
+
+.sl-slider-value {
+  width: 36px;
+  text-align: right;
+  font-size: 11px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-dropdown {
+  width: 100%;
+  padding: 6px 8px;
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 12px;
+}
+
+.sl-lock-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sl-lock-chip {
+  padding: 3px 8px;
+  border: 1px solid #3a3a5a;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.sl-lock-chip.locked {
+  background: #7ec8e3;
+  color: #111;
+  border-color: #7ec8e3;
+}
+
+/* Mixer — the per-category rows (v8 23.5).
+   Each row is a `.sl-slider-row` holding a `.sl-lock-chip` (which is also the row's LABEL, so the category is
+   named once), a follow box, the category's `.sl-slider` and a `.sl-slider-value` readout. The chip therefore
+   needs a fixed width that `.sl-lock-row`'s wrapping chips never did — without it the six sliders start at six
+   different x positions and the column cannot be read as a set of positions, which is the whole point of it.
+   `.sl-lock-row` is still used by the Randomiser and the Reel. */
+.sl-mix-cat-chip {
+  width: 68px;
+  flex-shrink: 0;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.sl-mix-follow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #888;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sl-mix-follow input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* A following or locked fader is disabled, and the row says WHICH in its readout ("held" for a lock). The
+   dimming is the second half of that: a slider that tracks the master while unusable has to look unusable. */
+.sl-slider:disabled {
+  opacity: 0.45;
+}
+
+.sl-slider:disabled::-webkit-slider-thumb {
+  cursor: default;
+}
+
+.sl-mix-note {
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #777;
+}
+
+.sl-btn-primary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #7ec8e3;
+  color: #111;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.sl-btn-primary:hover {
+  background: #5fb8d8;
+}
+
+.sl-btn-group {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* Evolution grid */
+.sl-evo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sl-evo-tile {
+  position: relative;
+  aspect-ratio: 4/3;
+  border: 2px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sl-evo-tile.selected {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 6px rgba(126, 200, 227, 0.4);
+}
+
+.sl-evo-tile canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* v8 Phase 25 (25.5).
+   `.dimmed` is what makes the fourth parent click's refusal VISIBLE — the click used to be dropped with no
+   feedback of any kind, which is invariant 13's harder half: the control did the right thing and the output
+   channel could not show it. The dimming marks the tiles that are no longer clickable, so the cause is on
+   screen rather than inferred.
+   The badge carries BOTH marks in one element (★ parent, ◆ carried over) because a tile can be both and two
+   badges would fight for the same corner. `pointer-events: none` so it can never eat a tile click. */
+.sl-evo-tile.dimmed {
+  opacity: 0.45;
+}
+
+.sl-evo-badge {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: #7ec8e3;
+  text-shadow: 0 0 3px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+
+/* v8 Phase 25, amended 2026-10-06 (owner): the Subtle/Medium/Wild toggles share ONE row with the four
+   action buttons, so the grid gets back the section title and the button row they used to occupy.
+
+   `flex-wrap` is the whole reason this is a tab-local class rather than an edit to `.sl-btn-group`: the
+   right panel is `1fr` of a two-column layout, so at a 1000 px window it is ~500 px — about what one label
+   and seven buttons need. Wrapping degrades to two rows there; overflowing would clip `Wild`. Every other
+   tab uses `.sl-btn-group` and none of them asked to wrap.
+
+   `margin-left: auto` on the label is what separates the two affordances: actions left, the strength
+   toggles pushed to the far end under a label the action buttons do not have. Without it a user reads seven
+   identical buttons and cannot tell which three are modes. */
+.sl-evo-controls {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* v8 Phase 26 (26.6 / 26.D4) — a row that cannot move anything on THIS preset.
+
+   NOT hidden and not tooltip-only: this is invariant 29's rule applied to a readout — a lit slot can have
+   a silent axis, so say so in the UI and do not grant the axis a size. Hiding the row would make the
+   panel's shape change per preset, which is worse, because then the user cannot tell a control that is
+   missing from one they have not found yet.
+
+   At least TWO rows are inert on every preset in the library (measured: 2 dead on 7 presets, 3 on 37,
+   4 on 71, 5 on 83, 6 on 57, 7 on 18, 8 on 1 — and not one preset has all fourteen live), so this is the
+   normal state of the panel rather than an edge case. It is styled to read as "not applicable here"
+   rather than as "broken": the label stays legible, only the track and the value dim. */
+.sl-slider-cell.inert .sl-slider,
+.sl-slider-cell.inert .sl-slider-value {
+  opacity: 0.35;
+}
+
+.sl-slider-cell.inert .sl-slider-label {
+  opacity: 0.6;
+}
+
+/* The reason, in the row. Indented under the label so it reads as a note about that row and not as a
+   section-level caption. `min-height` is deliberately absent: an inert row is common enough that reserving
+   space on every row would cost fourteen blank lines on a preset where everything is live. */
+.sl-slider-reason {
+  margin: -2px 0 6px 2px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #8a8aa8;
+  font-style: italic;
+}
+
+.sl-evo-strength-label {
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: help;
+  white-space: nowrap;
+}
+
+/* The status row: parent counter on the left, the seed-changed notice on the right. The notice occupies
+   RESERVED space and is toggled by `display` — never by swapping text, which `tipcheck` cannot see. */
+.sl-evo-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0 8px;
+  min-height: 16px;
+}
+
+/* History grid */
+.sl-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.sl-history-tile {
+  position: relative;
+  aspect-ratio: 4/3;
+  border: 2px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.sl-history-tile:hover {
+  border-color: #555;
+}
+
+.sl-history-tile.active {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 6px rgba(126, 200, 227, 0.4);
+}
+
+.sl-history-tile canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sl-history-tile-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  background: rgba(0,0,0,0.6);
+  font-size: 10px;
+  color: #aaa;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-history-empty {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  padding: 20px 0;
+  line-height: 1.6;
+}
+
+/* Visual FX tab */
+.sl-vfx-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1e1e36;
+}
+
+.sl-vfx-label {
+  width: 56px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #888;
+}
+
+.sl-vfx-select {
+  flex: 1;
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  color: #ccc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sl-vfx-slider-wrap {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 8px;
+}
+
+.sl-vfx-slider {
+  flex: 1;
+  accent-color: #7ec8e3;
+  cursor: pointer;
+}
+
+.sl-vfx-value {
+  font-size: 11px;
+  color: #7ec8e3;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Wider floor for readouts that reach 6 characters ("50,000"). The label is not clipped without this --
+   min-width is only a floor -- but the slider is `flex: 1`, so a growing label steals width from the track
+   and the thumb visibly shifts under the cursor mid-drag. A fixed floor keeps the track a constant length
+   across the whole range. */
+.sl-vfx-value--wide {
+  min-width: 46px;
+}
+
+.sl-vfx-check {
+  width: 16px;
+  height: 16px;
+  accent-color: #7ec8e3;
+  cursor: pointer;
+}
+
+/* Three captioned sliders on one row (Rotation X/Y/Z). `min-width: 0` on the cell is load-bearing: a flex
+   item's default `min-width: auto` is its CONTENT width, so the value readout ("+10.00 ccw") would refuse to
+   shrink and the three cells would overflow the panel instead of sharing it evenly. */
+.sl-vfx-triplet {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sl-vfx-triplet-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+/* ⚠️ Load-bearing, and the reason the first shipped version looked padded: `.sl-vfx-slider` carries `flex: 1`,
+   which grows along the container's MAIN axis — and this cell is `flex-direction: column`, so that main axis is
+   VERTICAL. The input's width therefore stayed at the UA default (~129px in Chrome, ~192px in Firefox) while
+   the cell grew with the panel, and `align-items: center` rendered the difference as symmetric slack either
+   side of each track. Measured at a 1920px viewport: cell 283px, track 129px, i.e. 154px wasted per cell and
+   462px across the row. `width: 100%` rather than `align-items: stretch` because a range input's cross size is
+   not reliably `auto` across engines, and stretch only applies when it is. */
+.sl-vfx-triplet-cell .sl-vfx-slider {
+  width: 100%;
+  min-width: 0;
+}
+
+.sl-vfx-triplet-caption {
+  font-size: 10px;
+  color: #666;
+}
+
+/* Centred rather than right-aligned like `.sl-vfx-value`: this label sits UNDER its slider rather than beside
+   it, so it reads as that slider's caption. No `min-width` floor for the same reason -- nothing to the side
+   of it can be squeezed by its width. */
+.sl-vfx-triplet-value {
+  font-size: 10px;
+  color: #7ec8e3;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Customize film look sub-panel */
+.sl-vfx-customize-panel {
+  margin-top: 8px;
+  border: 1px solid #2a2a5a;
+  border-radius: 6px;
+  padding: 8px;
+  background: #141428;
+}
+
+.sl-vfx-sub-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #7ec8e3;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 10px 0 4px;
+}
+
+.sl-vfx-sub-title:first-child {
+  margin-top: 2px;
+}
+
+
+/* ---- Composer (v8 Phase 16) --------------------------------------------------------------------------
+   Reuses `.sl-section`, `.sl-section-title`, `.sl-slider-row`, `.sl-slider-label`, `.sl-btn` and
+   `.sl-btn-group` rather than restyling them, so the tab reads as part of the Lab. Only the genuinely new
+   shapes are below.
+
+   ⚠️ **`.sl-lock-chip` AND `.sl-dropdown` ARE NO LONGER USED BY THIS TAB, and this list said "(the plane
+   toggle)" against the first of them until 16.9 removed it.** The chips were the plane selector (deleted by
+   16.9/E100 — the owner reported them as the tab's worst confusion) and `.sl-dropdown` was the Tuner's
+   `<select>` (merged into the ratio listbox by 16.11/E102). Both classes are still live for OTHER tabs;
+   **a reuse list is a claim about THIS file and it went stale silently — re-grep the class before trusting it.**
+
+   ⚠️ The precondition banner is styled as a WARNING, and its `display` is toggled from `sync()` — the rule
+   is that an inert-pipeline notice must be impossible to mistake for ordinary help text. */
+.sl-composer-precondition {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border-left: 3px solid #d9a13b;
+  border-radius: 3px;
+  background: rgba(217, 161, 59, 0.10);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #e0c48a;
+}
+
+/* ---- 16.17 (E108) — the switched-off-level notice ----------------------------------------------------
+
+   ⚠️ **IT SHARES THE PRECONDITION'S SHAPE AND DELIBERATELY NOT ITS COLOUR, AND THE DISTINCTION IS THE ONE
+   THING THIS RULE EXISTS TO SAY.** The amber rule above is an INERT-PIPELINE ALARM: it means nothing the user
+   does in this tab can reach the screen. This one is a CONSEQUENCE NOTICE — the tab is working exactly as
+   asked, and the sentence names a cost of a state the user deliberately entered (a level switched off is
+   written out cleared, so Export and Snapshot save it that way). **Two notices in one column with one colour
+   would make the alarm ordinary**, which is `CLAUDE.md`'s own argument for gating this one on the mute at all.
+
+   ⚠️ Cyan, because it is the Lab's INFORMATIONAL accent (`.sl-section-title`, the Score legend) — reusing the
+   accent rather than inventing a third colour. Everything else is copied from the precondition so the two
+   stack as one column: same margins, padding, 3 px left border, font size and line height. **Do not merge them
+   into one class with a modifier** — a shared class would let a future edit change the alarm's colour by
+   editing the notice, and the whole point is that the reader can tell them apart without reading. */
+.sl-composer-mute-notice {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border-left: 3px solid #7ec8e3;
+  border-radius: 3px;
+  background: rgba(126, 200, 227, 0.08);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #a8d8ea;
+}
+
+/* ---- 16.18 (E109) — the preview-bypass notice and its two checkboxes --------------------------------
+
+   ⚠️ **A THIRD NOTICE, AND THE COLOUR IS THE DECISION: it is a CONSEQUENCE, not an inert pipeline, so it takes
+   the cyan shape and not the amber one.** The tab is fully live while a bypass is on — every control works and
+   every diagram is correct; what needs saying is that the PREVIEW disagrees with two other tabs and that an edit
+   made there is lost on restore. That is the mute notice's category exactly. **Its own class rather than a shared
+   one, per the rule directly above** — three notices under one selector would let an edit aimed at one of them
+   silently restyle the alarm.
+
+   ⚠️ **NO `margin-bottom`, unlike the two above, because this one is LAST INSIDE ITS SECTION rather than one of a
+   stack of top-of-tab notices** — the section's own padding owns the gap, and a 10 px margin here reads as a
+   detached paragraph below the box it belongs to.
+
+   ⚠️ **`.sl-composer-bypass-check` IS A HOOK WITH ONE JOB: KEEPING THESE TWO BOXES DISTINGUISHABLE FROM 16.17's
+   THREE LEVEL BOXES, which sit a few rows below and have the OPPOSITE persistence semantics** (a level mute is
+   written into the preset and exports the level cleared; a bypass is never saved at all). The plan calls two
+   checkbox families with opposite semantics on one tab a real usability hazard. The margin is the whole rule —
+   deliberately NOT a colour change, which would read as a state rather than as a category. */
+.sl-composer-bypass-notice {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-left: 3px solid #7ec8e3;
+  border-radius: 3px;
+  background: rgba(126, 200, 227, 0.08);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #a8d8ea;
+}
+
+.sl-composer-bypass-check {
+  margin-left: 2px;
+}
+
+/* ---- 2026-09-10 — the two bypass boxes on ONE row -----------------------------------------------------
+
+   ⚠️ **THE OWNER ASKED FOR ONE ROW** (*"put the two checkboxes on the same row to save space"*), and the reason
+   this needs three rules rather than none is that `.sl-vfx-row`'s layout assumes ONE control: `.sl-vfx-label` is
+   a fixed 56 px column, which cannot hold two captions and could not fit either of these in any case. So the row
+   ships with NO `.sl-vfx-label` at all and the caption moves inside each cell — which is why the row gets its own
+   class, or a future `.sl-vfx-row > .sl-vfx-label` rule would apply to a label that is not there.
+
+   ⚠️ **`gap` IS THE ONLY THING SEPARATING THE TWO PAIRS, and it must stay comfortably larger than the 6 px
+   inside a pair** — with equal gaps the four elements read as one list of four rather than two labelled boxes,
+   which is the failure mode a checkbox pair has: the reader binds the caption to the WRONG box and the control
+   reads as inverted. That is the same misreading the `Apply …` polarity flip exists to remove, so an even gap
+   here would give it straight back.
+
+   ⚠️ **THE CELL IS A `<label>`, so a click on the caption toggles its own box** — which is also why the caption
+   must not be `pointer-events: none` (the trap already fixed on `.sl-composer-pane-flat`). */
+.sl-composer-bypass-row {
+  /* No 56 px label column on this row, so the pair starts at the row's own left edge. */
+  gap: 0;
+}
+
+.sl-composer-bypass-pair {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  /* Between the two PAIRS. Larger than the 6 px inside a pair, on purpose — see above. */
+  gap: 22px;
+  min-width: 0;
+}
+
+.sl-composer-bypass-cell {
+  display: flex;
+  align-items: center;
+  /* Between a box and ITS OWN caption. */
+  gap: 6px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.sl-composer-bypass-cap {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* ---- 16.9 / 16.10 (E100 / E101) — the three-plane triple ---------------------------------------------
+
+   ⚠️ **THIS REPLACES `.sl-composer-score-wrap` / `.sl-composer-score`, WHICH WERE THE SINGLE 200 px CANVAS
+   BEHIND THE PLANE CHIPS.** Their one load-bearing rule survives here and must not be dropped again: **a fixed
+   pixel HEIGHT is required, because a canvas has no intrinsic size and a `clientHeight` of 0 makes `drawScore`
+   fall back to its own 220 default while the element itself renders blank.** That failure looks like a dead
+   diagram, not like a CSS bug. */
+.sl-composer-triple {
+  display: grid;
+  /* ⚠️ `PLANES.length` columns — `buildTriple` iterates `PLANES`, so a fourth plane would silently wrap into a
+     second row here. The count is stated in ONE place in TS and mirrored here on purpose. */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.sl-composer-pane {
+  position: relative;
+  /* ⚠️ **LOAD-BEARING, the `.sl-vfx-triplet` trap in a grid: a grid item's default `min-width: auto` is its
+     CONTENT width**, so the caption would refuse to shrink and the three panes would overflow the panel instead
+     of sharing it. */
+  min-width: 0;
+  height: 150px;
+  border: 1px solid #2a2a5a;
+  border-radius: 5px;
+  background: #0c0c18;
+}
+
+/* The per-slot row is shorter than the combined one: three of them are on screen at once, under three sets of
+   numeric rows, and the combined triple at the top is the one that has to carry detail. */
+.sl-composer-triple-slot .sl-composer-pane {
+  height: 96px;
+}
+
+.sl-composer-pane-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * ⚠️ **THE CAPTION IS NOT DECORATION — IT IS WHAT MAKES THE SHARED EXTENT READABLE.** The three panes of a row
+ * are drawn at ONE extent (`computeOverlayScores` owns it), so a figure that reaches far in X and barely in Z
+ * renders as a nearly flat line in XZ — which is the truth, and unreadable without a label saying which
+ * projection it is. ⚠️ **And a plane label is what the retired chips got WRONG: it must read as a caption on a
+ * picture, never as a control.** No pointer cursor, no border, no hover state.
+ */
+.sl-composer-pane-cap {
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  font-size: 9px;
+  line-height: 1;
+  color: #7e9ec8;
+  background: rgba(8, 8, 20, 0.72);
+  padding: 1px 3px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/*
+ * v8 16.20 (E111) — the empty-pane caption.
+ *
+ * ⚠️ **IT IS CENTRED RATHER THAN CORNERED PRECISELY BECAUSE IT IS NOT A LABEL: it occupies the space where the
+ * curve would have been, which is the question it answers.** The plane caption above stays in its corner and
+ * stays visible underneath it — the reader still needs to know WHICH projection is empty, so the two are
+ * additive and must not be merged into one element.
+ *
+ * ⚠️ **NOT STYLED AS A WARNING, AND THAT IS THE SAME DECISION `open` GOT (16.13): this is a DESCRIPTION.** A
+ * planar figure with an empty XZ pane is the library's dominant case, so amber or red here would tell hundreds of
+ * presets they are broken. It sits at the plane caption's own hue, one step brighter.
+ *
+ * ⚠️ **IT IS THE ONE CAPTION IN THIS TAB THAT MUST *NOT* SET `pointer-events: none`, AND THAT IS A CORRECTION OF
+ * MY OWN FIRST VERSION RATHER THAN A STYLE CHOICE.** I wrote `pointer-events: none` by analogy with the plane
+ * caption above, then noticed it makes the element's `title` unreachable — the hover never lands on it — so the
+ * only place the *cause* of a flat pane is explained would have been undiscoverable. That is `tipcheck`'s premise
+ * inverted: a tooltip nobody can reach is worse than no tooltip, because the copy scan counts it as present.
+ * ⚠️ **`cursor: default` and `user-select: none` are what actually carry the "not a control" intent** — the retired
+ * plane chips read as controls because they were styled as buttons and could be clicked, not because they could be
+ * hovered. Every other captioned readout in this tab (`.sl-composer-extent`) is hoverable for the same reason.
+ */
+.sl-composer-pane-flat {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 92%;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #9ab4d6;
+  background: rgba(8, 8, 20, 0.78);
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: default;
+  user-select: none;
+}
+
+/*
+ * ⚠️ **THE LEGEND IS THE ONLY OWNER OF WHAT THE THREE COLOURS MEAN, AND IT IS ON SCREEN RATHER THAN IN A
+ * TOOLTIP FOR EXACTLY THAT REASON** — a tooltip is discovered only by someone who already suspects the control,
+ * and nobody suspects a colour. Its three swatches must stay in step with `OVERLAY_STYLES`; the tab builds them
+ * from a literal pair list so the contract is one edit wide.
+ */
+.sl-composer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #888;
+}
+
+.sl-composer-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sl-composer-key::before {
+  content: '';
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/* The three literals below are the SAME rgb triples as `OVERLAY_STYLES` in `score-canvas.ts`, at full alpha
+   because a 2 px swatch at 0.75 reads as grey. ⚠️ A swatch whose hue disagrees with its curve is worse than no
+   legend at all — change both or neither. */
+.sl-composer-key-now { color: #ebf2ff; }
+.sl-composer-key-size { color: #60d6e0; }
+.sl-composer-key-winding { color: #e0a848; }
+
+.sl-composer-score-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sl-composer-extent {
+  margin-left: auto;
+  font-size: 10px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.sl-composer-slot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* ⚠️ `.sl-composer-tier` is DELETED (v8 16.15 / E106) with the tier button. Its one reusable property was worth
+   naming for whatever landed on the slot head next, and 16.17 is what landed: a control on the slot's own title
+   row reads as belonging to that WAVE rather than to the tab, and `margin-left: auto` keeps it right-aligned
+   however long the title's own readout grows.
+
+   ---- 16.17 (E108) — the level's enable checkbox and its `Clear` -------------------------------------
+
+   ⚠️ **THE CHECKBOX REUSES `.sl-vfx-check` FOR ITS APPEARANCE AND THIS RULE ONLY OVERRIDES ALIGNMENT** — the head
+   is `align-items: baseline`, which a replaced element like an `input[type=checkbox]` has no useful baseline for,
+   so it would sit low against the title's text. **Do not turn this into a second full checkbox rule**: one
+   appearance with two owners is how the Lab's checkboxes would drift apart. */
+.sl-composer-level-check {
+  align-self: center;
+}
+
+/* ⚠️ **`margin-left: auto` IS WHAT THE DELETED `.sl-composer-tier` RULE EXISTED TO SAY, and it is load-bearing
+   twice over.** It right-aligns the destructive control away from the title the eye lands on, and it absorbs the
+   slot title's own growth — the head's readout is rebuilt on every `sync()`, so a fixed gap would move this
+   button horizontally as the user typed. */
+.sl-composer-level-clear {
+  margin-left: auto;
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #888;
+  background: #1c1c34;
+  border-color: #2a2a5a;
+}
+
+/* ⚠️ Same hover-only red as `.sl-composer-clear`, and for the same reason — three permanently red buttons would
+   read as three error states. This one destroys twenty-one numbers rather than three, which is answered by the
+   WORD `Clear` instead of a `✕` glyph, never by a louder colour. */
+.sl-composer-level-clear:hover {
+  background: #4a2a2a;
+  border-color: #7a3a3a;
+  color: #fff;
+}
+
+.sl-composer-slot-body {
+  margin-top: 6px;
+}
+
+/* ⚠️ The stepper is the Lab's first `input[type=number]`. The spinner arrows are KEPT — they are the whole
+   point of a stepper for an integer winding, where ±1 is the meaningful move. */
+.sl-composer-num {
+  flex: 1;
+  min-width: 0;
+  background: #14142a;
+  border: 1px solid #2a2a5a;
+  border-radius: 3px;
+  color: #ddd;
+  font-size: 11px;
+  padding: 2px 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-composer-num:focus {
+  outline: none;
+  border-color: #7ec8e3;
+}
+
+/* ---- 16.16 (E107) — the per-row `Clear` ------------------------------------------------------------
+
+   ⚠️ **`flex: 0 0 auto` IS LOAD-BEARING AND NOT A TIDY-UP: `.sl-composer-num` is `flex: 1`, so without it the
+   button would be a fourth flexible item and the three numeric columns would each lose a quarter of their width
+   on the seven rows that have a button — while the dial row and the two breathe rows, which have none, kept the
+   full width. The columns would then not line up down the slot.** The fixed width is what keeps every row's three
+   fields in the same three columns. */
+.sl-composer-clear {
+  flex: 0 0 auto;
+  width: 20px;
+  padding: 2px 0;
+  font-size: 10px;
+  line-height: 1;
+  color: #888;
+  background: #1c1c34;
+  border-color: #2a2a5a;
+}
+
+/* ⚠️ Hover is where the destructive one gets its colour — a permanently red glyph on twenty-one buttons reads as
+   twenty-one error states rather than as one available action. */
+.sl-composer-clear:hover {
+  background: #4a2a2a;
+  border-color: #7a3a3a;
+  color: #fff;
+}
+
+.sl-composer-readout {
+  font-size: 10px;
+  color: #7e9ec8;
+  margin: 4px 0 6px;
+  min-height: 12px;
+  line-height: 1.4;
+}
+
+.sl-composer-silent {
+  font-size: 11px;
+  color: #777;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+/* ---- 16.11 (E102) — the ONE ratio control: a custom listbox with drawn thumbnails --------------------
+
+   ⚠️ **THIS REPLACES BOTH `.sl-composer-gallery*` (the 4×4 tile grid) AND the Tuner's `.sl-dropdown` — two
+   controls that wrote the same three windings through the same `applyRatio`.** Those rules are deleted rather
+   than left unused, because a dead rule in a 700-line stylesheet is indistinguishable from a live one.
+
+   ⚠️ **IT IS HAND-BUILT BECAUSE A NATIVE `<select>` RENDERS AN `<option>`'s TEXT ONLY in every engine** — no
+   child elements, no per-option image in Chrome's or Firefox's native popup. So the keyboard behaviour a
+   `<select>` gave for free is now this stylesheet's and `onRatioKey`'s problem: **`:focus-visible` must stay
+   visible on the button, and `.active` must be distinguishable from `.selected`** — they are two different
+   things (where the keyboard is, versus what the figure currently is) and a user driving this from the keyboard
+   cannot see either otherwise. */
+
+.sl-composer-ratio-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.sl-composer-combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.sl-composer-combo-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sl-composer-combo-btn:hover {
+  border-color: #7ec8e3;
+}
+
+.sl-composer-combo-btn:focus-visible {
+  outline: 1px solid #7ec8e3;
+  outline-offset: 1px;
+}
+
+.sl-composer-combo-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-composer-combo-caret {
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: #7e9ec8;
+}
+
+/*
+ * ⚠️ **ABSOLUTE AND `z-index`-ED: the list must OVERLAY the rows below it rather than push them down.** A list
+ * that reflows the panel moves the numeric rows out from under the cursor every time it opens, and the row it
+ * writes to is one of the ones that moves.
+ *
+ * ⚠️ **`max-height` + `overflow-y` because the set is TWENTY rows** (`RATIO_ROWS.length`, counted in code from
+ * `RATIO_TILES` ∪ `RATIOS` — never hardcoded), each ~26 px tall. Without the cap the list runs off the panel and
+ * the last rows are unreachable; `scrollIntoView({block:'nearest'})` in `toggleRatioList`/`onRatioKey` is what
+ * makes keyboard travel work inside it, and it needs a scroll container to act on.
+ *
+ * ⚠️ **v8 16.14: `max-height` AND `.sl-composer-thumb`'s size ARE ONE CHANGE AND NEITHER MAY MOVE WITHOUT THE
+ * OTHER.** The rows are `max(thumb, caption) + padding` tall, so growing the thumbnail 22 → 34 px grows every
+ * row; at the old 220 px cap the list would show FIVE of twenty rows and the widened icons would be paid for
+ * with the scrolling. 320 px restores ~8 rows visible — the same fraction the 220/26 px pair gave.
+ */
+.sl-composer-combo-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+  background: #14142a;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+.sl-composer-combo-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sl-composer-combo-opt:hover {
+  background: #1e1e3a;
+}
+
+/* Where the KEYBOARD is. Deliberately a background and not a border, so it can be seen at the same time as
+   `.selected`'s border on a different row. */
+.sl-composer-combo-opt.active {
+  background: #24244a;
+}
+
+/* What the figure IS — `paintRatioBoxes` sets it through the same `ratioBase` the write uses, so it means
+   exactly "picking this changes nothing". */
+.sl-composer-combo-opt.selected {
+  border-color: #7ec8e3;
+}
+
+.sl-composer-thumbs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+/*
+ * ⚠️ **THREE THUMBNAILS PER ROW, AND THE THIRD IS NOT REDUNDANCY: `composercheck` §K measures 11 / 11 / 10
+ * distinct drawn curves of 16 in XY / XZ / YZ against 16 of 16 in 3D**, so in any single plane several rows draw
+ * the SAME picture (invariant 29 — a one-plane view of a three-axis subject). A single-thumbnail list would show
+ * duplicate icons against different captions.
+ *
+ * ⚠️ SQUARE, like the tiles it replaces: the Score auto-fits its box to the figure's largest extent, so a
+ * non-square thumbnail squashes a `1:1` circle into an ellipse — misrepresenting the one ratio a user is most
+ * likely to recognise. Fixed px rather than `aspect-ratio` because these are ~34 px and a percentage-driven
+ * canvas at that size rounds to a different integer per row.
+ *
+ * ⚠️ **v8 16.14 — 22 → 34 px, AND THE SIZE WAS THE SMALLER HALF OF WHY THEY WERE UNREADABLE.** `drawScore`'s
+ * `pad` was an absolute `10 * dpr`, written when a ~300 px canvas called it, so at 22 px the FIGURE got a 2 px
+ * box (9.1 %) and the crosshair got the square. Both were fixed in one step because either alone reads as barely
+ * changed. ⚠️ **`box-sizing` is NOT set anywhere in this file, so the 1 px border is OUTSIDE these 34 px** — the
+ * row measures 36, which is what the `max-height` note above is counted against. Three thumbs + 2 px gaps + the
+ * caption still fit the panel width; a fourth would not.
+ */
+.sl-composer-thumb {
+  display: block;
+  width: 34px;
+  height: 34px;
+  background: #0d0d1c;
+  border: 1px solid #23233f;
+  border-radius: 2px;
+}
+
+/* ⚠️ The caption stays for the same reason the thumbnails are tripled — several rows are visually identical in
+   any one plane, and the numbers are the only thing that names them. **Do not drop it to make the thumbnails
+   bigger**, and do not let the name replace the numbers: a row a user cannot quote as three integers is a row
+   nobody can put in a bug report. */
+.sl-composer-combo-cap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #9fb6d4;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 16.7 (E98) — the phase dial -------------------------------------------------------------------- */
+
+.sl-composer-dial-row {
+  align-items: center;
+}
+
+.sl-composer-dial {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  cursor: grab;
+  border-radius: 50%;
+  /* ⚠️ Or a drag starts a text selection and the pointer capture fights the browser's own gesture. */
+  touch-action: none;
+  user-select: none;
+}
+
+.sl-composer-dial:focus-visible {
+  outline: 1px solid #7ec8e3;
+  outline-offset: 1px;
+}
+
+/*
+ * ⚠️ **`inert` IS A WINDING OF ZERO — "no phase can shift this axis" — AND NOT "the axis has no size".** A
+ * zero-size axis keeps a fully working dial, because the stored phase is real and becomes visible the moment
+ * the axis is given size; the row's own `no size — winding inert there` readout owns that case. Styling both
+ * the same way would tell the user a working control is broken.
+ */
+.sl-composer-dial.inert {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ---- 16.8 (E99) — breathe in real units -------------------------------------------------------------- */
+
+.sl-composer-breathe-row {
+  align-items: center;
+}
+
+.sl-composer-breathe {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sl-composer-breathe-num {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * ⚠️ **THE UNIT IS A LIVE READOUT, NOT DECORATION: it reads `%` or `abs` depending on whether the base is
+ * zero** (386 axes carry a pulse over a size of 0, 343 a wobble over a winding of 0). It must stay visible
+ * beside its own field, because the number means a different thing in each state and `applyBreathe` writes it
+ * accordingly.
+ */
+.sl-composer-breathe-unit {
+  font-size: 9px;
+  color: #7e9ec8;
+  flex: 0 0 auto;
+  min-width: 14px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────────────
+ * The Reel tab (v8 Phase 19)
+ *
+ * ⚠️ **The two panes are side by side because the right panel is HALF THE VIEWPORT WIDTH** (`layout.css`:
+ * `grid-template-columns: 1fr 1fr`), which is ~960 px on a 1920 screen — wide enough for two tile grids. Below
+ * 999 px `layout.css` stacks the whole app vertically and the panel becomes half the HEIGHT instead, so the
+ * media query at the bottom of this block stacks the panes too. Without it the two grids get ~180 px each and
+ * a tile is unreadable.
+ *
+ * ⚠️ **Both scroll panes need an explicit `min-height: 0`.** They are flex children of a column flex pane, and
+ * a flex item's default `min-height: auto` makes it refuse to shrink below its content — the grid then grows
+ * past the panel instead of scrolling, the `IntersectionObserver` sees every tile as intersecting at once, and
+ * `acquireSlot` evicts them in a loop. That reads as "the tiles all flicker", not as a layout bug.
+ *
+ * ⚠️ **AND the `min-height: 0` chain is worth nothing unless the TAB CONTAINER is a bounded flex column,
+ * which `.tab-content` is not — it is `display: block` with an auto height, so `flex: 1` on `.sl-reel-body`
+ * below has no flex parent to divide and every "scroll" pane sizes to its own content.** That shipped on
+ * 2026-09-12 and the owner reported it as "the presets in the two grids are not animating", which is what it
+ * looks like: with nothing scrolling, all 177 library tiles intersect at once, the tab asks for 177 + the
+ * reel's slots against `GridTileRenderer`'s `MAX_SLOTS = 128`, and every acquire past 128 evicts the
+ * least-recently-acquired slot. `releaseSlot` does not clear the canvas and the tab's own mirror of what it
+ * holds is never told, so an evicted tile is DEAD — the observer has no intersection change left to fire, so
+ * it never re-acquires. The rule below (`.tab-reel`) is what bounds the panes; `MAX_LIVE_TILES` in
+ * `tabs/reel.ts` is the second half, and neither is sufficient alone.
+ * ───────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * ⚠️ **The ONE tab that is a bounded flex column instead of a scrolling block.** Every other tab is a
+ * document that grows and lets `.sl-tab-content` scroll it; this one owns two independently scrolling grids,
+ * which is only possible if the container has a definite height to divide. `height: 100%` resolves because
+ * `.sl-tab-content` is `flex: 1` inside `.synthesis-lab` (`height: 100%`, column) and the global
+ * `box-sizing: border-box` (`index.html`) makes 100 % of its CONTENT box exactly fit inside its padding.
+ *
+ * ⚠️ The `:not([style*="display: none"])` is LOAD-BEARING, not copied for symmetry. `.tab-content` is
+ * `display: none` by default and the `:not` rule is what re-shows the one tab the registry set `display = ''`
+ * on. Dropping it here would leave `display: flex` matching unconditionally at higher specificity than that
+ * base rule, and the Reel tab would be visible underneath every other tab.
+ */
+.tab-content.tab-reel:not([style*="display: none"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.sl-reel-body {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.sl-reel-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.sl-reel-left { flex: 1 1 55%; }
+.sl-reel-right { flex: 1 1 45%; }
+
+.sl-reel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.sl-reel-attrs { row-gap: 4px; }
+
+.sl-reel-label {
+  font-size: 11px;
+  color: #9a9ab8;
+  flex: 0 0 auto;
+}
+
+.sl-reel-unit {
+  font-size: 10px;
+  color: #7e9ec8;
+  margin-left: -2px;
+}
+
+.sl-reel-body select,
+.sl-reel-body input[type="text"],
+.sl-reel-body input[type="number"],
+.sl-reel-body input[type="search"] {
+  padding: 3px 6px;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  background: #23233d;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.sl-reel-body select:focus,
+.sl-reel-body input:focus {
+  outline: none;
+  border-color: #7ec8e3;
+}
+
+.sl-reel-select { flex: 1; }
+.sl-reel-name { flex: 1; }
+.sl-reel-search { flex: 1; }
+.sl-reel-seconds { width: 58px; }
+
+.sl-reel-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.sl-reel-main input:disabled + span { color: #666; }
+
+.sl-reel-status {
+  font-size: 10px;
+  color: #7e9ec8;
+  line-height: 1.5;
+  min-height: 15px;
+  margin-bottom: 6px;
+}
+
+.sl-reel-strip-head {
+  border-top: 1px solid #2a2a4a;
+  padding-top: 6px;
+}
+
+.sl-reel-count {
+  flex: 1;
+  font-size: 11px;
+  color: #9a9ab8;
+}
+
+.sl-reel-strip-scroll,
+.sl-reel-browse-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  padding: 6px;
+  background: #15152a;
+}
+
+.sl-reel-strip,
+.sl-reel-browse {
+  display: grid;
+  gap: 6px;
+}
+
+.sl-reel-strip { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.sl-reel-browse { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
+.sl-reel-tile {
+  position: relative;
+  aspect-ratio: 4/3;
+  border: 2px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  background: #0d0d18;
+  transition: border-color 0.15s;
+}
+
+.sl-reel-tile:hover { border-color: #555; }
+.sl-reel-tile.selected {
+  border-color: #7ec8e3;
+  box-shadow: 0 0 6px rgba(126, 200, 227, 0.4);
+}
+
+/*
+ * ⚠️ **RED = "this is what the main view is showing", BLUE = "this is selected", and the two are independent
+ * states on the same tile** — the previewed tile is normally also selected, so this rule MUST come after
+ * `.selected` to win on `border-color`. Equal specificity, so the order in this file is the whole mechanism:
+ * moving the block up silently turns the red marker blue on every tile that carries both classes.
+ *
+ * ⚠️ It is a border, not an overlay or an outline: `.sl-reel-tile` is `overflow: hidden` with a 2 px border
+ * already reserved in the box, so recolouring it cannot shift the grid by a pixel the way adding an outline
+ * would. `.missing` follows below and would therefore out-order this rule, which costs nothing: an entry the
+ * library does not have can never be previewed (`setPreview` returns early), so the two never co-occur.
+ */
+.sl-reel-tile.preview {
+  border-color: #ff4d4d;
+  box-shadow: 0 0 8px rgba(255, 77, 77, 0.5);
+}
+
+/*
+ * ⚠️ **A `missing` tile is a reel entry naming a preset THIS LIBRARY DOES NOT HAVE**, which is a real state
+ * (an imported reel, or a preset renamed since). It must look different from an empty one: an unstyled missing
+ * tile is indistinguishable from a tile whose slot has not been acquired yet, and the user would read a
+ * skipped preset as a rendering delay.
+ */
+.sl-reel-tile.missing {
+  border-color: #6a4a4a;
+  background: repeating-linear-gradient(45deg, #1a1216, #1a1216 5px, #241a1e 5px, #241a1e 10px);
+}
+
+/*
+ * Drag-to-reorder, STRIP TILES ONLY — the library pane has no order to change, which is why the grab cursor is
+ * on `.sl-reel-strip-tile` and not on `.sl-reel-tile`. Being a later rule of equal specificity is what lets it
+ * override the base tile's `pointer`.
+ *
+ * ⚠️ **`.drag-over` must stay the LAST of the four tile-state rules.** A dragged-over tile is usually selected
+ * as well, and may be the previewed one; while a drag is in flight its landing place is the only thing worth
+ * showing, and the amber says "this is the position it will take", not "this is chosen". Same
+ * equal-specificity ordering argument as `.preview` above — moving this block up silently loses the highlight
+ * on exactly the tiles a user drags between.
+ */
+.sl-reel-strip-tile { cursor: grab; }
+
+.sl-reel-tile.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.sl-reel-tile.drag-over {
+  border-color: #ffb347;
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.55);
+}
+
+.sl-reel-tile-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sl-reel-tile-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 9px;
+  color: #bbb;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sl-reel-tile-tools {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+/*
+ * The move/remove buttons appear on hover and on keyboard focus. ⚠️ `:focus-within` is not optional — with
+ * `opacity: 0` alone a tab-focused button is invisible while still being the focus target, so a keyboard user
+ * would be operating a control they cannot see.
+ */
+.sl-reel-strip-tile:hover .sl-reel-tile-tools,
+.sl-reel-strip-tile:focus-within .sl-reel-tile-tools {
+  opacity: 1;
+}
+
+.sl-reel-tile-tool {
+  border: 1px solid #3a3a5a;
+  border-radius: 3px;
+  background: rgba(20, 20, 40, 0.9);
+  color: #ccc;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.sl-reel-tile-tool:hover:not(:disabled) {
+  background: #3a3a6a;
+  color: #fff;
+}
+
+.sl-reel-tile-tool:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+@media (max-width: 999px) {
+  .sl-reel-body {
+    flex-direction: column;
+  }
+
+  .sl-reel-left,
+  .sl-reel-right {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Transmap (v8 21.12) ------------------------------------------------------------------------------
+
+   Reuses `.sl-section`, `.sl-section-title`, `.sl-vfx-row`, `.sl-vfx-label`, `.sl-vfx-select`,
+   `.sl-vfx-slider*`, `.sl-vfx-sub-title`, `.sl-btn`, `.sl-btn-group`, `.sl-slider-row`,
+   `.sl-composer-num`, `.sl-composer-precondition` and `.sl-composer-mute-notice` rather than restyling
+   them — ⚠️ **re-grep each of those before trusting this list**, which is the Composer block's own
+   hard-won warning: a reuse list is a claim about this file and it goes stale silently.
+
+   ⚠️ **THE AMBER / CYAN SPLIT IS INHERITED DELIBERATELY AND THE TAB USES BOTH MEANINGS.** Amber
+   (`.sl-composer-precondition`) is an INERT-PIPELINE ALARM — TransMap off, no separable layer, or the two
+   zoom controls the engine does not read. Cyan (`.sl-composer-mute-notice`) is a CONSEQUENCE NOTICE: the
+   multi-layer line, where everything works and the sentence names a cost. Picking the wrong one is
+   invisible to every checker and makes the alarm ordinary. */
+
+/* ⚠️ **THE FIXED HEIGHT IS LOAD-BEARING, and the Composer paid for this rule twice.** A canvas has no
+   intrinsic size, so a `clientHeight` of 0 makes `drawFieldFrame` fall back to its own 320×220 default
+   while the element renders blank — a dead diagram, which reads as a broken measurement rather than as a
+   CSS bug. Taller than the Composer's panes because this one is letterboxed to the FRAME's aspect ratio
+   and then gives up an L-shaped gutter to the two edge profiles. */
+.sl-transmap-frame {
+  display: block;
+  width: 100%;
+  height: 240px;
+  border: 1px solid #2a2a5a;
+  border-radius: 5px;
+  background: #0c0c18;
+}
+
+/* The scale caption and the per-pane harmonics are the same KIND of text — a small blue-grey annotation on
+   a picture or a row — so they share the Composer readout's colour rather than inventing one. */
+.sl-transmap-frame-cap,
+.sl-transmap-pane-sum {
+  font-size: 10px;
+  color: #7e9ec8;
+  margin: 4px 0 6px;
+}
+
+/* ⚠️ Indented under the four term rows it summarises, because it is the one line that can say an entire
+   direction is silent and it must not be read as belonging to the section below it. */
+.sl-transmap-pane-sum {
+  padding-left: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ⚠️ **The identification line is a FINDING, not help text, and it is the longest sentence on the tab** —
+   it names a pattern and a Strength the track may not even reach. Left border and no background: enough
+   to separate it from the dropdown above without competing with the two notice colours, which carry
+   meanings this line does not have. */
+.sl-transmap-ident {
+  margin: 4px 0 8px;
+  padding: 4px 0 4px 8px;
+  border-left: 2px solid #3a3a5a;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #9aa8c0;
+}
+
+/* What typing in the term boxes below will cost, on the one pattern shape where the take-over cannot be exact.
+   ⚠️ **Since 2026-09-23 it explains no greying — nothing here is read-only any more** (`StaticFieldBake.warning`
+   replaced the refusal), so this is advice read BEFORE a keystroke, never after a refused one. Dimmer than the
+   identification line, and it is the same sentence the arithmetic gates itself on, never a second wording. */
+.sl-transmap-term-note {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.45;
+  color: #7a7a8c;
+}
+
+/* ⚠️ **The measured readout is the one place on this tab a number is CLAIMED**, so it is the only text here
+   given the informational accent at full strength — the picture above states a shape and prints the factor
+   it exaggerated by, and confusing the two is the tab's central hazard. */
+.sl-transmap-readout {
+  margin: 10px 0 0;
+  padding: 6px 8px;
+  border-left: 3px solid #7ec8e3;
+  border-radius: 3px;
+  background: rgba(126, 200, 227, 0.08);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #bcd6e6;
+}
+
+/* ⚠️ **`gap` and NOT a margin on the children**: `.sl-composer-num` is `flex: 1`, so the two number fields
+   share whatever is left after the checkbox and the two captions — exactly the Composer's `sl-composer-clear`
+   trap, where a non-fixed sibling silently stole a share of every numeric column. */
+.sl-transmap-term {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sl-transmap-term-check {
+  flex: 0 0 auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* `Amp` / `Freq`, fixed width so all eight rows line their two fields up in two columns. */
+.sl-transmap-term-cap {
+  flex: 0 0 auto;
+  width: 26px;
+  font-size: 10px;
+  color: #7a7a8c;
+  text-align: right;
+}
+
+/* ⚠️ **The disabled state has to be VISIBLE, because on this tab it is information.** A term row greyed out
+   means a pattern is the source and these numbers are not what is on screen; a greyed Zoom Bias means the
+   engine does not read it. Both are stated in words as well — this is what makes the words findable. */
+.sl-transmap-term input:disabled,
+.sl-transmap-term-check:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ⚠️ **GLOBAL, not scoped to Transmap, and that is the point: nothing in the Lab styled a disabled
+   `.sl-vfx-select` or `.sl-vfx-slider` at all, so a control that was switched off simply looked normal.**
+   A range input and a select with explicit colours do not grey themselves the way a bare one does, and
+   21.12 §J turns on being able to SEE that two controls are inert — "greyed rather than hidden so the gap
+   is visible" is a claim this rule is what makes true. `visual-fx.ts` already disables a select of its own
+   (the add-layer dropdown when no style is addable) and was relying on the browser for it, so this fixes
+   that case in the same stroke rather than only the new one. */
+.sl-vfx-select:disabled,
+.sl-vfx-slider:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ⚠️ 2026-10-31 (owner) — **a SILENT wave level's `Sharpness` cell, dimmed WHOLE.** The rule above greys the
+   track, but the cell's caption (`Detail`) and its readout are the parts a user reads first and they stayed
+   at full contrast, so the cell still looked operable. ⚠️ **The cell is dimmed rather than HIDDEN on
+   purpose**: hiding it would make the triplet change shape with the preset — three cells on one figure and
+   two on the next, captions no longer lining up with the levels — which is what `34.D12` chose visibility
+   for. What the owner reported was the cell being usable, not its being present. The reason is on the
+   input's `title`, which is where a precondition belongs. */
+.sl-vfx-triplet-cell.sl-vfx-cell-dead .sl-vfx-triplet-caption,
+.sl-vfx-triplet-cell.sl-vfx-cell-dead .sl-vfx-triplet-value {
+  opacity: 0.35;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────────
+   v8 31.U — the Visual FX tab's FIVE COLLAPSIBLE GROUPS.
+
+   ⚠️ The tab had grown to 19 always-visible sections and ~112 rows on a typical preset, which is a
+   scroll rather than a navigation. The groups are Figure / Particles / Colour / Image / Fields, in
+   that order, with Fields last because it is the least used.
+
+   ⚠️ **COLLAPSING TOGGLES `display` ON THE BODY AND NEVER DEFERS CONSTRUCTION.** Every row is built
+   on first show of the tab regardless of group state, because `syncKey()` and `syncFromControls()`
+   address rows that must exist — the same trap `TabRegistry` records for a tab's own container.
+   `display: none` stops a row being SEEN, not working.
+   ───────────────────────────────────────────────────────────────────────────────────────────────── */
+.sl-vfx-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 18px 0 2px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #cfd6dd;
+  font: 600 11px/1.2 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-vfx-group-head:hover { background: rgba(255, 255, 255, 0.12); }
+.sl-vfx-group-head:focus-visible { outline: 1px solid #5ac8fa; outline-offset: 1px; }
+/* The caret is CSS content rather than a glyph in the label, so the accessible name stays the group
+   name alone — a screen reader should not read the open/closed state twice. */
+.sl-vfx-group-head::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 90ms ease;
+  flex: 0 0 auto;
+}
+.sl-vfx-group-head[aria-expanded='true']::before { transform: rotate(90deg); }
+.sl-vfx-group-body { display: block; }
+.sl-vfx-group-body[hidden] { display: none; }
+/* The first section title inside a group needs no extra top margin — the group head supplies it. */
+.sl-vfx-group-body > .sl-section-title:first-child { margin-top: 6px; }
+
+/* v8 31.U2 — the ACTIVITY MARKER on a group head.
+   ⚠️ It counts ACTIVE FEATURES, not changed settings: the panel has no per-control default table, and
+   "3" meaning *three field systems are running* is both well defined and more useful than a diff count
+   against defaults nobody can see. The number's meaning is stated in the head's own title text. */
+.sl-vfx-group-count {
+  margin-left: auto;
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #1f6feb;
+  color: #fff;
+  font: 600 10px/1.35 system-ui, sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+}
+/* 0 active: no badge at all rather than a grey zero — an empty group should look empty. */
+.sl-vfx-group-count[hidden] { display: none; }
+.sl-vfx-group-head.is-active { color: #e8eef5; }
+.sl-vfx-group-head.is-active::before { border-left-color: #58a6ff; }
+
+/* A SECTION-level collapsible (Deformation). Slightly quieter than a group head so the hierarchy reads. */
+.sl-vfx-sub-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 10px 0 2px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #b9c2cc;
+  font: 600 11px/1.2 system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-vfx-sub-head:hover { background: rgba(255, 255, 255, 0.09); }
+.sl-vfx-sub-head:focus-visible { outline: 1px solid #5ac8fa; outline-offset: 1px; }
+.sl-vfx-sub-head::before {
+  content: '';
+  width: 0; height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 90ms ease;
+  flex: 0 0 auto;
+}
+.sl-vfx-sub-head[aria-expanded='true']::before { transform: rotate(90deg); }

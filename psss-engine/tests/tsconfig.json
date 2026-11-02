@@ -1,0 +1,35 @@
+{
+  /*
+   * ⚠️ **A SEPARATE tsconfig SO THE SPECS ARE TYPE-CHECKED WITHOUT WIDENING THE ENGINE'S OWN COMPILE.** The root
+   * `tsconfig.json` has `"include": ["src"]`, so `npm run verify` never sees this directory. That was recorded as
+   * a real limit when the harness landed; this file closes it in the only direction that is safe.
+   *
+   * ⚠️ **WIDENING THE ROOT `include` WOULD HAVE BEEN THE WRONG FIX, AND IT IS THE ONE THAT LOOKS TIDIER.** It
+   * would put `@playwright/test`'s types into the engine's compile, and `noUnusedLocals` /
+   * `exactOptionalPropertyTypes` are tuned for `src/` — **the engine's compile settings are not the harness's to
+   * change.** `CLAUDE.md`: *"Read a `noUnusedLocals` failure as a claim about the DESIGN before deleting the
+   * symbol"*, which is only true while that setting means what `src/` intends it to mean.
+   *
+   * ⚠️ **AND IT MUST NOT REACH `deadcheck`.** That checker enumerates `git ls-files -co --exclude-standard src`,
+   * measured to move from 80 to 81 files the moment anything appears under `src/` — so nothing here may live
+   * there, and `include` below is scoped to this directory only.
+   *
+   * Run as `npm run check:specs`. Deliberately NOT chained into `verify`: `verify` is the engine's gate and must
+   * stay readable as such, whereas a spec type error is the harness's problem.
+   */
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    /* ⚠️ **`types: []` RATHER THAN `["node"]` — `@types/node` IS NOT A DEPENDENCY OF THIS PROJECT AND ADDING ONE
+     * FOR THE HARNESS'S CONVENIENCE WOULD BE THE HARNESS EDITING THE ENGINE'S DEPENDENCY SET.** `tsc` fails hard
+     * on a named-but-absent type library (`TS2688`), which is the correct behaviour and was measured here. The
+     * one Node global the config needs (`process.env`) is reached through an index signature, so no ambient
+     * declaration is required. */
+    "types": [],
+    "noEmit": true
+  },
+  /* ⚠️ **THIS DIRECTORY ONLY — `../src` WAS TRIED AND IS WRONG.** Pulling the engine in re-compiles it with
+   * `types` overridden, which drops `vite/client` and turns every `import './panel.css'` into `TS2882`: three
+   * errors that are artefacts of the harness's own config, not defects. **`verify` already type-checks `src/`
+   * with the settings `src/` intends; a second compile of it under different settings can only disagree.** */
+  "include": ["."]
+}

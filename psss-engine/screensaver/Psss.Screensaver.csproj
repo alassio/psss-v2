@@ -1,0 +1,120 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Psss screensaver host — Phase 20 (plan §Phase 20, decisions D1-D8).
+
+    ⚠️ TWO DEVIATIONS FROM THE PLAN'S LAYOUT LINE, BOTH MEASURED RATHER THAN ASSUMED.
+    The plan's 20.2 skeleton says `net9.0-windows, PublishAot`. Neither survived its own
+    retire-the-risk step, and each is recorded here because a silent substitution is the
+    failure this project's build rules are written against:
+
+      1. `net8.0-windows`, not net9.0. Installing a .NET 9 SDK machine-wide needs
+         elevation (`winget install Microsoft.DotNet.SDK.9` exits 1602 in a non-elevated
+         shell) and the phase was to be implemented without blocking on a UAC prompt.
+         8.0.421 was already present. Nothing in this host uses a .NET 9 API.
+
+      2. `PublishSingleFile` + `SelfContained` + a PARTIAL trim, not `PublishAot` — the
+         plan's own stated fallback, taken because the risk it told us to retire first
+         DID fire. Measured 2026-09-14 with a 30-line WebView2 stub: an AOT-published
+         binary reaches `CoreWebView2Environment.CreateAsync` and throws
+         `System.NotSupportedException: COM Interop requires ComWrapper instance
+         registered for marshalling.` — WebView2 reaches the browser through built-in
+         COM interop, which NativeAOT does not provide. `BuiltInComInteropSupport` does
+         NOT rescue the AOT build; it DOES rescue the trimmed single-file one, which is
+         why the property below is load-bearing rather than defensive. Without it the
+         same stub throws `System.TypeLoadException`, because trimming removes the COM
+         support the compiler cannot see being used.
+         D1's requirement was ONE FILE, not a small one, so the fallback satisfies it.
+         Probe result: PROBE PASS, one file, 13,792,736 B.
+
+    ⚠️ `TrimMode partial` is not a tuning knob. It trims only assemblies marked
+    trimmable, which keeps `System.Drawing.Common` (20.7's PNG decode) and the WebView2
+    interop assembly whole. A full trim is untested here and its failure mode is a
+    runtime TypeLoadException in a process with no console.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Psss.Screensaver</AssemblyName>
+    <RootNamespace>Psss.Screensaver</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- D1: one self-contained file. See the deviation note above. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>none</DebugType>
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 1.0.3485.44 is the version the AOT/trim probe measured. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3485.44" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      D4's embedded half of the payload, plus 20.7's thumbnail.
+
+      ⚠️ NO `LogicalName` HERE, DELIBERATELY. D8's mitigation is that each payload
+      filename is spelled ONCE, in PayloadFiles.cs; a LogicalName would spell two of
+      them a second time, in a file no compiler compares against the first. The
+      resolver therefore matches a resource by SUFFIX against that single spelling.
+      Both entries are explicit Includes rather than globs so the pre-build copy below
+      can create them after item evaluation.
+    -->
+    <EmbeddedResource Include="Payload\index.html" />
+    <EmbeddedResource Include="Payload\psss-engine.js" />
+    <EmbeddedResource Include="preview.png" Condition="Exists('preview.png')" />
+  </ItemGroup>
+
+  <!--
+    ⚠️ A STALE EMBEDDED PAYLOAD IS THE SILENT FAILURE THIS TARGET EXISTS TO PREVENT.
+    If `../dist` has not been built, the previous copy in Payload/ would be embedded and
+    the screensaver would play a build nobody asked for — indistinguishable, on screen,
+    from the current one. So the build FAILS rather than falling back, and it fails
+    naming the command that fixes it. Payload/ is regenerated on every build, never
+    edited by hand, and is git-ignored along with the rest of this untracked tree.
+  -->
+  <Target Name="CopyDeploymentPayload" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <PsssDist>$(MSBuildProjectDirectory)\..\dist</PsssDist>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(PsssDist)\index.html')"
+           Text="Payload source missing: $(PsssDist)\index.html — run `npm run build` in psss-engine/ before building the screensaver host." />
+    <Error Condition="!Exists('$(PsssDist)\psss-engine.js')"
+           Text="Payload source missing: $(PsssDist)\psss-engine.js — run `npm run build` in psss-engine/ before building the screensaver host." />
+    <Copy SourceFiles="$(PsssDist)\index.html;$(PsssDist)\psss-engine.js"
+          DestinationFolder="$(MSBuildProjectDirectory)\Payload"
+          SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="[screensaver] embedded payload refreshed from $(PsssDist)" />
+  </Target>
+
+  <!--
+    A screensaver is an ordinary Win32 PE with a `.scr` extension — the rename IS the
+    deliverable, so it happens in the build rather than in a human's instructions.
+    The `.exe` is removed so the publish folder cannot ship two entry points that drift.
+  -->
+  <Target Name="RenameToScr" AfterTargets="Publish">
+    <PropertyGroup>
+      <PsssScr>$(PublishDir)psss.scr</PsssScr>
+    </PropertyGroup>
+    <Copy SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFiles="$(PsssScr)" />
+    <Delete Files="$(PublishDir)$(AssemblyName).exe" />
+    <Message Importance="high" Text="[screensaver] published $(PsssScr)" />
+  </Target>
+
+</Project>
