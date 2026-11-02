@@ -13,9 +13,13 @@ page. A frame like the one above is a click away in it.
 > single self-contained binary of about 16 MB that needs no runtime, no Node and no browser install
 > (WebView2 ships with Windows 11). It plays your own **Reel** full screen on the primary monitor with the
 > other displays blacked out, and the Settings dialog's *Configure* button opens the engine's own Reel
-> editor rather than a stand-in. **`npm run build:all` produces it**, and a tagged release publishes it as
-> a download. That wrapper is `psss-engine/screensaver/`, and *Install it as a Windows screensaver* below
-> walks the install.
+> editor rather than a stand-in.
+>
+> ### ⬇ [Download the screensaver](https://github.com/alassio/psss-v2/releases/latest)
+>
+> The release carries `psss.scr` plus both reference manuals as PDFs. Or build it yourself with
+> `npm run build:all` — the wrapper is `psss-engine/screensaver/`, and *Install it as a Windows
+> screensaver* below walks the install.
 
 > ### Built with three tools, each doing a different job
 >
