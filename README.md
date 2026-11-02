@@ -1,4 +1,39 @@
-# PSSS — Particle Systems Screen Saver
+# PSSS V2 — new generation Particle Systems Screen Saver
+
+[![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
+
+### ▶ [Run it in your browser](https://alassio.github.io/psss-v2/)
+
+No install, no build: the whole engine, its preset library and the full control surface run from that
+page. A frame like the one above is a click away in it.
+
+> ### And it is a real Windows screensaver, not only a web demo
+>
+> The same TypeScript engine is wrapped in a .NET 8 host and installs as a genuine Windows `.scr` — a
+> single self-contained binary of about 16 MB that needs no runtime, no Node and no browser install
+> (WebView2 ships with Windows 11). It plays your own **Reel** full screen on the primary monitor with the
+> other displays blacked out, and the Settings dialog's *Configure* button opens the engine's own Reel
+> editor rather than a stand-in. **`npm run build:all` produces it**, and a tagged release publishes it as
+> a download. That wrapper is `psss-engine/screensaver/`, and *Install it as a Windows screensaver* below
+> walks the install.
+
+> ### Built with three tools, each doing a different job
+>
+> **[Reversa](https://github.com/sandeco/reversa)** reverse-analysed the original JavaScript implementation into written
+> specifications — control flow, data model, preset format, figure mathematics — and this TypeScript
+> engine was built against *those*, not against a reading of the old source. It is why an original preset
+> still loads unchanged.
+>
+> **[hyperresearch](https://github.com/jordan-gibbs/hyperresearch)** did the deep research and ideation behind the later features: each pass read
+> papers and reference implementations and recorded every claim against its source, so a feature traces
+> to a citation or a measurement rather than to a hunch — and several of the strongest ideas were dropped
+> on inspection, with the reason written down.
+>
+> **[Claude Code](https://claude.com/claude-code)** implemented all of it: engine, checkers, tests and both manuals, with
+> `npm run verify` as the gate and an eye as the gate for anything that changes a picture.
+>
+> `ENGINEERING-NOTES.md` has the longer account, including why none of those artefacts are in this
+> repository.
 
 3D particles travelling along modulated sine waves — 3D Lissajous figures — projected to 2D, trailed,
 warped and colour-graded. It runs in a browser, and on Windows it can also be installed as a real
@@ -285,6 +320,18 @@ library are his, carried across essentially unchanged.
 | **Author** | Andreas Kardin (*mephzara*) |
 | **Source of the JavaScript version** | <https://github.com/mephzara/psss_js> |
 | **Live demo of the JavaScript version** | <http://mephzara.com/misc/psss_js/> |
+| **Live demo of this version** | <https://alassio.github.io/psss-v2/> |
+
+## How it was built
+
+| tool | what it did |
+|---|---|
+| **[Reversa](https://github.com/sandeco/reversa)** | reverse-analysed the original JavaScript implementation into the specifications this engine was built against |
+| **[hyperresearch](https://github.com/jordan-gibbs/hyperresearch)** | the deep research and ideation behind the later features, every claim recorded against its source |
+| **[Claude Code](https://claude.com/claude-code)** | the implementation — engine, checkers, tests and both manuals |
+
+`ENGINEERING-NOTES.md` has the longer account, including why none of those artefacts are in this
+repository.
 
 **Thank you, Andreas Kardin** — for the original program, and for publishing the source so that it could
 be taken further.

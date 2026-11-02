@@ -1,5 +1,7 @@
 # PSSS Engine
 
+**▶ [Run the engine in your browser](https://alassio.github.io/psss-v2/)** — the same build this directory produces, deployed from `main` by the `pages` workflow.
+
 A modern TypeScript/WebGL2 reimplementation of the PSSS (Particle Systems Screen Saver) engine. Achieves full visual parity with the legacy Canvas2D/JavaScript implementation for all 177 original presets, plus a modern HDR rendering stack with bloom, tone mapping, depth shading, lighting, palettes, film looks, ribbon rendering, and fractal/strange attractor blending.
 
 ## Quick Start

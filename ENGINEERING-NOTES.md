@@ -18,6 +18,35 @@ reading
 
 tells you the whole rule. The reference adds provenance and nothing else.
 
+## How this was built
+
+Three tools did distinct jobs, and the distinction is worth stating because it explains the shape of the
+repository rather than just crediting software.
+
+**The original JavaScript implementation was reverse-analysed with [Reversa](https://github.com/sandeco/reversa)**, a reverse-engineering
+framework, which extracted its behaviour into written specifications — the control flow, the data model,
+the preset format and the figure mathematics. The TypeScript engine was then built against those
+specifications rather than against a reading of the old source, and the extracted legacy tree is still
+the reference a parity question is settled by. That is why this engine reproduces the original's preset
+format exactly enough that an original preset still loads.
+
+**The research that scoped the later work was done with [hyperresearch](https://github.com/jordan-gibbs/hyperresearch)**, a multi-source deep-research
+pipeline with a persistent source vault. Features were not chosen from intuition: each research pass
+read papers and reference implementations, recorded every claim against its source, and produced a study
+from which a phase was then scoped — so a decision to build or to drop usually traces to a measurement
+or a citation rather than to a preference. Several of the strongest ideas in that study were dropped on
+inspection, and the record says why.
+
+**The implementation was carried out with [Claude Code](https://claude.com/claude-code)** — the engine, the checkers, the tests and both
+manuals. The review discipline described above is what made that workable: the checkers are the gate a
+change has to pass, and a visual change additionally has to pass an eye, because no checker can tell
+whether a picture is worth looking at. Several features in this engine were built, measured, found
+correct and then cut on exactly that basis.
+
+⚠️ **None of those artefacts are in this repository.** The specifications, the research vault, the
+ideation notes and the phase plan are part of the private engineering tree described above. They are
+cited by comments here for provenance, and the comments state their own rules inline.
+
 ## What the comments are for
 
 They are unusually dense, and deliberately so. This engine's characteristic failure is **silent**: a
