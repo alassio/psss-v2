@@ -10,6 +10,21 @@
 #
 # ⚠️ verify:browser IS DELIBERATELY ABSENT. See browser-tests.yml.
 
+#
+# ⚠️⚠️ ACTION MAJORS BUMPED 2026-11-02, AND THE REASON WAS AN ANNOTATION RATHER THAN A FAILURE. Every run
+# carried "Node.js 20 is deprecated... being forced to run on Node.js 24" because `checkout@v4` and
+# `setup-node@v4` declare `using: node20`. The current majors declare node24, so the warning goes away by
+# moving forward rather than by silencing anything.
+#
+# ⚠️ ONLY STABLE INPUTS ARE PASSED HERE -- `node-version`, `cache`, `cache-dependency-path`, `path`,
+# `files`, `retention-days` -- which is why a major bump is a drop-in for THIS workflow and would not be
+# for one using removed inputs. ⚠️ THE PAGES TRIO MOVES TOGETHER (`configure-pages`,
+# `upload-pages-artifact`, `deploy-pages`): the matching majors are the supported combination.
+#
+# ⚠️⚠️ A BUMP IS NOT DONE UNTIL IT HAS RUN, which is this file's own standing rule. `ci` and `pages` fire
+# on push; `release` needs a `workflow_dispatch` rehearsal, where the upload step is gated on
+# `refs/tags/` and therefore skipped. Prove it with a run; do not reason about it.
+
 name: verify
 
 on:
@@ -28,9 +43,9 @@ jobs:
       run:
         working-directory: psss-engine
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
