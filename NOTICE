@@ -24,11 +24,11 @@ stated here rather than left for a reader to discover. `LICENSE` and
 lines) and `index.html` (622 -> 1070 lines) carry substantial further work done
 on the JavaScript version in this project before the rewrite began.
 
-The sharing has not been one-directional, so a difference between this snapshot
-and the upstream repository is not evidence of a single direction of copying:
-this extended JavaScript demo was shared with the original author, and the
-upstream repository may since have taken parts of it up. The upstream repository
-linked above is the author's own current state and is the place to look for it.
+The difference is work added here, not work removed from the original: the
+upstream repository has not changed since September 2023, and the extended
+JavaScript demo in `psss-original/` was shared with the original author as a
+courtesy. The upstream repository linked above remains the place to find his own
+implementation.
 
 
 Modifications
