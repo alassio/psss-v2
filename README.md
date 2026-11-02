@@ -51,13 +51,15 @@ This repository holds the last two of the three:
 
 | | `psss-engine/` | `psss-original/` |
 |---|---|---|
-| What it is | **the current engine** — use this one | the earlier JavaScript version |
+| What it is | **the current engine** — use this one | the JavaScript version it was migrated from |
 | Built with | TypeScript, WebGL2, Vite | plain JavaScript, Canvas2D |
-| Status | active | **read-only**, kept for reference |
+| Status | active | **read-only**, frozen at the state the migration started from |
 
-Everything below is about `psss-engine/`. `psss-original/` is frozen and never edited — and it is
-the JavaScript implementation as it stood when this rewrite began, not the upstream tip; `NOTICE`
-states the difference.
+Everything below is about `psss-engine/`. ⚠️ **`psss-original/` is NOT the upstream project**: it is
+the JavaScript implementation **as it stood in this project when the rewrite began** — the original plus
+substantial further work done here on the JavaScript version, and it is the tree the migration
+specifications were extracted from. It is frozen and never edited. `psss-original/README.md` states
+exactly what differs and where the original author's own code is; `NOTICE` carries the attribution.
 
 ### The three documents you are most likely to want
 
@@ -76,7 +78,7 @@ states the difference.
 | Path | What it is |
 |---|---|
 | `psss-engine/` | The current engine. See §1.2. |
-| `psss-original/` | The earlier JavaScript version as it stood when the rewrite began, read-only. |
+| `psss-original/` | The JavaScript version this engine was migrated from — the original **plus** the JavaScript-era work done here. Read-only; see its own `README.md`. |
 | `psss-engine-v2_how_to_use_it.md` | The user manual. |
 | `psss-engine-v2_how_it_works.md` | The technical reference. |
 | `manual-images/` | Screenshots used by the user manual. See §6. |
