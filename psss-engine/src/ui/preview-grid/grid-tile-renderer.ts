@@ -1,4 +1,5 @@
 import type { UnifiedPreset, FluidFeedbackConfig, LiquidTintSource } from '../../presets/types.ts';
+import { resolveFigureType } from '../../generators/figure-types.ts';
 import { compileProgram } from '../../core/gl-program.ts';
 import type { MaterialConfig } from '../../presets/types.ts';
 import { LissajousGenerator } from '../../generators/lissajous.ts';
@@ -1090,7 +1091,16 @@ export class GridTileRenderer {
     const generator = new LissajousGenerator();
     generator.init(
       {
-        type: 'lissajous',
+        // ⚠️ v8 `36.1` — the SECOND of the two `GeneratorConfig` call sites, and `36.D16`/`33.21`'s
+        // standing warning applies to everything added here: this renderer forwarded only
+        // `setViewScale` and `setSymmetry` until Phase 33, so NINE operators were invisible in tiles for
+        // four phases and no checker compares a tile to a main view.
+        type: resolveFigureType(preset.generators.type, preset.generators).type,
+        // ⚠️⚠️ v8 `36.16`/`36.D16` — **a figure type that is not forwarded here draws every `lsystem`
+        // preset as a WAVE figure in its own thumbnail, and the main view cannot show that.** This is
+        // `33.21`'s exact failure mode: the renderer forwarded only `setViewScale` and `setSymmetry`
+        // until Phase 33, so NINE operators were invisible in tiles for four phases.
+        ...(preset.generators.lsystem !== undefined ? { lsystem: preset.generators.lsystem } : {}),
         particleCount: Math.min(MAX_TILE_PARTICLES, Math.max(10, Math.round(preset.generators.particleCount / divisor))),
         waves: preset.generators.waves ?? [],
         waveSpeed: preset.generators.waveSpeed ?? 0.05,

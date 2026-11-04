@@ -1,4 +1,5 @@
 import './ui/layout.css';
+import { resolveFigureType } from './generators/figure-types.ts';
 import { detectBackend } from './core/compute-backend.ts';
 import { BOX_FOLD_DEFAULT_LIMIT, CHANNEL_DRIVERS } from './core/deform-limits.ts';
 import { createDefaultConfig } from './core/config.ts';
@@ -5979,6 +5980,35 @@ async function init() {
       if (preset) preset.generators.waves = copy;
       generator.setWaves(copy);
     },
+    /*
+     * v8 `36.11` — the curve type's three doors, each the sibling of a `waves` one above.
+     *
+     * ⚠️ **`structuredClone` ON THE WAY IN, exactly as `setWaves` does** — without it the Lab's object and
+     * the engine's are the same reference, and the tab would be editing engine state behind the setter's
+     * back with nothing for a `Reset` to restore.
+     *
+     * ⚠️⚠️ **NO `initGenerator()` ON ANY OF THEM, INCLUDING THE TYPE.** That is the whole point of the
+     * seam being a branch inside `update()` (`36.D5`): a type switch is a different figure SOURCE, not a
+     * different generator, so it needs no re-init — and a re-init would reset `pos`, which is also the
+     * breathing clock, snapping every modulated parameter back to its base.
+     */
+    getFigureType: () => resolveFigureType(preset?.generators.type, preset?.generators ?? {}).type,
+    setFigureType: (type) => {
+      if (preset) preset.generators.type = type;
+      generator.setFigureType(type);
+    },
+    getLSystem: () => (preset?.generators.lsystem !== undefined
+      ? structuredClone(preset.generators.lsystem) : null),
+    setLSystem: (config) => {
+      const copy = config === null ? null : structuredClone(config);
+      if (preset) {
+        // ⚠️ `delete` rather than writing `undefined`: an explicit `undefined` would serialise as a key in
+        // some paths and `36.2`'s round-trip clause asserts the block's ABSENCE round-trips too.
+        if (copy === null) delete preset.generators.lsystem;
+        else preset.generators.lsystem = copy;
+      }
+      generator.setLSystem(copy);
+    },
     getWaveSpeed: () => preset?.generators.waveSpeed ?? 0.05,
     /**
      * ⚠️ **`waveSpeed` IS BAKED AT `init()` (`config.waveSpeed`) AND HAS NO IN-PLACE SETTER, so this one
@@ -8437,8 +8467,13 @@ async function init() {
 function initGenerator(generator: LissajousGenerator, preset: UnifiedPreset | undefined, w: number, h: number): void {
   generator.init(
     {
-      type: 'lissajous',
+      // ⚠️ v8 `36.1` — was the literal `'lissajous'`, hard-coded. One of only TWO `GeneratorConfig` call
+      // sites, and both hard-coded it, which is what made `generators.type` dead for everything except
+      // `migration.ts`' palette gate. Resolved at read time (`36.2`) and never written back.
+      type: resolveFigureType(preset?.generators.type, preset?.generators ?? {}).type,
       particleCount: preset?.generators.particleCount ?? 500,
+      // v8 `36.2` — forwarded whether or not it is the live type: the dormant block is authorial intent.
+      ...(preset?.generators.lsystem !== undefined ? { lsystem: preset.generators.lsystem } : {}),
       waves: preset?.generators.waves ?? [],
       waveSpeed: preset?.generators.waveSpeed ?? 0.05,
       rotation: preset?.generators.rotation ?? [0, 0, 0],

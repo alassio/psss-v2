@@ -1,4 +1,4 @@
-import type { Renderer, GeneratorState, ComputeBackend, GPUTarget, ParamSchema, RendererConfig, RenderMode } from '../core/interfaces.ts';
+import type { Renderer, GeneratorState, ComputeBackend, GPUTarget,  RendererConfig, RenderMode } from '../core/interfaces.ts';
 import { compileProgram } from '../core/gl-program.ts';
 import type { WebGL2Backend } from '../core/compute-backend.ts';
 import type {
@@ -4457,15 +4457,6 @@ void main() {
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     this.paletteEnabled = true;
-  }
-
-  getSchema(): ParamSchema {
-    return {
-      params: [
-        { key: 'glow', type: 'number', label: 'Glow', category: 'Rendering', min: 0.5, max: 10, step: 0.1, default: 2.0 },
-        { key: 'depthSize', type: 'number', label: 'Depth Size', category: 'Rendering', min: 0, max: 2, step: 0.1, default: 0 },
-      ],
-    };
   }
 
   dispose(): void {

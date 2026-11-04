@@ -87,7 +87,8 @@
  */
 
 import type { UnifiedPreset, OverlayState, CrystalShape, LiquidSeedPattern, LiquidTintSource, ForceGateSource, DyeFieldConfig } from './types.ts';
-import type { RenderMode } from '../core/interfaces.ts';
+import type { RenderMode, FigureType } from '../core/interfaces.ts';
+import { resolveFigureType } from '../generators/figure-types.ts';
 // ⚠️ Every one of these is a pure module. `material-presets.ts` owns the mode resolution since 22.1;
 // `trans-map-chain.ts` owns which styles are live; `palette-selection.ts` owns the palette's two sources.
 // **Importing a resolution rather than re-deriving it is rule 2, and it is the rule this phase turns on.**
@@ -131,7 +132,9 @@ export type BooleanFacetKey =
   // v8 33.3 — `Travel`'s own chip (33.D10). ⚠️ It is NOT a member of `particles:deformed` and
   // `facetcheck` §B carries the reason in `NOT_DEFORMATION`: this answers *is the figure a closed loop*,
   // which is a different question from *is the figure bent*.
-  | 'figure:attractor' | 'figure:open';
+  | 'figure:attractor' | 'figure:open'
+  // v8 `36.15` — the self-similar curve figure type.
+  | 'figure:curve';
 
 /** The invented BAND keys (`22.D12`'s ⚙ marks) — closed unions, because their boundaries are authored here. */
 export type TrailDecayBand = 'crisp' | 'medium' | 'long' | 'veryLong';
@@ -220,6 +223,14 @@ interface Resolved {
   readonly anyForceMode: boolean;
   /** The attractor actually driving the figure, or `null`. ⚠️ See the `figure:attractor` row for why. */
   readonly attractorType: string | null;
+  /**
+   * v8 `36.15` — the RESOLVED figure type, which is what the `figure:curve` chip reads.
+   *
+   * ⚠️⚠️ **RESOLVED, never the stored string.** An unknown stored value resolves by `36.2`'s order, so
+   * reading `generators.type` raw here would put a preset in no bucket at all while the engine happily
+   * draws it — the chip would be absent rather than wrong, which is the harder failure to notice.
+   */
+  readonly figureType: FigureType;
   /** `resolvePaletteSelection().name` — ⚠️ the film-look half carries the majority. */
   readonly paletteName: string;
   /** `resolvePaletteSelection().mapping` — ⚠️ defaults to `'depth'`, so there is NO "unset" value. */
@@ -320,6 +331,7 @@ function resolve(preset: UnifiedPreset): Resolved {
   return {
     preset, ov, materialName, materialLive, mode, tmEnabled,
     chainLength: chain.length, liveStyles, anyForceMode, attractorType,
+    figureType: resolveFigureType(preset.generators?.type, preset.generators ?? {}).type,
     paletteName: sel.name, paletteMapping: sel.mapping,
     filmLook: ov.filmLook ?? '',
     liveSlots, flat, maxWinding, aspect,
@@ -783,6 +795,34 @@ const SURFACES_GROUP: FacetGroup = {
 const FIGURE_GROUP: FacetGroup = {
   id: 'figure', label: 'Figure', combinator: 'any', defaultOpen: false,
   rows: [
+    /*
+     * v8 `36.15` — **the self-similar curve chip, HAND-WRITTEN because nothing would demand it.**
+     *
+     * ⚠️⚠️ **`facetcheck` §B's FAMILY SCAN IS STRUCTURALLY BLIND TO THIS ONE, AND THAT IS `36.D1`'s COST
+     * ARRIVING CONCRETELY.** §B scans the `shape` group of `OVERLAY_RULES` and holds the `Deformed`
+     * predicate to it — which is exactly what caught Phase 32's three missing operators. But this figure
+     * type lives in `generators.lsystem`, a NON-`overlay` block, so §B does not see it at all: there is
+     * no registry entry for the scan to miss.
+     *
+     * ⚠️⚠️ **AND `32.15` IS THE PRECEDENT FOR WHAT HAPPENS NEXT IF THIS IS FORGOTTEN.** Phase 32 added
+     * taper, bend and inversion and gave none of them a clause in `particles:deformed`, so two demos
+     * shipped as presets the one chip that finds them COULD NOT — 4 matched against 6 genuinely
+     * deformed, with `verify` GREEN, and the MANUAL already claiming the chip found them. **A missing
+     * clause reads exactly like a correct predicate over a shorter list.** `figurecheck` §E asserts the
+     * registry against this catalogue in both directions, with a seed, because that is the only
+     * instrument that can.
+     *
+     * ⚠️ **It is NOT a widening of `particles:deformed`**, and the rule for that chip says why: every
+     * member of it maps a point AFTER the figure is produced, and a figure type PRODUCES it. The
+     * `NOT_DEFORMATION` table owes no entry for a non-`overlay` key, so the exemption is recorded here
+     * instead.
+     */
+    bool('figure:curve', 'Self-similar curve',
+      'Presets whose figure is a self-similar curve — a space-filling or branching stroke built by '
+      + 'repeating a rule — rather than a sum of sine waves. ⚠️ **Reads the RESOLVED figure type, never '
+      + 'the stored string**: an unknown stored value resolves to a real type by the load order, so a '
+      + 'raw read would leave such a preset in no bucket while the engine draws it happily.',
+      (r) => r.figureType === 'lsystem'),
     bool('figure:attractor', 'Attractor',
       'Presets whose figure is driven by a strange attractor rather than by sine waves alone. Needs a named attractor AND a non-zero blend — one preset names one at zero, and its figure is pure waves.',
       (r) => r.attractorType !== null),

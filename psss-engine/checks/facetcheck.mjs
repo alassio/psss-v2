@@ -495,6 +495,18 @@ chk(`§C is pointed at ${uiFiles.length} file(s) under src/ui/`, uiFiles.length 
  * until the inventions passed, and then no invention would ever be visible again.
  */
 const INVENTED = {
+  /*
+   * v8 `36.15`. ⚠️⚠️ **THIS ONE IS NOT ACTUALLY AN INVENTION, AND THE DISTINCTION IS WORTH THE
+   * ENTRY RATHER THAN A WIDENED SCAN.** `Self-similar curve` is the figure-type registry's own
+   * `label` in `src/generators/figure-types.ts`, and the Composer's dropdown ships it DERIVED from
+   * there rather than restated — which is the property `36.20` clause 1 asserts. So it IS a shipped
+   * literal; §C simply cannot see it, because its corpus is `src/ui/` and the registry is not in it.
+   *
+   * ⚠️ **Declared rather than widening §C, on this clause's own advice** (*widening the scan instead
+   * is how a private vocabulary grows one word at a time*) — and recorded as a SCOPE gap rather than
+   * as a private word, so a later reader does not 'fix' it by renaming the chip.
+   */
+  'Self-similar curve': 'the figure-type registry label, shipped via the Composer dropdown; outside the src/ui corpus that section C scans',
   // v8 Phase 30. The Visual FX section ships the NOUN, `Deformation`; a filter chip needs the
   // adjective, because every row in its group answers *presets that ARE this* (`Sparks`, `Crystals`,
   // `Buoyancy`). ⚠️ **Declared rather than renamed, and the alternative was considered**: calling the

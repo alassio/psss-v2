@@ -1,4 +1,5 @@
 import type { UnifiedPreset, SinMagicParams, MaterialConfig, LiquidSurfaceConfig, CohesionConfig, LiquidFieldConfig, DyeFieldConfig, OverlayState } from '../presets/types.ts';
+import type { ModulatedValue } from '../core/interfaces.ts';
 import type { CategoryLock } from './state.ts';
 import { deepCopy } from './state.ts';
 // ⚠️ `OverlayRule` was `MixRule` until 2026-10-05 — renamed by 24.1 when the record grew the Randomiser's
@@ -123,13 +124,79 @@ export function interpolatePreset(
   }
 
   /**
-   * ⚠️ **`generators.type` AND `generators.attractor` ARE STILL NOT BLENDED, AND THAT IS DELIBERATE, NOT THE
-   * HOLE 23.2 CLOSED.** Both come from `deepCopy(a)` at every `t`. They are out of Phase 23's scope (23.D7
-   * names the design box and the pose and nothing else) and they are not independently fixable: snapping
-   * `type` without `attractor` would hand the engine the attractor generator with deck A's attractor
-   * parameters, and the `fractal` block below already owns the attractor's own crossfade. Fixing it means
-   * deciding what "halfway between a lissajous and an attractor figure" is — a phase, not a line.
+   * v8 `36.13` — **`generators.type` AND `generators.lsystem`, HAND-WRITTEN, because nothing would do it
+   * for them.**
+   *
+   * ⚠️⚠️ **THIS COMMENT USED TO SAY THE OPPOSITE AND IT WAS REWRITTEN RATHER THAN DELETED.** It read:
+   * *"`generators.type` and `generators.attractor` are still not blended, and that is deliberate… Fixing
+   * it means deciding what 'halfway between a lissajous and an attractor figure' is — **a phase, not a
+   * line**."* **Phase 36 is that phase, and it decided: THERE IS NO HALFWAY, so the type SNAPS.**
+   * ⚠️ `generators.attractor` is still not blended here and that half of the old note stands — the
+   * `fractal` block below owns the attractor's own crossfade.
+   *
+   * ⚠️⚠️ **`36.D1`'s COST ARRIVED EXACTLY AS PREDICTED AND `mixercheck` IS WHAT FOUND IT.** A non-`overlay`
+   * block gets **no automatic law of any kind**: `OVERLAY_RULES` is total over `OverlayState`, which is
+   * what buys an `overlay` key its Mixer law, its Randomiser column, its crossover law, its export gate
+   * and its `facetcheck` coverage for free — and a `generators` block gets none of it. The first two
+   * curve demos turned the endpoint clauses red on **20 ADDED + 20 REMOVED + 1 CHANGED** paths, every one
+   * `generators.lsystem.*`. **Nothing would have failed if this had been forgotten until a user tried it.**
+   *
+   * The law, and every clause of it is a decision rather than an implementation detail:
+   *   - **`type` SNAPS AT t = 0.5**, never at an endpoint — invariant 16, and `16.D`'s own rule for a
+   *     categorical field. A type difference is a HARD CUT and that is not a defect (`36.D18`).
+   *   - **The DORMANT block is not interpolated at all.** It is both wasted work and a correctness
+   *     question: interpolating data that affects neither picture would make the result depend on it.
+   *   - **`rule` SNAPS** — there is no interpolant between two production systems, and an intermediate
+   *     would not be a fractal at all.
+   *   - **The five `ModulatedValue` triples lerp component-wise**, which is what makes a crossfade on
+   *     `yaw` alone morph BETWEEN NAMED FRACTALS — the best Mixer demo in either spec, and something no
+   *     other crossfade in the product can do.
+   *   - ⚠️ **`descend` is GEOMETRIC, not linear.** Octaves are multiplicative, so a linear lerp from 1 to
+   *     128 spends half the crossfade above ×64. `lerpTransform`'s scale term takes the same treatment
+   *     for the same reason.
    */
+  if (!locks.has('shape')) {
+    const { t } = weight('shape');
+    // Categorical: snap at the midpoint, never at an endpoint (invariant 16).
+    const typeWinner = t < 0.5 ? a : b;
+    result.generators.type = typeWinner.generators.type;
+    const liveA = a.generators.lsystem;
+    const liveB = b.generators.lsystem;
+    if (liveA !== undefined && liveB !== undefined) {
+      // Both decks carry a curve: blend it. `rule` snaps with the type for the same reason.
+      const lerpMV = (x: ModulatedValue, y: ModulatedValue): ModulatedValue => ({
+        base: x.base + (y.base - x.base) * t,
+        amplitude: x.amplitude + (y.amplitude - x.amplitude) * t,
+        frequency: x.frequency + (y.frequency - x.frequency) * t,
+      });
+      // GEOMETRIC on `descend` -- see the header. Guarded because a non-positive base has no log.
+      const geoMV = (x: ModulatedValue, y: ModulatedValue): ModulatedValue => ({
+        base: x.base > 0 && y.base > 0 ? x.base * Math.pow(y.base / x.base, t) : x.base + (y.base - x.base) * t,
+        amplitude: x.amplitude + (y.amplitude - x.amplitude) * t,
+        frequency: x.frequency + (y.frequency - x.frequency) * t,
+      });
+      result.generators.lsystem = {
+        rule: (t < 0.5 ? liveA : liveB).rule,
+        recursion: lerpMV(liveA.recursion, liveB.recursion),
+        yaw: lerpMV(liveA.yaw, liveB.yaw),
+        pitch: lerpMV(liveA.pitch, liveB.pitch),
+        roll: lerpMV(liveA.roll, liveB.roll),
+        descend: geoMV(liveA.descend, liveB.descend),
+        smoothness: liveA.smoothness + (liveB.smoothness - liveA.smoothness) * t,
+        centre: (t < 0.5 ? liveA : liveB).centre.slice(),
+      };
+    } else {
+      // ⚠️ Only one deck (or neither) carries a curve, so there is nothing to blend TOWARD. The block
+      // follows the TYPE's winner, which keeps the result self-consistent: a result whose type is
+      // `lsystem` always has the block, and one whose type is not never gains a synthetic one.
+      const blockWinner = t < 0.5 ? a : b;
+      if (blockWinner.generators.lsystem !== undefined) {
+        result.generators.lsystem = deepCopy(blockWinner.generators.lsystem);
+      } else {
+        delete result.generators.lsystem;
+      }
+    }
+  }
 
   if (!locks.has('transmap')) {
     const { t, inv } = weight('transmap');

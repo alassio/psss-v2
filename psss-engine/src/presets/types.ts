@@ -1,4 +1,6 @@
-import type { WaveConfig, AttractorParams, RenderMode, ChannelDriver } from '../core/interfaces.ts';
+import type {
+  WaveConfig, AttractorParams, RenderMode, ChannelDriver, FigureType, LSystemConfig,
+} from '../core/interfaces.ts';
 import type { FilmLookParams, PaletteMapping } from '../renderers/film-looks.ts';
 
 // ⚠️ **The `FilmLookParams` import above is TYPE-ONLY and creates no dependency edge** (triage I11).
@@ -786,7 +788,14 @@ export interface UnifiedPreset {
     tags?: string[];
   };
   generators: {
-    type: 'lissajous' | 'attractor';
+    /**
+     * ⚠️ v8 `36.1` — widened from `'lissajous' | 'attractor'` to the registry's union. **Measured
+     * before the change: 339 of 339 presets stored `'lissajous'` and ZERO stored `'attractor'`**, so
+     * the second member was unreachable and this field had exactly one live reader (`migration.ts`'
+     * `adoptIndexPalette` gate). An unknown value is resolved at READ time by `resolveFigureType` and
+     * is never rewritten — see `generators/figure-types.ts`.
+     */
+    type: FigureType;
     particleCount: number;
     waveSpeed: number;
     rotation: number[];
@@ -797,6 +806,15 @@ export interface UnifiedPreset {
     colorFreq: number[];
     colorShift: number[];
     attractor?: AttractorParams;
+    /**
+     * v8 `36.2` — the self-similar curve block. ⚠️⚠️ **A TYPE SWITCH LEAVES EVERY OTHER BLOCK
+     * UNTOUCHED — not zeroed, not omitted, not normalised.** Three things depend on that and the
+     * sentence belongs here rather than only in the switch handler: switching is REVERSIBLE so the
+     * dropdown is safe to explore, a preset may carry several tuned figures, and forward compatibility
+     * is free. **Anyone who "tidies" a dormant block on save breaks forward compatibility without
+     * touching any code that mentions it.**
+     */
+    lsystem?: LSystemConfig;
   };
   // A REQUIRED `fields: { active: string[] }` block sat here and was deleted on 2026-08-10 (triage G8).
   // It was written at 14 sites — `migration.ts` synthesised `{ active: [] }` for every legacy preset and

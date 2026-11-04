@@ -193,6 +193,25 @@ const EXTRA_SHOTS = [
    * twenty-one inputs gone, and the one line that says the values are kept.
    */
   { tab: 'composer', file: 'lab-composer-2', scrollTo: 'Structure' },
+  /*
+   * v8 `36.22` — the self-similar curve body.
+   *
+   * ⚠️⚠️ **IT NAMES A PRESET BECAUSE THE BODY DOES NOT EXIST OTHERWISE.** The two figure types have
+   * mutually exclusive bodies, so on any wave preset this shot would photograph three wave slots and the
+   * caption would be a claim about a picture that does not show it. `Curve Morph` is chosen over the
+   * others because its rule uses yaw alone, which is the common case — a 3-D rule would show Pitch and
+   * Roll rows that most rules do not have.
+   *
+   * ⚠️ **The script RELOADS before every extra shot**, so this entry restates everything it needs rather
+   * than inheriting the previous shot's state. That reload exists because a shot once inherited an
+   * earlier shot's edits and its caption was wrong about the preset.
+   */
+  { tab: 'composer', file: 'lab-composer-curve', preset: 'Curve Morph' },
+  /*
+   * ⚠️ A SECOND curve shot on a 3-D rule, so the Pitch and Roll rows are documented as existing at all.
+   * `Curve Tilt` is the only shipped preset that modulates both.
+   */
+  { tab: 'composer', file: 'lab-composer-curve-3d', preset: 'Curve Tilt', scrollTo: 'Pitch' },
   { tab: 'composer', file: 'lab-composer-setup', group: 'Framing & Preview' },
 
   /*

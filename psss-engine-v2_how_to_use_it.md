@@ -15,9 +15,10 @@ pipeline stage by stage, the mathematics, the algorithms — that is a separate 
 
 **Part I — Foundations**
 
-- [1. What Lissajous Figures and Lissajous Knots Are](#1-what-lissajous-figures-and-lissajous-knots-are)
+- [1. The Two Kinds of Figure](#1-the-two-kinds-of-figure)
   - [The idea in one picture](#the-idea-in-one-picture)
   - [Adding the third dimension](#adding-the-third-dimension)
+  - [The second kind: self-similar curves](#the-second-kind-self-similar-curves)
   - [How PSSS uses them](#how-psss-uses-them)
 - [2. What PSSS Does](#2-what-psss-does)
   - [The particle half](#the-particle-half)
@@ -51,9 +52,11 @@ pipeline stage by stage, the mathematics, the algorithms — that is a separate 
     - [6.3.3 Fire — rising heat, and what it throws off](#633-fire--rising-heat-and-what-it-throws-off)
     - [6.3.4 Crystals — a third population that grows and stays](#634-crystals--a-third-population-that-grows-and-stays)
   - [6.4 Composer — the figure itself](#64-composer--the-figure-itself)
+    - [Figure type — the first choice on the tab](#figure-type--the-first-choice-on-the-tab)
     - [Why there are three waves](#why-there-are-three-waves)
     - [The top of the tab](#the-top-of-the-tab)
     - [Framing & Preview — the one closed header](#framing--preview--the-one-closed-header)
+    - [The curve controls](#the-curve-controls)
     - [A wave slot, control by control](#a-wave-slot-control-by-control)
     - [The seven values on every axis](#the-seven-values-on-every-axis)
     - [The readout line](#the-readout-line)
@@ -113,7 +116,7 @@ pipeline stage by stage, the mathematics, the algorithms — that is a separate 
 
 # Part I — Foundations
 
-## 1. What Lissajous Figures and Lissajous Knots Are
+## 1. The Two Kinds of Figure
 
 ### The idea in one picture
 
@@ -149,6 +152,35 @@ pulled flat without cutting it is a **knot**, and a Lissajous figure in three di
 This matters for a simple visual reason: a flat figure is a line drawing, while a knot has a front and
 a back. It can occlude itself, catch light differently where it faces you, and read as a solid object
 rather than as a diagram.
+
+### The second kind: self-similar curves
+
+Everything above describes PSSS's original figure, and it is still the one most presets use. There is a
+second kind, and it is built on a completely different idea.
+
+A **self-similar curve** is one continuous stroke produced by **repeating a small rule**. You start with
+a short path, replace every piece of it with a scaled copy of a pattern, and repeat. After a few rounds
+the stroke has folded itself into something intricate — a lattice that fills a cube, a coastline, a
+branching tree — while still being a single line you could draw without lifting the pen.
+
+The famous members of this family have names: the **Hilbert** curve, which visits every cell of a cube
+exactly once; the **dragon** and **terdragon**; the **Koch** curve; the **Gosper** island; the
+**Sierpiński** arrowhead. PSSS ships thirteen of them.
+
+What makes them useful here rather than merely pretty is one property that is easy to miss: **the angle
+the rule turns at is not part of the rule.** Run the Koch production at its published 90° and you get
+the Koch curve. Run the *same* production at 117° and you get a Sierpiński triangle — a different named
+fractal, reached by moving one dial. So a single rule plus one continuous angle is a whole family, and
+sweeping the angle animates the figure *between named shapes* rather than merely wobbling one.
+
+Two more properties matter in practice:
+
+- **Order is preserved.** Particle 1 and particle 2 sit next to each other along the stroke, exactly as
+  they do on a wave figure. That is what lets trails, ribbons, neon lines and the per-particle colour
+  controls work on this kind of figure at all.
+- **Position along the curve means something.** Because the stroke visits each region of space as one
+  unbroken run, colouring by particle index gives a smooth gradient through the figure's volume, and on
+  a branching rule it bands by branch.
 
 ### How PSSS uses them
 
@@ -1875,10 +1907,30 @@ anything at all.*
 
 ### 6.4 Composer — the figure itself
 
-This is the only tab that edits the **waves**. Everywhere else in the Lab decides how the figure is
-drawn, photographed or warped; here you decide **what shape it is**.
+This is the only tab that edits the **figure**. Everywhere else in the Lab decides how it is drawn,
+photographed or warped; here you decide **what shape it is**.
+
+#### Figure type — the first choice on the tab
+
+The row at the very top chooses which **kind** of figure the preset draws:
+
+| Type | What it is |
+|---|---|
+| **Waves** | Up to three sine waves added together per axis. The original figure, and what most presets use. |
+| **Self-similar curve** | One continuous stroke built by repeating a rule — a space-filling lattice, a coastline, a branching tree. |
+
+The rest of the tab changes with this choice, because the two kinds have nothing in common to edit: a
+wave slot cannot affect a curve, and a turn angle cannot affect a wave.
+
+**Switching is safe to explore, and that is worth knowing before you try it.** Changing the type does
+**not** clear the settings of the other kind — they are kept, and switching back restores that figure
+exactly as it was. A line under the dropdown tells you when a preset is carrying both. So one preset can
+hold a tuned wave figure *and* a tuned curve, and you can flip between them to compare.
 
 #### Why there are three waves
+
+> **This section describes the Waves type.** On a self-similar curve there are no wave slots at all —
+> see **The curve controls** below.
 
 A PSSS figure is not one sine wave but **up to three, added together**, on each of the three axes. That
 sum is the whole trick, and it is worth understanding before touching anything.
@@ -1975,6 +2027,32 @@ inside. The **reach** figure on the right is the widest the curve gets, in model
 offset on Y — and resets the particle count and sweep rate to the library's most common values. It
 leaves the render mode, the material and the film look alone, so you keep your look and start the shape
 again.
+
+#### The curve controls
+
+When the figure type is **Self-similar curve**, the three wave slots are replaced by a single **Curve**
+section. Every row here except **Rule** and **Smoothness** is a **triple** — the value, plus a **Depth**
+and a **Rate** that make it wobble over time, exactly as the wave rows work.
+
+| Row | What it does |
+|---|---|
+| **Rule** | Which fractal. This is the figure's *identity* — Hilbert, dragon, Koch, Gosper, a plant. The line under it tells you the angle at which this rule is the named fractal, how deep it can recurse, and whether it closes into a loop. |
+| **Recursion** | How many times the rule is applied. Fractional values blend two levels, so the curve **subdivides smoothly** — new detail appears *between* existing strokes rather than the whole figure growing. |
+| **Yaw** | The turn angle, left and right. **The rule's published angle is a landmark, not a limit:** other angles give other named fractals, and sweeping this is the point of the whole type. |
+| **Pitch**, **Roll** | The other two turn axes. They appear only for a rule whose pattern actually uses them — most rules are flat and turn in one plane only, so on those two rows are simply absent. |
+| **Descend** | Travels *into* the curve, revealing finer structure as you go. It is **not** Figure Scale: the figure does not get bigger, it gets deeper. Only available on rules whose structure can be indexed backwards, so it is absent on most. |
+| **Smoothness** | Rounds the curve's corners toward a spline. At 0 the stroke is exactly as the rule draws it. Raising it also makes deeper recursions readable instead of solid. |
+
+**Two things that are easy to be surprised by:**
+
+- **Picking a rule re-seats the angles** on that rule's own landmark. Each rule has a different useful
+  range, so carrying a 120° angle onto a rule whose range stops at 60° would silently clamp it and give
+  you a figure that is neither. The wobble Depth and Rate are kept, because those are your gesture
+  rather than the rule's identity.
+- **On a few rules a wobbling angle is noticeably more expensive**, and the tab says so in a note when
+  it applies. The space-filling rules — Hilbert, Moore, Peano — have to rebuild the whole stroke every
+  frame when an angle moves, because their shape is not a smooth function of the angle at any useful
+  step. Recursion and Smoothness are unaffected on every rule.
 
 #### A wave slot, control by control
 

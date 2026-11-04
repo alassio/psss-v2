@@ -1,4 +1,4 @@
-import type { Renderer, GeneratorState, ComputeBackend, GPUTarget, ParamSchema, RendererConfig } from '../core/interfaces.ts';
+import type { Renderer, GeneratorState, ComputeBackend, GPUTarget,  RendererConfig } from '../core/interfaces.ts';
 import { compileProgram } from '../core/gl-program.ts';
 import type { WebGL2Backend } from '../core/compute-backend.ts';
 import type { PaletteMapping } from './film-looks.ts';
@@ -228,14 +228,6 @@ export class RibbonRenderer implements Renderer {
 
   isAdditiveBlend(): boolean {
     return true;
-  }
-
-  getSchema(): ParamSchema {
-    return {
-      params: [
-        { key: 'ribbonWidth', type: 'number', label: 'Ribbon Width', category: 'Rendering', min: 0.5, max: 20, step: 0.5, default: 3.0 },
-      ],
-    };
   }
 
   dispose(): void {

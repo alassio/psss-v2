@@ -59,6 +59,14 @@ substantially the original mathematics. The full account is
     - [1.4.3 Escape-time sets — Julia and Mandelbrot](#143-escape-time-sets--julia-and-mandelbrot)
     - [1.4.4 Fitting an attractor into the figure's space](#144-fitting-an-attractor-into-the-figures-space)
   - [1.5 Extra populations](#15-extra-populations)
+  - [1.6 Self-similar curves](#16-self-similar-curves)
+    - [The model](#the-model)
+    - [The bracket pop retraces](#the-bracket-pop-retraces)
+    - [Resampling, and the two interpolations](#resampling-and-the-two-interpolations)
+    - [Normalisation](#normalisation)
+    - [Smoothness](#smoothness)
+    - [Descend — the self-similar zoom](#descend--the-self-similar-zoom)
+    - [What this figure source inherits, and what it does not](#what-this-figure-source-inherits-and-what-it-does-not)
 - [2. Stage 2 — Field Systems That Move Particles](#2-stage-2--field-systems-that-move-particles)
   - [2.1 Curl noise](#21-curl-noise)
   - [2.2 Cohesion](#22-cohesion)
@@ -182,7 +190,7 @@ particles into pixels; the last four operate on the **image** and no longer know
 
 | Stage | What it produces | Runs on | Edited in |
 |---|---|---|---|
-| 1 Positions | a model-space position per particle | CPU | **Composer**; Visual FX → **Figure** (Framing & Timing, Curve Basis, Deformation, Attractor) |
+| 1 Positions | a model-space position per particle | CPU | **Composer** (figure type, and either the wave slots or the curve rows); Visual FX → **Figure** (Framing & Timing, Curve Basis, Deformation, Attractor) |
 | 2 Fields | that position, nudged | CPU + GPU | Visual FX → **Fields** (all six sections); **Materials** → Fire (buoyancy) |
 | 3 Colour | an RGB value per particle | CPU | Visual FX → **Colour** (Colour Palette); **Materials** (ramps) |
 | 4 Transform | a screen-space position and a depth | CPU | Visual FX → **Figure** (Rotation, Figure Scale) |
@@ -196,6 +204,13 @@ particles into pixels; the last four operate on the **image** and no longer know
 using.** The tab's five groups — *Figure*, *Particles*, *Colour*, *Image*, *Fields* — are the pipeline
 cut where a reader can act on it, so a symptom that localises to a stage localises to a group. The two
 orders only differ where one stage is edited from two groups, and stage 5 is the only one that is.
+
+⚠️ **Stage 1 has TWO interchangeable figure SOURCES, and everything downstream of it has exactly one
+input either way.** A preset's `generators.type` selects between the additive wave sum (§1.1) and a
+self-similar curve (§1.6); both write the same model-space position array, and stages 2–9 cannot tell
+which produced it. **That is why the whole rest of this document applies unchanged to both** — the
+deformation operators, the field systems, the colour sources, the projection, the trail, the warp and
+the grade are all consumers of stage 1's output rather than of the wave model specifically.
 
 **Two consequences worth holding on to, because they explain most "why did that happen" questions:**
 
@@ -998,6 +1013,122 @@ The pool slot order is `[wave][sparks][liquid][crystals]`, and the liquid pool w
 that order rather than appended — worth knowing if you are reading index arithmetic in the source.
 
 ---
+
+### 1.6 Self-similar curves
+
+Stage 1's second figure source. A preset selects it with `generators.type: 'lsystem'`, and its parameters
+live in `generators.lsystem`.
+
+#### The model
+
+A **production system** plus a **3-D turtle**. The production is a set of string rewrite rules; applying
+them `n` times to an axiom gives a long symbol string, and the turtle walks that string, emitting a point
+every time it steps forward. `F` and `G` draw; `f` moves without drawing; `+`/`-` turn about the turtle's
+up axis (**yaw**), `&`/`^` about its left axis (**pitch**), `<`/`/` and `>`/`\` about its heading
+(**roll**); `|` turns around; `[` and `]` push and pop.
+
+This is to self-similar curves what the Fourier sum is to smooth closed ones: one model, a small
+parameter set, an open-ended family.
+
+| Fourier model | Turtle model |
+|---|---|
+| three slots per axis | a production rule |
+| per slot: size, winding, phase | per symbol: a yaw, pitch or roll turn |
+| windings choose the figure's identity | the **rule** chooses the figure's identity |
+| modulation animates it | the **angles** animate it |
+
+⚠️ **The angle is not part of the rule, and that is the property the whole type rests on.** The Koch
+quadratic production at 90° is the Koch curve; the same production at 117° is a Sierpiński triangle.
+Sweeping the angle therefore morphs the figure **between named fractals**, which no other control in the
+engine can do.
+
+#### The bracket pop retraces
+
+On `]` the turtle does **not** jump back to the branch point. It **re-emits the sub-path in reverse**,
+then restores its state. That return leg is the Euler tour's, and it is what makes a branching structure
+**one continuous curve with index adjacency preserved** — a tree drawn with a teleporting pop is a
+scatter of disconnected branches, and the chord it leaves in the point list is as long as the whole
+branch. ⚠️ It roughly doubles the list length per branch level, which is why the recursion ceiling is
+declared per rule.
+
+#### Resampling, and the two interpolations
+
+The point list has whatever length the expansion produced; the figure needs exactly `particleCount`
+positions. The list is therefore **walked continuously and interpolated between entries**, never indexed
+into — indexing gives many particles the same entry, so the minimum distance between consecutive
+particles becomes zero.
+
+Two parameters are continuous but change the list, so each is resolved by interpolating between two
+builds rather than by rebuilding every frame:
+
+- **Recursion** interpolates the list at `floor(n)` and `floor(n)+1`. Both depend only on a particle's
+  fraction along the curve, so both are fully precomputable, and the result reads as the curve
+  **subdividing** rather than scaling.
+- **An angle** interpolates two builds at the ends of a bracket, and rebuilds only when the angle leaves
+  it. ⚠️ **The bracket width is declared per rule and is derived from a measured error budget**, because
+  the figure's sensitivity to its angle differs by more than an order of magnitude across the rule set.
+  On the space-filling rules the bracket is below the point of usefulness — a deep Hilbert curve is not a
+  near-linear function of its angle at any workable width — so those rules **bypass it and rebuild each
+  frame**, which the Composer states in a note.
+
+#### Normalisation
+
+Each build is fitted to its own extent, and the fit is interpolated alongside the points. ⚠️ **This is
+what keeps an angle sweep a change of SHAPE rather than of SIZE.** A single fit captured once and held
+makes a deeper recursion a bigger figure and an angle sweep a shrinking one; a fit recomputed per frame
+makes the figure pulse. Interpolating a fit that is captured per cached bracket corner does neither.
+
+The figure is then scaled to a fraction of the preset's own design box — the same fraction and the same
+reasoning as the attractor path, so a curve and a wave figure are comparable in size rather than one
+dwarfing the other.
+
+#### Smoothness
+
+A uniform quadratic B-spline over the same points, blended toward the polyline. ⚠️ **At 0 the spline is
+not evaluated at all.** That is a branch rather than a zero weight, for two reasons: a weighted blend at
+zero is not bitwise the polyline, and evaluating the expensive path unconditionally would make the plain
+path cost more than the smoothed one. The basis sums to one at every parameter value, so smoothing cannot
+change the figure's scale — it cuts corners, which is the whole visual effect.
+
+#### Descend — the self-similar zoom
+
+Effective recursion is `recursion + log2(descend)`, and the index window narrows by the same factor. So
+the particle budget stays entirely on screen and the figure **reveals new structure** instead of being
+magnified. `Figure Scale` cannot do this: it maps the same points over a larger area, so a lattice
+becomes a few squares and then a dot.
+
+⚠️ **The window is snapped to a power-of-two sub-cube boundary, and that alignment is not an
+optimisation.** An aligned sub-cube is visited as **one contiguous run of indices**; an arbitrarily
+placed box of the same size is not, and a band taken from its extremes contains stretches of curve from
+elsewhere in the figure. The symptom is that the spacing between particles drifts as the zoom deepens
+instead of holding constant.
+
+⚠️ **It is available only on rules whose structure can be indexed backwards**, and is absent — not
+disabled — everywhere else, because on a rule without that property the band is a scattered subset: a
+picture, but not a zoom.
+
+⚠️ **Its depth is bounded by cost rather than by arithmetic.** Each octave multiplies the symbol count,
+so the ceiling is two levels above the rule's own recursion range — roughly two octaves of genuinely new
+detail. The clamp is reported rather than silent.
+
+#### What this figure source inherits, and what it does not
+
+Everything downstream of stage 1 is a consumer of positions, so the curve inherits it unchanged: the
+model-space operators (§1.3), all six field systems (§2), every colour source (§3), the projection (§4),
+every render mode (§5), the trail, the warp and the grade. **Index adjacency is preserved**, so trails,
+ribbons, neon lines and the per-particle channels work on it.
+
+Two things are specific to the wave model and are therefore absent:
+
+- **Sharpness** substitutes a triangle wave for the sine inside the wave sum. There is no sinusoid in a
+  turtle walk for it to replace.
+- **The per-slot modulation** (Pulse, Wobble) acts on wave slots, which this type does not have. Its
+  equivalent is the Depth and Rate pair on each curve row, resolved through the same operator law the
+  figure operators use — so `Speed` controls both kinds of motion with no separate wiring.
+
+⚠️ **A curve with no modulation and no rotation is a static figure, and on a static figure the trail is
+a no-op and the trajectory renderers have nothing to accumulate.** Every shipped curve preset modulates
+at least one parameter for that reason.
 
 ## 2. Stage 2 — Field Systems That Move Particles
 
@@ -3555,7 +3686,7 @@ and taking its keys; never by summing the sources, and never by counting indenta
 ```jsonc
 {
   "metadata":       { … },   // identity, and the resolution every amplitude is relative to
-  "generators":     { … },   // the curve: the wave table, colour, spin, optional attractor
+  "generators":     { … },   // the figure: its TYPE, the wave table or the curve block, colour, spin
   "renderer":       { … },   // how one particle is drawn, and how long the trail lives
   "postProcessors": { … },   // the warp's tables — plus two blocks nothing reads
   "overlay":        { … }    // everything the Lab owns; AUTHORITATIVE wherever the two overlap
@@ -3565,6 +3696,19 @@ and taking its keys; never by summing the sources, and never by counting indenta
 The first four are the shape the format had before the Lab existed. `overlay` is where the engine's own
 vocabulary lives — film looks, materials, the warp chain, crystals, the six field systems — and it is
 why two of `postProcessors`' three members are inert ([§10.7](#107-the-blocks-nothing-reads)).
+
+⚠️ **`generators.type` selects which figure source runs, and the per-type parameter blocks
+are INDEPENDENT of each other.** `type: "lissajous"` reads `generators.waves`; `type: "lsystem"`
+reads `generators.lsystem`. **A preset may carry both, and the one that is not live is preserved
+rather than cleared** — on export, on import, in a snapshot and through a type switch in the
+Composer. That is what makes switching reversible, and what lets one preset hold a tuned version of
+each.
+
+⚠️ **An unrecognised `type` is resolved on READ and never rewritten.** The order is: a known
+type wins; otherwise a parameter block belonging to a known type selects that type and the UI shows a
+one-line notice; otherwise the default type with defaults. **It never throws and never renders an
+empty frame.** The preset on disk is left exactly as it was, so a file written by a newer build keeps
+working when it returns to that build.
 
 | Block | Required fields | Notes |
 |---|---|---|
@@ -4466,6 +4610,17 @@ fix.
 > ⚠️ **An unmet precondition almost never looks like an error.** It looks like a working control with
 > no effect, which sends you to the wrong subsystem. That is the whole reason this table is measured
 > rather than reasoned: the third column is what was actually observed on screen.
+
+**The self-similar curve type's own preconditions:**
+
+| Control | Needs | When unmet it looks like | Fix |
+|---|---|---|---|
+| **Every curve row** | `Figure type` set to **Self-similar curve** | The rows are not merely inert — they are **absent**, because the two types have mutually exclusive bodies. If you are looking for them on a wave preset there is nothing to find. | Switch the type at the top of the Composer. Your wave settings are kept. |
+| **Pitch**, **Roll** | a rule whose pattern contains pitch or roll turns | **Absent, not disabled.** Most rules are flat and turn in one plane, so two of the three angle rows simply do not appear. Only two of the thirteen rules use them. | Pick a rule that turns in three dimensions; the provenance line under **Rule** is the quickest way to tell. |
+| **Descend** | a rule whose structure can be indexed backwards | **Absent on most rules.** Without that property a zoom would select scattered pieces of the curve rather than one region — a picture, but not a zoom — so the control is withheld instead of lying. | Pick a rule that supports it. |
+| **Descend**, at depth | headroom below the cost ceiling | The figure stops revealing new detail and the spacing between particles begins to drift. The readout reports the clamp. | Lower **Recursion** to buy depth, or accept the ceiling: it is about two octaves of genuinely new structure. |
+| **Smoothness** | a value above 0 | At exactly 0 the stroke is drawn precisely as the rule produces it, with no spline evaluated at all. That is the intended identity, not a failure. | Raise it. The visible range is the lower half; the top is measurably flat. |
+| **The trail**, **ribbons**, **neon lines** | at least one modulated curve parameter, or a non-zero Rotation | A completely static curve gives the trail nothing to accumulate and the trajectory renderers nothing to join, so all three go quiet while appearing to be on. | Give one row a non-zero **Depth** and **Rate**. Every shipped curve preset does. |
 
 > ⚠️ **A control this table says is inert may now be INVISIBLE instead, and the two symptoms need
 > different handling.** Visual FX, Materials and the Composer hide what is switched off: a section whose

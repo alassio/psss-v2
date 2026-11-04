@@ -419,6 +419,42 @@ const AUTHORED_INDEX_PALETTES = {
   'Quader Deep Orbit': 'Cycle: Neutral',
   'Square Mosaic': 'Ocean',
   /*
+   * ─── v8 `36.21`, 2026-11-03 — the SELF-SIMILAR CURVE demos ─────────────────────────────────────
+   *
+   * ⚠️ **TWO rows, both AUTHORED and neither from an export: they are TS bodies, and `MigrationLayer`
+   * never sees one — adoption only ever runs over the legacy JSON.** Both are the first presets in the
+   * library to store `generators.type: 'lsystem'`.
+   *
+   * ⚠️ **`paletteMapping: 'index'` IS LOAD-BEARING ON THIS FIGURE TYPE RATHER THAN DECORATIVE, which is
+   * why the pair is authored rather than left to a look.** On a locality-preserving rule the curve
+   * visits each sub-cube as a CONTIGUOUS INDEX RANGE, so `index` is a smooth 3-D gradient and a
+   * bracketed rule bands by branch. `velocity` would be the wrong driver twice over — the figure has
+   * no intrinsic motion (`motion: 'static'`).
+   *
+   * ⚠️⚠️ **EIGHT rows, and the NINTH demo's absence is the finding.** `Curve Subdivide` authors
+   * `palette: 'Warm'` under `paletteMapping: 'depth'`, so it is **not in this clause's population
+   * at all** — the clause reads `index`-mapped bodies. It was declared here while it mapped
+   * `index` and had to be REMOVED when the owner's finetuned export changed the mapping, which is
+   * this clause working in the direction nobody expects: **a declaration that stops being true is
+   * as much a defect as a missing one.**
+   *
+   * ⚠️ **The other eight all map `index` and all author their palette explicitly**, because `index` is
+   * load-bearing on this figure type rather than decorative: a locality-preserving rule visits each
+   * sub-cube as a CONTIGUOUS index range, so `index` is a smooth 3-D gradient and a bracketed rule
+   * bands by branch. `velocity` would be wrong twice over — the type declares `motion: 'static'`.
+   *
+   * ⚠️ `Curve Morph`'s palette is explicit because its look is `Customize`, which **adopts
+   * nothing** — it is an edit mode, so the pair has to be authored or there is no palette at all.
+   */
+  'Curve Lattice': 'Prismatic',
+  'Curve Descent': 'Cycle: Azure',
+  'Curve Gasket': 'Pastel',
+  'Curve Island': 'Ocean',
+  'Curve Thicket': 'Warm',
+  'Curve Volume': 'Neon',
+  'Curve Tilt': 'Prismatic',
+  'Curve Morph': 'Neon',
+  /*
    * ─── v8 `35.7`, 2026-10-30 — the ORIENTATION-ANGLE demos ──────────────────────────────────────
    *
    * ⚠️ **ONE row, and it is `Warp Split Shapes`' case inherited rather than a new one.**

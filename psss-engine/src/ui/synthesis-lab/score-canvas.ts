@@ -32,7 +32,16 @@
  * cyan for the size extreme, amber for the winding extreme, white for `now`. The ghost is retired.
  */
 
-import type { WaveConfig } from '../../core/interfaces.ts';
+import type { WaveConfig, LSystemConfig } from '../../core/interfaces.ts';
+// ⚠️⚠️ v8 `36.12` — these three are SAFE here and the reason is the rule this file's header states:
+// `composercheck` imports this module under bare Node, which strips types only. All three import
+// NOTHING at runtime and contain no `enum` and no constructor parameter property, so the chain stays
+// loadable. **Do not add an import here that reaches the DOM or a GL type.**
+import {
+  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, type RuleKey,
+} from '../../generators/lsystem/rules.ts';
+import { walkTurtle } from '../../generators/lsystem/turtle.ts';
+import { captureExtent } from '../../generators/lsystem/curve.ts';
 /*
  * v8 `34.1` — **the wave law is SHARED with the generator and this file no longer owns a copy of it.**
  *
@@ -439,6 +448,81 @@ export function computeScore(waves: readonly WaveConfig[], plane: ScorePlane): S
   }
   return { path, ghost, extent, undersampled, maxWinding };
 }
+
+/**
+ * v8 `36.12` — **the Score for the self-similar curve type (`36.D2`, owner).**
+ *
+ * ⚠️⚠️ **A NEW EXPORTED FUNCTION, NEVER A DEFAULTED PARAMETER ON `computeScore`.** That function keeps
+ * arity 2 and `plane` stays REQUIRED: `composercheck` carries an arity clause whose message records that
+ * the arity was last wrong when a caller passed a value it should not have, and 259 clauses measure the
+ * wave path through it. **Widening it would put the new type inside every one of them.**
+ *
+ * ⚠️⚠️ **IT TAKES NO `time`, FOR THE SAME ALGEBRAIC REASON `computeScore` TAKES NONE.** At `pos === 0`
+ * the modulator sine is 0, so an instantaneous amplitude is not amplitude — **the Score draws the BASES.**
+ * ⚠️ And §16's ghost-instant lesson applies to any second outline: a readout sampling one instant of
+ * something periodic must not sample `t = 0`, and a ghost at +½ period shifts every argument by `k·π` and
+ * draws the SAME picture — the defect that affected 191 of 399 presets. **So this returns `ghost: null`
+ * rather than guessing an instant**; if the curve ever wants a breathing indicator, SEARCH the instants.
+ *
+ * ⚠️ **`ScoreResult`'s shape is returned unchanged so `drawScore` is reused verbatim** — three panes, the
+ * same auto-fit, the same `scorePad`. The new type gets the Composer's existing diagram, which is what
+ * `36.D2` is for: it is the surface an author reads *while authoring*, and the thing that makes the type
+ * feel parallel rather than bolted on.
+ *
+ * ⚠️ **`undersampled` means something different here and the difference is stated rather than reused
+ * silently.** For a wave it means the winding needed more samples than the ceiling allows. For a curve it
+ * means the expander hit `EXPAND_SYMBOL_BUDGET`, i.e. the figure drawn is a TRUNCATED expansion — which
+ * reads as a different rule rather than as a coarse one, so the label saying so matters more, not less.
+ */
+export function computeCurveScore(cfg: LSystemConfig, plane: ScorePlane): ScoreResult {
+  const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+  const [ax, ay] = PLANE_AXIS_INDEX[plane];
+
+  // The BASES, never an instant — see the header.
+  const recursion = Math.min(rule.recursionRange[1],
+    Math.max(rule.recursionRange[0], cfg.recursion.base));
+  const walk = walkTurtle(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base);
+
+  // Normalised by its own extent, which is the same canonical fit the engine's figure source uses, so
+  // the diagram and the figure agree in shape even though they differ in absolute scale.
+  const tf = captureExtent(walk.xyz, walk.count);
+  const n = Math.min(walk.count, CURVE_SCORE_SAMPLES);
+  const stride = walk.count > n ? (walk.count - 1) / Math.max(1, n - 1) : 1;
+  const path = new Float32Array(n * 2);
+  let extent = 0;
+  const inv = 1 / tf.scale;
+  const ctr = [tf.cx, tf.cy, tf.cz];
+  for (let i = 0; i < n; i++) {
+    const src = Math.round(i * stride) * 3;
+    const hx = (walk.xyz[src + ax]! - ctr[ax]!) * inv;
+    const hy = (walk.xyz[src + ay]! - ctr[ay]!) * inv;
+    path[i * 2] = hx;
+    path[i * 2 + 1] = hy;
+    if (Math.abs(hx) > extent) extent = Math.abs(hx);
+    if (Math.abs(hy) > extent) extent = Math.abs(hy);
+  }
+
+  return {
+    path,
+    // See the header: no instant is guessed, so there is no ghost.
+    ghost: null,
+    extent,
+    undersampled: walk.truncated,
+    // ⚠️ `maxWinding` has no meaning for a curve. Reporting the RECURSION in its place would be two
+    // quantities wearing one name, which is the mistake this file's own `PLANE_AXIS_INDEX` header warns
+    // about — so it reports 0, and the label reads the recursion from the config instead.
+    maxWinding: 0,
+  };
+}
+
+/**
+ * How many points the curve diagram plots.
+ *
+ * ⚠️ Fewer than the figure's particle count on purpose: a 300 px pane cannot show 50 000 points, and the
+ * curve's shape is carried by its envelope rather than by its density. Deliberately a power of two so the
+ * stride arithmetic is exact at the common recursion depths.
+ */
+const CURVE_SCORE_SAMPLES = 4096;
 
 /**
  * Draw a computed Score into a 2D canvas.

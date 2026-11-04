@@ -82,6 +82,25 @@ export function crossoverPresets(
   // ⚠️ **KEPT VERBATIM, AND IT IS THE ONE GENETIC OPERATOR THE MIXER DOES NOT HAVE.** Lerping two wave
   // tables was proposed and declined by the owner: averaging different tables mostly yields a figure
   // resembling neither parent, and it removes the discrete jumps that make a gallery worth scanning.
+  /*
+   * v8 `36.15`/`36.D18` — **the figure TYPE and its config cross as ONE WHOLE-BLOCK CHOICE, never per
+   * field.**
+   *
+   * ⚠️ **A per-field crossover here would build a figure neither parent has**: taking `rule` from A and
+   * the angles from B gives a production run at an angle that is not its landmark, which is a valid curve
+   * and nobody's offspring. **The type and the block travel together or the result is incoherent.**
+   *
+   * ⚠️ The choice is the SAME parent for both, which is what makes it a block rather than two
+   * coincidental fields — and it is why this cannot be expressed as two entries in a generic table.
+   */
+  {
+    // The same `rnd() < blend` draw every other block here uses, so the type follows the same bias.
+    const src = rnd() < blend ? b : a;
+    result.generators.type = src.generators.type;
+    if (src.generators.lsystem !== undefined) result.generators.lsystem = deepCopy(src.generators.lsystem);
+    else delete result.generators.lsystem;
+  }
+
   const maxWaves = Math.max(a.generators.waves.length, b.generators.waves.length);
   result.generators.waves = [];
   for (let w = 0; w < maxWaves; w++) {

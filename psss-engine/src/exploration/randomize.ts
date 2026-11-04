@@ -421,6 +421,24 @@ function jitterRuled(value: number, key: KeysWithMutate<'continuous'>, sigma: nu
 
 function applyGaussianJitter(preset: UnifiedPreset, sigma: number, locks: Set<CategoryLock>, stats: PresetStatistics): void {
   if (!locks.has('shape')) {
+    /*
+     * v8 `36.15`/`36.D20` — **`generators.lsystem` DOES NOT ROLL, and the REASON is recorded here rather
+     * than the absence being left to be discovered.**
+     *
+     * `rule` is categorical and has no interpolant. The three angles and the recursion each move the
+     * figure to a **different NAMED fractal** rather than to a variant of the same one, so a roll would
+     * hand back a different figure rather than variety — **which reads as the Randomiser being broken**,
+     * exactly as `34.D10` reasoned about `Offset` and centring.
+     *
+     * ⚠️⚠️ **WRITTEN AS A COMMENT AT THE SITE THAT WOULD DO IT, AND DELIBERATELY NOT AS A `mutate` COLUMN
+     * ON A REGISTRY WITH NO READER FOR IT.** `34.D13` is the trap: `jitterRuled` has FOUR literal call
+     * sites while SIXTEEN `overlay` keys declare `mutate: 'continuous'` and have NONE — **a declaration
+     * is not a behaviour**, and adding one here would advertise a roll that does not happen.
+     *
+     * ✅ **Evolution's crossover is the opposite case and DOES owe an entry** — it reads `law` generically
+     * and reaches `generators` fields — so `evolution-ops.ts` carries one, as a WHOLE-BLOCK choice and
+     * never a per-field lerp (`36.D18`).
+     */
     preset.generators.particleCount = Math.max(10, Math.round(jitter(preset.generators.particleCount, 'generators.particleCount', sigma, stats)));
     for (let w = 0; w < preset.generators.waves.length; w++) {
       const wave = preset.generators.waves[w]!;

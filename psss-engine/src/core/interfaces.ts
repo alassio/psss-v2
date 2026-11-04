@@ -147,16 +147,23 @@ export interface Generator {
   init(config: GeneratorConfig, canvasSize: CanvasSize): void;
   update(dt: number): void;
   getState(): GeneratorState;
-  getSchema(): ParamSchema;
   dispose(): void;
 }
 
-export interface ForceField {
-  readonly id: string;
-  apply(positions: Float32Array, velocities: Float32Array, dt: number): void;
-  getSchema(): ParamSchema;
-  dispose(): void;
-}
+/**
+ * ⚠️ **`ForceField` WAS DELETED HERE BY v8 `36.17` (`36.D19`), AND THIS NOTE IS IN THE
+ * `PostProcessor` DELETION'S OWN STYLE SO THE EXTENSION POINT IS NOT RE-INVENTED.**
+ *
+ * It declared `name`, `apply()` and `getSchema()` and had **ZERO implementations** — `grep -rn
+ * "implements ForceField"` returned nothing, and `TransMapForceField`, the one class whose name
+ * suggests it, does not implement it. The force fields the engine actually ships
+ * (`TransMapForceField`, spark `applyForceField`, the crystal cluster force) are all wired
+ * directly, because each needs a different signature and a different call site in the frame.
+ *
+ * **Deleted with `ParamSchema` and `ParamDef` for the reason this file already states eight lines
+ * above: *a declared contract that nothing satisfies is worse than none — it tells the next author
+ * to conform to a shape the code does not use.***
+ */
 
 export interface Renderer {
   readonly id: string;
@@ -171,7 +178,6 @@ export interface Renderer {
    */
   render(state: GeneratorState, target: GPUTarget, dtSeconds?: number): void;
   resize(width: number, height: number): void;
-  getSchema(): ParamSchema;
   dispose(): void;
 }
 
@@ -233,22 +239,6 @@ export interface BlendDescriptor {
   dst: 'one' | 'one-minus-src-alpha' | 'zero';
 }
 
-export interface ParamSchema {
-  params: ParamDef[];
-}
-
-export interface ParamDef {
-  key: string;
-  type: 'number' | 'boolean' | 'select' | 'color';
-  label: string;
-  category: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  default: number | boolean | string;
-  options?: { value: string; label: string }[];
-}
-
 export interface CanvasSize {
   width: number;
   height: number;
@@ -273,15 +263,32 @@ export interface CanvasSize {
  * `UnifiedPreset.metadata`, and both call sites lift it across by hand. Do not "fix" that by moving the
  * field: `metadata` is where the migration layer defaults it (100×100 for all 177 legacy presets).
  *
- * The `[key: string]: unknown` index signature is retained deliberately — a generator type other than
- * `lissajous` may carry its own parameters, and `ParamSchema` is how they are surfaced. It is what makes
- * this interface open, so adding a field here can never be a breaking change.
+ * ⚠️⚠️ **THE INDEX SIGNATURE'S JUSTIFICATION WAS REWRITTEN BY v8 `36.17`, AND THE OLD ONE WAS A TRAP.**
+ * It read: *"a generator type other than `lissajous` may carry its own parameters, and `ParamSchema` is
+ * how they are surfaced"* — i.e. it argued for keeping the very interface `36.D19` deletes, which is
+ * why the paragraph had to change in the SAME edit. **Phase 36 answers the question it was speculating
+ * about:** a second figure type carries its parameters in a **typed per-type config block**
+ * (`LSystemConfig`) read by a **hand-written** section, not by a schema. ⚠️ **Do NOT build the
+ * Composer's per-type sections from a schema** — every per-type section this product needs has
+ * non-generic behaviour (a Score canvas, slot mute toggles, a ratio picker, derived readouts, a
+ * rule-provenance line, per-rule track bounds), and all three slider instruments read hand-written
+ * descriptors.
+ *
+ * The signature itself is RETAINED, for its other stated reason: it is what makes this interface open,
+ * so adding a field here can never be a breaking change.
  */
 export interface GeneratorConfig {
-  type: string;
+  /**
+   * ⚠️ **NARROWED FROM `string` BY `36.1`, AND THE NARROWING IS THE POINT OF THE STEP**: it is what
+   * makes a typo at either of the two call sites (`main.ts`' `initGenerator`, `grid-tile-renderer.ts`)
+   * a COMPILE ERROR instead of a figure that silently draws as waves.
+   */
+  type: FigureType;
   particleCount: number;
   waves?: WaveConfig[];
   attractor?: AttractorParams;
+  /** v8 `36.2` — the self-similar curve block. Optional: a preset carries only what it uses. */
+  lsystem?: LSystemConfig;
   /** Wave phase advance per unit time. Default 0.05 when absent. */
   waveSpeed?: number;
   /** Rotation SPEED per axis, degrees/second — accumulated every frame. */
@@ -341,10 +348,129 @@ export interface WaveConfig {
   axes: [AxisWave, AxisWave, AxisWave];
 }
 
+/**
+ * v8 `36.1` — **every figure type the format can store.**
+ *
+ * ⚠️⚠️ **THE TYPE LIVES HERE AND THE REGISTRY LIVES IN `generators/figure-types.ts`, AND THAT SPLIT IS
+ * THIS FILE'S OWN DOCUMENTED RULE RATHER THAN A PREFERENCE.** `ChannelDriver`'s header, a few hundred
+ * lines up, states it: a union named by `presets/types.ts` belongs in the module every other one
+ * imports, because *"putting it beside the implementation would have pointed the preset format at the
+ * generator, which is the wrong direction."* `FigureType` is named by `presets/types.ts`,
+ * `GeneratorConfig` below, the generator, the Composer and every checker — so the union is here and the
+ * **data** (labels, descriptions, `selectable`, `motion`, the resolution order) is there, importing this.
+ *
+ * ⚠️ **`'lissajous'` IS THE STORED WORD AND IS KEPT FOR COMPATIBILITY** even though its UI label is
+ * `Waves`: 339 presets and every legacy JSON carry the string. **A stored word printed in a UI, or a
+ * label persisted to disk, is the defect** — `reel-store.ts`'s rule, generalised.
+ *
+ * ⚠️ `RENDER_MODE_LABELS`' lesson applies verbatim: a union buys type safety, **not enumeration
+ * coverage.** `FIGURE_TYPE_BY_KEY` is the total `Record` that supplies the coverage.
+ */
+export type FigureType = 'lissajous' | 'attractor' | 'lsystem';
+
+/**
+ * Does the figure move on its own, with no modulation and no rotation?
+ *
+ * ⚠️⚠️ **THE ONE CAPABILITY DECLARATION THAT SHIPS (`36.D9`), AND IT SHIPS BECAUSE IT EARNS A READER IN
+ * THIS PHASE.** `SPEC-figure-types` §1.5 proposes five; the other four are cut individually, because a
+ * declared contract with no satisfier *"tells the next author to conform to a shape the code does not
+ * use"* (the `PostProcessor` deletion note in this file) — the `ParamSchema` mistake that `36.17`
+ * deletes three interfaces for.
+ *
+ * **What it guards, narrowed by measurement rather than taken from the spec:** velocity is derived at
+ * `lissajous.ts:2787` from a **screen-space** delta of PROJECTED positions, so **rotation alone produces
+ * a full `[0,1]` spread.** The freeze is reachable only on rotation `[0,0,0]` **and** no modulated
+ * parameter — and **66 of 339 presets have zero rotation**, so the configuration exists. Readers: the
+ * velocity-derived set (velocity-mapped heat, velocity stretch, slowness-keyed crystal birth,
+ * threshold-keyed spark ejection). ⚠️ **Crystals are the dangerous one: slowness-keyed birth sees every
+ * particle as slow and freezes the whole figure.** ⚠️ **Resolve it ONCE outside the particle loop.**
+ */
+export type FigureMotion = 'intrinsic' | 'static';
+
+/**
+ * v8 `36.3`/`36.D6` — **a static value plus a wobble, named ONCE.**
+ *
+ * `base` is the static value, `amplitude` the wobble SIZE, `frequency` the wobble RATE. This is the
+ * owner's *"similarly parametrized way"* made concrete and it is the shape Phase 36's whole
+ * parametrisation is built on.
+ *
+ * ⚠️⚠️ **IT EXISTED TWICE WITH NO COMPILER BETWEEN THE COPIES UNTIL THIS EDIT.** `AxisWave.am` and
+ * `AxisWave.fm` were each the anonymous inline object `{ base: number; amplitude: number; frequency:
+ * number }`, written out twice, with no name connecting them — the defect class this project keeps
+ * correcting. **Naming it is the point; do not re-inline either copy.**
+ *
+ * ⚠️⚠️ **THE RENAME IS LOAD-BEARING AT EXACTLY ONE SITE AND THAT SITE MUST SURVIVE.**
+ * `lissajous.ts:124-125` translates this shape into the generator's internal `{base, amp, freq}` **with
+ * `?? 0` defaulting, so the translation IS the normaliser** — deleting or relocating it moves behaviour
+ * on any preset with a missing field (`34.1`'s finding, still live). **Keep the translation; name the
+ * type.**
+ *
+ * ⚠️⚠️ **`frequency` NAMES THE ROLE, NOT THE UNIT, AND THE TWO USERS READ IT ON DIFFERENT SCALES.** For
+ * a wave slot it is the slot rate `AxisWave` has always used. For `LSystemConfig` it is read on Phase
+ * 34's **`OP_RATE_*`** scale from `core/deform-limits.ts`, which already carries a measured zero band, a
+ * `LIVE_FROM` and a track (`36.D6c`). **Two fields with one name and two scales is a trap, and the
+ * resolution is that each consumer's own type declaration states its scale** — `LSystemConfig` does,
+ * below. The alternative (reusing the slot scale) was refused because it would put a second rate
+ * convention beside eleven breathing quantities that already share one.
+ */
+export interface ModulatedValue {
+  base: number;
+  amplitude: number;
+  frequency: number;
+}
+
 export interface AxisWave {
   phase: number;
-  am: { base: number; amplitude: number; frequency: number };
-  fm: { base: number; amplitude: number; frequency: number };
+  am: ModulatedValue;
+  fm: ModulatedValue;
+}
+
+/**
+ * v8 `36.3` — **the self-similar curve type's parameters** (`generators.lsystem`).
+ *
+ * ⚠️⚠️ **FIVE PARAMETERS ARE TIME-MODULATED AND THE REST ARE STATIC (`36.D3`, owner).** The three
+ * turtle angles, the continuous recursion and the zoom breathe; the rule and the centre do not.
+ * **That is what makes the trail mean something on this type:** on a truly static figure the trail is a
+ * no-op — the figure is already everywhere it will ever be — and **333 of 339 presets carry
+ * `decayFactor > 0`** (median 0.85). So `36.D3` is what makes the owner's *"drive interesting
+ * animations from those parameters"* reachable at all.
+ *
+ * ⚠️⚠️ **THE RATE UNIT IS `OP_RATE_*`, NOT THE WAVE-SLOT `frequency` SCALE** — see `ModulatedValue`.
+ * ⚠️ **No new modulation law:** all five resolve through the shipped `resolveOp`/`opTriple`
+ * (`lissajous.ts:1826`/`:1838`), which is `base + sin(time · rate / DEG) · depth` with a `depth === 0`
+ * BRANCH for bit-exactness and a clamp on the RESOLVED value. ✅ **And the clock comes free:
+ * `scaledTime = this.pos`, so the breathing rides the same accumulator the wave slots do and
+ * `speedFactor` controls it with no new wiring.**
+ *
+ * ⚠️ **`shrink` IS ABSENT BY OWNER DECISION** (`36.Q4`, 2026-11-02, reversing `36.D12`) — it was
+ * measured inert on every shipping rule. Do not re-add it; see `generators/lsystem/turtle.ts`.
+ *
+ * ⚠️ **`recursion`'s label is `Recursion`, NEVER `Depth`** (`36.D15`): Phase 34 made `Depth` mean
+ * *breathing amplitude* across `sharpnessDepth`/`travelDepth*`/`growDepth*`/`offsetDepth*`, and a row
+ * labelled `Depth` meaning recursion next to five rows whose wobble control is also called Depth is the
+ * repeated-label hazard that invalidated two of Phase 32's six measurement passes.
+ */
+export interface LSystemConfig {
+  /** The production system's key — a `RuleKey` from `generators/lsystem/rules.ts`. Categorical. */
+  rule: string;
+  /** Continuous recursion depth; lerped between its integer bracket (`36.6`). */
+  recursion: ModulatedValue;
+  /** Turtle yaw, about the `U` axis, in degrees. ⚠️ NOT the figure's orientation — that is `Rotation`. */
+  yaw: ModulatedValue;
+  /** Turtle pitch, about `L`. Hidden for a rule whose symbol set has no pitch symbols (DERIVED). */
+  pitch: ModulatedValue;
+  /** Turtle roll, about `H`. Hidden for a rule whose symbol set has no roll symbols (DERIVED). */
+  roll: ModulatedValue;
+  /**
+   * The self-similar zoom. ⚠️ **Staged LAST (`36.D13`) and available only on a rule that declares an
+   * inverse index map** — on a rule without one the index band is not contiguous, so a zoom would
+   * select a scattered subset: *a picture, but not a zoom, i.e. a control that lies.*
+   */
+  descend: ModulatedValue;
+  /** Blend toward the polyline's spline form. ⚠️ A BRANCH at 0, never a weight (`36.D10`). Static. */
+  smoothness: number;
+  /** The zoom's centre in figure space. Static (`36.D3`). */
+  centre: number[];
 }
 
 export interface AttractorParams {

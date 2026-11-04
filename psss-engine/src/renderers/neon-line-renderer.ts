@@ -1,4 +1,4 @@
-import type { Renderer, GeneratorState, ComputeBackend, GPUTarget, ParamSchema, RendererConfig } from '../core/interfaces.ts';
+import type { Renderer, GeneratorState, ComputeBackend, GPUTarget,  RendererConfig } from '../core/interfaces.ts';
 import { compileProgram } from '../core/gl-program.ts';
 import type { WebGL2Backend } from '../core/compute-backend.ts';
 import type { PaletteMapping } from './film-looks.ts';
@@ -303,14 +303,6 @@ export class NeonLineRenderer implements Renderer {
 
   isAdditiveBlend(): boolean {
     return true;
-  }
-
-  getSchema(): ParamSchema {
-    return {
-      params: [
-        { key: 'lineWidth', type: 'number', label: 'Line Width', category: 'Rendering', min: 0.5, max: 10, step: 0.5, default: 2.0 },
-      ],
-    };
   }
 
   dispose(): void {

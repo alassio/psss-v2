@@ -1490,6 +1490,45 @@ export const TAB_TIPS: Record<string, string> = {
     + 'as plain stars, to see the figure the material is sitting on. ⚠️ Nothing is saved either way, and a preset '
     + 'whose look depends on the liquid surface will look very different while this is off.',
 
+  /* ── The figure type and the self-similar curve (v8 36.11) ────────────────────────────────────────────
+   *
+   * ⚠⚠ **FOUR OF THESE NINE CARRY SOMETHING NOTHING ELSE IN THE PRODUCT SAYS, and `36.18` names them:**
+   * `rule` (that it chooses the figure's IDENTITY while the angles animate it — the model's whole idea, and
+   * not guessable from the controls), `yaw` (that the published angle is a LANDMARK rather than a limit, and
+   * that other angles give other named fractals — without this an author treats the default as the only
+   * correct value), `descend` (that it is NOT `Figure Scale`), and `figureType` (that switching is
+   * non-destructive). The other five are ordinary.
+   */
+  'composer.figureType': 'Which kind of figure this preset draws. Switching keeps the other kind\'s '
+    + 'settings rather than clearing them, so you can switch back and forth freely \u2014 and a preset can '
+    + 'carry a tuned version of both.',
+  'composer.curve': 'A self-similar curve: one continuous stroke that fills space or branches, built by '
+    + 'repeating a small rule. The rule picks WHICH fractal; the angles below animate it.',
+  'composer.rule': 'The production rule, which is the figure\'s identity \u2014 Hilbert, dragon, Koch, '
+    + 'Gosper, a plant. \u26a0 The angles below are NOT part of the rule: run one rule at another angle and '
+    + 'you get a valid, different, still self-similar curve. That is what makes this one dial a family.',
+  'composer.recursion': 'How many times the rule is applied. Fractional values blend two levels, so the '
+    + 'curve subdivides smoothly instead of jumping \u2014 new detail appears BETWEEN existing strokes '
+    + 'rather than the whole figure scaling. The range is the rule\'s own.',
+  'composer.yaw': 'The turtle\'s left/right turn, in degrees. \u26a0 The rule\'s published angle is a '
+    + 'LANDMARK, not a limit \u2014 it is where this production is the NAMED fractal, and other angles give '
+    + 'other named fractals. Sweeping it is the point. \u26a0 This is not the figure\'s orientation; that is '
+    + 'Rotation, in Visual FX.',
+  'composer.pitch': 'The turtle\'s up/down turn, in degrees. Only shown for a rule whose production '
+    + 'actually contains pitch symbols \u2014 most are flat and use yaw alone.',
+  'composer.roll': 'The turtle\'s spin about its own heading, in degrees. Only shown for a rule whose '
+    + 'production actually contains roll symbols.',
+  'composer.descend': 'Travels INTO the curve, revealing finer structure as you go. \u26a0 It is not '
+    + 'Figure Scale and not a zoom of the picture: the figure does not get bigger, it gets DEEPER, because '
+    + 'the recursion and the slice of the curve on screen move together. Only available on rules whose '
+    + 'structure can be indexed backwards.',
+  'composer.smoothness': 'Rounds the curve\'s corners toward a spline. At 0 the curve is left exactly as '
+    + 'the rule draws it; raising it relaxes the hard turns, which also makes deeper recursions readable '
+    + 'instead of solid.',
+  'composer.curveDepth': 'How far this value wobbles \u2014 it is added to and subtracted from the value '
+    + 'above over time. Zero holds it still.',
+  'composer.curveRate': 'How fast the value above wobbles. Zero holds it still, whatever the depth.',
+
   /* ── The Transmap tab (v8 21.12) ──────────────────────────────────────────────────────────────────────
    *
    * ⚠️ **THE WORKING PHRASE "field editor" IS RETIRED AND MAY NOT RETURN HERE** (owner, 2026-09-21). The tab

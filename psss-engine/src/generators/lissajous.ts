@@ -1,5 +1,10 @@
-import type { Generator, GeneratorState, GeneratorConfig, CanvasSize, ParamSchema, AttractorParams, WaveConfig,
-  ChannelDriver } from '../core/interfaces.ts';
+import type { Generator, GeneratorState, GeneratorConfig, CanvasSize,  AttractorParams, WaveConfig,
+  ChannelDriver, FigureType, LSystemConfig } from '../core/interfaces.ts';
+import {
+  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, DESCEND_MIN, DESCEND_MAX, type RuleKey,
+} from './lsystem/rules.ts';
+import { createFigureCache, resolveFigure } from './lsystem/figure.ts';
+import { LSYSTEM_DESIGN_FRACTION } from './lsystem/curve.ts';
 import { createAttractorState, initAttractorState, iterateAttractor, type AttractorState } from './attractors.ts';
 import type { CurlNoiseConfig, PhysarumConfig, MaterialConfig, BuoyancyConfig, SparkConfig, CrystalRenderConfig, CohesionConfig, LiquidFieldConfig } from '../presets/types.ts';
 import { CrystalPool } from '../crystal/crystal-pool.ts';
@@ -202,6 +207,28 @@ export class LissajousGenerator implements Generator {
   private velRefEMA = 0;
 
   private waves: LegacyWaveAxis[][] = [];
+  /*
+   * v8 `36.10` — **the figure-source seam's whole state.** `figureType` selects which source fills the
+   * `[wave]` block's positions; everything after the fill is untouched.
+   *
+   * ⚠️⚠️ **THE SEAM IS A BRANCH INSIDE `update()`, NOT A SECOND `Generator` IMPLEMENTATION (`36.D5`),
+   * and that is `31.D1`'s measured ground rather than a preference:** `main.ts:845` is
+   * `const generator = new LissajousGenerator();` — hardwired, constructed once, never replaced —
+   * **seven adoption sites depend on that**, and Phase 30's twist/box-fold/bias state survives `init()`
+   * precisely *because* the object is not rebuilt. A swappable `generator` invalidates that property.
+   *
+   * ⚠️ **COST, STATED: the class gets longer, not shorter.** The new code lives in
+   * `generators/lsystem/*` so its SIZE does not land here, but the seam itself does.
+   *
+   * ⚠️ **`init()` resets `pos`, which is the breathing clock (`36.D6`) — so a type switch restarts the
+   * animation phase.** Stated rather than fixed: a second clock would be a second source of truth for
+   * the same quantity.
+   */
+  private figureType: FigureType = 'lissajous';
+  private lsystem: LSystemConfig | null = null;
+  private lsysCache = createFigureCache();
+  /** Resolved curve, `particleCount` xyz triples in [-1,1]. A FIELD: invariant 8 is about RATE. */
+  private lsysPoints = new Float64Array(0);
   private pos = 0;
   private waveSpeed = 0.05;
 
@@ -575,6 +602,18 @@ export class LissajousGenerator implements Generator {
 
     // Convert unified wave format to legacy internal format
     this.waves = buildWaveTable(config.waves ?? []);
+    /*
+     * v8 `36.10` — the figure source, adopted here beside the wave table.
+     *
+     * ⚠️ **`config.type` ARRIVES ALREADY RESOLVED** (`resolveFigureType` at both call sites), so this is
+     * an adoption and not a second resolution. A second one here would be invariant 17's two-sources
+     * defect: *two readers must resolve them in the same order AND nothing may write the resolved value
+     * afterwards.*
+     * ⚠️ **The dormant block is adopted too** — `setLSystem(null)` only when the preset truly has none,
+     * which is what makes `36.2`'s non-destructive switching work without a re-init.
+     */
+    this.figureType = config.type;
+    this.lsystem = config.lsystem ?? null;
 
     // Fit the authored amplitudes to this canvas. The amplitudes themselves are NOT modified — the
     // factor is applied at projection time, so it can be recomputed on resize without accumulating.
@@ -1170,6 +1209,22 @@ export class LissajousGenerator implements Generator {
    * `interpolate.ts:555`, and **read by nothing** — `init()` takes `config.waveSpeed`, not a per-wave
    * value. A setter that pretended to honour it would be inert on arrival (invariant 13).
    */
+  /**
+   * v8 `36.10` — **`setLSystem` and `setWaves` are SIBLINGS, and the non-live one is a NO-OP rather than
+   * an error.** A preset carrying both blocks is the entire point of `36.2`'s non-destructive switching,
+   * so a setter that threw on the dormant type would make the format's own guarantee unusable.
+   *
+   * ⚠️ Passing `null` means *this preset has no curve block*; the figure falls back to the waves.
+   */
+  setLSystem(config: LSystemConfig | null): void {
+    this.lsystem = config;
+  }
+
+  /** v8 `36.1` — which source fills the `[wave]` block. Resolved by the caller (`resolveFigureType`). */
+  setFigureType(type: FigureType): void {
+    this.figureType = type;
+  }
+
   setWaves(waves: readonly WaveConfig[]): void {
     this.waves = buildWaveTable(waves);
   }
@@ -1948,10 +2003,65 @@ export class LissajousGenerator implements Generator {
     // v8 `34.D9` — the Z extent, re-measured from scratch every frame. See `getZExtent()`.
     let zLo = Infinity, zHi = -Infinity;
 
+    /*
+     * v8 `36.10` — **THE FIGURE SOURCE. Resolved ONCE, OUTSIDE the loop, into a buffer.**
+     *
+     * ⚠️⚠️ **THE WAVE PATH BELOW IS BIT-IDENTICAL TO THE PRE-`36.10` CODE, AND THAT IS THE STEP'S WHOLE
+     * CORRECTNESS CLAIM** — `36.20` clause 2 holds the entire library to it. So the seam is a NULL CHECK
+     * hoisted out of the loop, not a per-particle `FigureSource` call: `wave-law.ts`' header records that
+     * routing nine per-particle evaluations through a function measured a **2.1x regression** because V8
+     * does not inline across them, and this loop is the same hot path. ⚠️ **If the one remaining branch
+     * ever measures badly the remedy is TWO loops sharing the operator stages — not an indirection.**
+     *
+     * ⚠️ The curve arrives normalised to [-1,1] and is scaled by a FRACTION of the design box, which is
+     * `ATTRACTOR_DESIGN_FRACTION`'s convention and for its reason (`36.7`): an absolute extent is right
+     * for a 100x100 design box and 6.8x too small for a 960x720 one.
+     */
+    let lsysPts: Float64Array | null = null;
+    let lsysFit = 0;
+    if (this.figureType === 'lsystem' && this.lsystem !== null) {
+      const cfg = this.lsystem;
+      const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+      if (this.lsysPoints.length < this.particleCount * 3) {
+        this.lsysPoints = new Float64Array(this.particleCount * 3);
+      }
+      // The five modulated parameters go through the SHIPPED operator law (`36.D6`) -- no new law, and
+      // `resolveOp`'s `depth === 0` branch is what makes a preset authoring only bases bit-exact.
+      const recursion = this.resolveOp(cfg.recursion.base, cfg.recursion.amplitude, cfg.recursion.frequency,
+        scaledTime, rule.recursionRange[0], rule.recursionRange[1]);
+      const yaw = this.resolveOp(cfg.yaw.base, cfg.yaw.amplitude, cfg.yaw.frequency,
+        scaledTime, rule.angleRange[0], rule.angleRange[1]);
+      const pitch = this.resolveOp(cfg.pitch.base, cfg.pitch.amplitude, cfg.pitch.frequency,
+        scaledTime, rule.angleRange[0], rule.angleRange[1]);
+      const roll = this.resolveOp(cfg.roll.base, cfg.roll.amplitude, cfg.roll.frequency,
+        scaledTime, rule.angleRange[0], rule.angleRange[1]);
+      resolveFigure(this.lsysCache, {
+        rule, recursion, yaw, pitch, roll,
+        // ⚠️ `multiAxis` selects the bracket width and the two differ by 5x on `Hilbert 3D`, so it must
+        // read whether pitch or roll is BREATHING -- not whether the rule uses those axes.
+        multiAxis: cfg.pitch.amplitude !== 0 || cfg.roll.amplitude !== 0,
+        smoothness: Math.max(0, Math.min(1, cfg.smoothness)),
+        // ⚠️ `descend` is resolved through the SAME operator law as the angles (`36.D6`), and its
+        // bounds are geometric -- see `DESCEND_MIN`/`DESCEND_MAX`.
+        descend: this.resolveOp(cfg.descend.base, cfg.descend.amplitude, cfg.descend.frequency,
+          scaledTime, DESCEND_MIN, DESCEND_MAX),
+        centre: cfg.centre,
+      }, this.lsysPoints, this.particleCount);
+      lsysPts = this.lsysPoints;
+      lsysFit = LSYSTEM_DESIGN_FRACTION * Math.min(this.designW, this.designH);
+    }
+
     for (let i = 0; i < this.particleCount; i++) {
-      const n = i * cStep;
       const tau = i * invCount;
-      sumWaveAxes(pt, n, am, fm, ph, sharp);
+      if (lsysPts !== null) {
+        const b = i * 3;
+        pt[0] = lsysPts[b]! * lsysFit;
+        pt[1] = lsysPts[b + 1]! * lsysFit;
+        pt[2] = lsysPts[b + 2]! * lsysFit;
+      } else {
+        const n = i * cStep;
+        sumWaveAxes(pt, n, am, fm, ph, sharp);
+      }
       /*
        * v8 `34.3` — **STAGE A: `Grow`, and it MUST be here, on the wave sum ALONE.** Downstream of either
        * stage below it would ramp the secular term and the DC term too — a quadratic sweep and a ramped
@@ -3483,14 +3593,6 @@ export class LissajousGenerator implements Generator {
 
   getSparkPool(): SparkPool | null {
     return this.sparkPool;
-  }
-
-  getSchema(): ParamSchema {
-    return {
-      params: [
-        { key: 'particleCount', type: 'number', label: 'Particles', category: 'Shape', min: 5, max: 50000, step: 5, default: 500 },
-      ],
-    };
   }
 
   dispose(): void {

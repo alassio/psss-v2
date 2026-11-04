@@ -1,4 +1,5 @@
 import type { WaveConfig } from '../core/interfaces.ts';
+import { resolveFigureType } from '../generators/figure-types.ts';
 import type { UnifiedPreset, SinMagicParams } from './types.ts';
 // Value import, not a type: the crystal backfill below iterates the defaults so a newly added field
 // cannot be forgotten. `crystal-config.ts` imports only types, so there is no cycle.
@@ -277,7 +278,20 @@ export class MigrationLayer {
     if (p.overlay?.palette !== undefined || p.overlay?.paletteMapping !== undefined) return p;
 
     const g = p.generators;
-    if (!g || g.type !== 'lissajous') return p;
+    /*
+     * ⚠️⚠️ **RE-POINTED BY `36.1`, AND THE OLD FORM FAILED IN THE WORST DIRECTION.** It read
+     * `g.type !== 'lissajous'`, which was correct while `'lissajous'` was the only stored value — but
+     * `main.ts` and `grid-tile-renderer.ts` HARD-CODED `type: 'lissajous'` into the generator config, so
+     * an unknown stored type got **the wave generator with its wave migration SKIPPED**: the figure drew
+     * and only the palette adoption was missing. That is a worse failure than the one
+     * `SPEC-figure-types` §3.3 designs against, because nothing on screen says so.
+     *
+     * ✅ Now it asks the question it means — *is the live figure the WAVE figure?* — through the one
+     * owner of that answer, so an unknown type resolves by `36.2`'s order and the migration still runs
+     * on whatever the resolution picked. `36.20` clause 5 asserts exactly that.
+     */
+    if (!g) return p;
+    if (resolveFigureType(g.type, g).type !== 'lissajous') return p;
 
     // 3. Does the law reach the screen? (Checked before 2, because it is the cheaper of the two.)
     const ov = p.overlay;

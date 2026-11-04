@@ -111,6 +111,17 @@ import { sliderMul } from '../../../exploration/slider-mappings.ts';
 import { ROT_STEP, rotationToPos, posToRotation, fmtRotationRpm } from '../../../core/rotation-track.ts';
 import { TAB_TIPS } from '../tooltips.ts';
 import { makeCollapsible } from '../collapsible.ts';
+import { computeCurveScore } from '../score-canvas.ts';
+import { FIGURE_TYPES } from '../../../generators/figure-types.ts';
+import {
+  LSYSTEM_RULES, LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, LSYSTEM_ANGLE_BRACKET,
+  LSYSTEM_MIN_USEFUL_BRACKET_DEG, DESCEND_MIN, DESCEND_MAX, defaultLSystemConfig,
+  ruleAngleUsage, type RuleKey,
+} from '../../../generators/lsystem/rules.ts';
+import type { FigureType, LSystemConfig, ModulatedValue } from '../../../core/interfaces.ts';
+// ⚠️ The rate unit is Phase 34's `OP_RATE_*`, NOT the wave-slot `frequency` scale (`36.D6c`) — the two
+// fields share a NAME and not a unit, and `LSystemConfig`'s own declaration states which is which.
+import { OP_RATE_MAX } from '../../../core/deform-limits.ts';
 import type { Collapsible } from '../collapsible.ts';
 import {
   readFigure, writeFigure, applyStack, seedFigure, applyMutes, blankAxisCell,
@@ -511,6 +522,20 @@ export class ComposerTab implements TabModule {
    */
   private unsubscribeExternal: (() => void) | null = null;
 
+  /*
+   * ───── v8 `36.11` — the figure-type row and the curve body ─────────────────────────────────────
+   *
+   * ⚠️ **Cleared by `render()` with the DOM that owns them, like every other registry on this tab** —
+   * a reference kept across a rebuild has `sync()` writing into detached nodes for the rest of the
+   * session, which shows as a control that has simply stopped responding.
+   */
+  private figureTypeSelect: HTMLSelectElement | null = null;
+  private figureTypeDescEl: HTMLElement | null = null;
+  private dormantNoticeEl: HTMLElement | null = null;
+  private ruleProvenanceEl: HTMLElement | null = null;
+  /** One refresher per curve row, so `sync()` needs a single line rather than knowledge of each row. */
+  private lsysSync: Array<() => void> = [];
+
   constructor(controls: VisualFxControls) {
     this.controls = controls;
   }
@@ -859,6 +884,12 @@ export class ComposerTab implements TabModule {
     // re-apply the full look while the box the user ticked came back ticked.
     this.bypassToggles = [];
     this.setupGroup = null;
+    // v8 `36.11` — cleared here for the reason the six above are.
+    this.figureTypeSelect = null;
+    this.figureTypeDescEl = null;
+    this.dormantNoticeEl = null;
+    this.ruleProvenanceEl = null;
+    this.lsysSync = [];
 
     const desc = document.createElement('p');
     desc.className = 'sl-tab-desc';
@@ -874,8 +905,23 @@ export class ComposerTab implements TabModule {
      * (invariant 25)** — a precondition is discovered only by someone who already suspects the control, and each
      * of those three describes a state in which the controls are lying.
      */
-    desc.textContent = 'The figure itself — the three stacked sine waves every preset is built from, which '
-      + 'everything else in the Lab decorates. Hover any header or control for what it does.';
+    /*
+     * ⚠️⚠️ **TYPE-AWARE, AND THE SINGLE-SENTENCE VERSION WAS A FALSE STATEMENT ON A CURVE PRESET.** It
+     * read *"the three stacked sine waves every preset is built from"* — which stopped being true the
+     * moment a second figure type shipped, and **no checker reads a sentence.** Found by opening the
+     * screenshot, which is the only instrument there is for this class.
+     *
+     * ⚠️ Both branches are STRING LITERALS assigned directly to `.textContent`, because `tipcheck` §I's
+     * inline-copy scan matches a literal after `=` and a ternary expression is invisible to it. Two
+     * assignments in a branch, never one conditional expression.
+     */
+    if (this.liveFigureType() === 'lsystem') {
+      desc.textContent = 'The figure itself — a self-similar curve built by repeating one rule, which '
+        + 'everything else in the Lab decorates. Hover any header or control for what it does.';
+    } else {
+      desc.textContent = 'The figure itself — the three stacked sine waves every preset is built from, which '
+        + 'everything else in the Lab decorates. Hover any header or control for what it does.';
+    }
     el.appendChild(desc);
 
     /*
@@ -955,8 +1001,23 @@ export class ComposerTab implements TabModule {
      * the sections. Closed by default: `Framing & Timing` duplicates Visual FX's own section, and this copy
      * does not follow a Visual FX drag (`setSpeedFactor` does not notify), so it is the copy to keep shut.
      */
+    // ⚠️ **ABOVE the Score, which REVERSES `31.C` by owner decision (`36.Q1`, 2026-11-02).** It is the
+    // one row allowed above it; `buildHeaderActions()` stays with the Score.
+    el.appendChild(this.buildFigureTypeSection());
     el.appendChild(this.buildScoreSection());
-    el.appendChild(this.buildHeaderActions());
+    /*
+     * ⚠️⚠️ **`New Figure` AND `Stack` ARE WAVE-SPECIFIC AND ARE OMITTED ON A CURVE, which is `36.D7`'s
+     * own test applied to the header rather than only to the body.** Both act on the wave table —
+     * `Stack` gives a slot a winding and `New Figure` seeds one — and **neither can change a curve's
+     * picture under any state of the preset**, because that figure source never reads `generators.waves`.
+     * The test: *is the hidden control capable of changing the picture in the current state?* If no, it
+     * must be hidden. ⚠️ **Found by opening the screenshot** — they rendered happily above a curve, and
+     * no checker reads a control that is merely in the wrong place.
+     *
+     * ⚠️ `31.C`'s reason for pairing them WITH the Score is untouched: a figure-wide action belongs beside
+     * the figure-wide picture. There simply are no figure-wide wave actions on this type.
+     */
+    if (this.liveFigureType() !== 'lsystem') el.appendChild(this.buildHeaderActions());
 
     const setup = makeCollapsible({
       text: 'Framing & Preview',
@@ -970,7 +1031,18 @@ export class ComposerTab implements TabModule {
     el.appendChild(setup.wrap);
     this.setupGroup = setup;
 
-    for (let w = 0; w < MAX_WAVES; w++) el.appendChild(this.buildSlotSection(w));
+    /*
+     * ⚠️⚠️ **MUTUALLY EXCLUSIVE PER-TYPE BODIES — an explicit override of `34.D12` (`36.D7`), and the
+     * distinction is the thing to keep written down.** `34.D12` forbids demoting a LIVE control set
+     * within one type: a per-level cell that is inert only because its wave level happens to be silent
+     * is still *capable* of changing the picture the moment the level is switched on, so hiding it hides
+     * authored content. **Swapping a type's whole body is a different act** — a wave slot cannot affect
+     * a self-similar curve under ANY state of the preset, because that type's figure source never reads
+     * `generators.waves`. **The test: is the hidden control capable of changing the picture in the
+     * current state? If yes it must be visible. If no it must be hidden.**
+     */
+    if (this.liveFigureType() === 'lsystem') el.appendChild(this.buildLSystemSection());
+    else for (let w = 0; w < MAX_WAVES; w++) el.appendChild(this.buildSlotSection(w));
 
     // ⚠️ **NO FOOTER: THE `Figure-wide` SECTION WAS DELETED WITH ITS ONE ROW (owner, 2026-09-10).** The slot
     // sections are now the last thing on the tab. See the block where `buildFooter()` used to be defined for why
@@ -1458,9 +1530,18 @@ export class ComposerTab implements TabModule {
     const legend = document.createElement('div');
     legend.className = 'sl-composer-legend';
     legend.title = TAB_TIPS['composer.legend']!;
-    for (const [cls, text] of [
-      ['now', 'now'], ['size', 'size extreme (Pulse)'], ['winding', 'winding extreme (Wobble)'],
-    ] as const) {
+    /*
+     * ⚠️⚠️ **THE TWO EXTREME KEYS ARE WAVE VOCABULARY AND THE CURVE SCORE EMITS NO GHOST, so showing them
+     * on a curve preset is a legend for lines that are not drawn.** `computeCurveScore` returns
+     * `ghost: null` deliberately — a ghost needs an INSTANT, and §16's lesson is that a readout sampling
+     * one instant of something periodic must not sample `t = 0` while a ghost at +½ period draws the same
+     * picture. **Rather than guess an instant, the curve Score has no second outline, so the legend must
+     * not advertise one.** Found by opening the screenshot.
+     */
+    const keys: ReadonlyArray<readonly [string, string]> = this.liveFigureType() === 'lsystem'
+      ? [['now', 'the curve']]
+      : [['now', 'now'], ['size', 'size extreme (Pulse)'], ['winding', 'winding extreme (Wobble)']];
+    for (const [cls, text] of keys) {
       const key = document.createElement('span');
       key.className = `sl-composer-key sl-composer-key-${cls}`;
       key.textContent = text;
@@ -2980,6 +3061,9 @@ export class ComposerTab implements TabModule {
    */
   private sync(): void {
     if (!this.container) return;
+    // v8 `36.11` — every curve row refreshes itself; see `lsysSync`.
+    this.syncFigureType();
+    for (const f of this.lsysSync) f();
 
     /*
      * The Region D precondition, re-evaluated on every sync.
@@ -3233,7 +3317,30 @@ export class ComposerTab implements TabModule {
   }
 
   private drawScoreNow(): void {
-    if (!this.model || this.panes.length === 0) return;
+    if (this.panes.length === 0) return;
+    /*
+     * v8 `36.12` — **the curve type draws its own Score and returns BEFORE the wave path (`36.D2`).**
+     *
+     * ⚠️⚠️ **WITHOUT THIS EARLY RETURN A CURVE PRESET SHOWS A WAVE DIAGRAM OF ITS DORMANT BLOCK, which is
+     * the worst available failure: the panes are not blank, they are CONFIDENTLY WRONG.** The dormant
+     * `waves` block is real data (`36.2` keeps it rather than zeroing it), so `computeScore` draws a
+     * perfectly good picture of a figure the engine is not rendering.
+     *
+     * ⚠️ **The `this.model` guard moved below this block**, because the model is the WAVE model and a
+     * curve preset legitimately has nothing in it — guarding on it first would have returned early and
+     * left the panes holding the previous preset's drawing.
+     */
+    if (this.liveFigureType() === 'lsystem') {
+      const cfg = this.liveLSystem();
+      for (const pane of this.panes) {
+        // ⚠️ Only the FIGURE panes take the curve. A per-slot pane has no meaning for this type and its
+        // `slot` is non-null, so it is left alone rather than fed a diagram of something else.
+        if (pane.slot !== null) continue;
+        drawScore(pane.canvas, computeCurveScore(cfg, pane.plane));
+      }
+      return;
+    }
+    if (!this.model) return;
     /*
      * ⚠️ **THE WAVES COME FROM `workingPreset`, WHICH IS SAFE ONLY BECAUSE `commit()` WRITES IT FIRST.** The
      * order in `commit()` is `refreshDerived` → `growSlotCountForAuthoredContent` → `writeFigure(p, model)` →
@@ -3360,5 +3467,341 @@ export class ComposerTab implements TabModule {
        */
       this.extentLabel.textContent = parts.join(' · ');
     }
+  }
+
+  /** The live type, read through the ONE owner so this tab cannot become a second resolution. */
+  private liveFigureType(): FigureType {
+    return this.controls.getFigureType();
+  }
+
+  /**
+   * v8 `36.11` — **the figure-type row.** ⚠️ Its options are DERIVED from the registry at run time and
+   * never restated: the failure being designed out is a hand-written option list checked against a
+   * separate `Record` that `tsc` does not compare.
+   *
+   * ⚠️⚠️ **THE DORMANT-BLOCK NOTE IS LOAD-BEARING, NOT DECORATION: without it the dropdown LOOKS
+   * destructive and authors will avoid the single most important control on the tab.** Switching leaves
+   * every other block untouched (`36.2`) — measured bit-identical at the engine level, 0 of 6000
+   * position slots — and a user cannot know that from a `<select>`. ⚠️ Inline rather than a tooltip for
+   * invariant 25's reason: a tooltip is only found by someone who already suspects the control.
+   */
+  private buildFigureTypeSection(): HTMLElement {
+    const sec = document.createElement('div');
+    sec.className = 'sl-section';
+
+    const row = document.createElement('div');
+    row.className = 'sl-row';
+    const label = document.createElement('label');
+    label.textContent = 'Figure type';
+    label.title = TAB_TIPS['composer.figureType']!;
+    row.appendChild(label);
+
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Figure type');
+    for (const entry of FIGURE_TYPES) {
+      // ⚠️ `selectable` filters the reserved `attractor` member out: promoting it would create a second
+      // route to one figure while the legacy blend is live, and 0 presets have ever stored it (`36.D8`).
+      if (!entry.selectable) continue;
+      const opt = document.createElement('option');
+      opt.value = entry.key;
+      opt.textContent = entry.label;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => this.applyFigureType(select.value as FigureType));
+    row.appendChild(select);
+    sec.appendChild(row);
+    this.figureTypeSelect = select;
+
+    const desc = document.createElement('p');
+    desc.className = 'sl-row-note';
+    sec.appendChild(desc);
+    this.figureTypeDescEl = desc;
+
+    const dormant = document.createElement('p');
+    dormant.className = 'sl-row-note';
+    // ⚠️ Set ONCE, with only `display` toggled, so `tipcheck` §I's inline-copy scan can see it: that scan
+    // matches a literal directly after `.textContent =`, and a ternary assignment is INVISIBLE to it.
+    dormant.textContent = 'This preset also carries settings for the other figure type. They are kept, '
+      + 'not cleared — switching back restores that figure exactly.';
+    sec.appendChild(dormant);
+    this.dormantNoticeEl = dormant;
+
+    this.syncFigureType();
+    return sec;
+  }
+
+  /** Refresh the type row from the live preset. Called from `sync()` and at build time. */
+  private syncFigureType(): void {
+    const live = this.liveFigureType();
+    if (this.figureTypeSelect) this.figureTypeSelect.value = live;
+    const entry = FIGURE_TYPES.find((e) => e.key === live);
+    if (this.figureTypeDescEl) this.figureTypeDescEl.textContent = entry ? entry.description : '';
+    if (this.dormantNoticeEl) {
+      const p = this.state?.workingPreset;
+      // A block for a type that is NOT live is the dormant case the note describes.
+      const hasDormant = !!p && ((live !== 'lsystem' && p.generators.lsystem !== undefined)
+        || (live === 'lsystem' && p.generators.waves.some((w) => w.axes.some(
+          (a) => a.am.base !== 0 || a.fm.base !== 0))));
+      this.dormantNoticeEl.style.display = hasDormant ? '' : 'none';
+    }
+  }
+
+  /**
+   * Switch the figure type.
+   *
+   * ⚠️⚠️ **IT WRITES THE TYPE AND NOTHING ELSE — that IS the non-destructive guarantee (`36.2`).** No
+   * block is zeroed, omitted or normalised. ⚠️ **A `render()` follows because the bodies are mutually
+   * exclusive**, and `adoptExternalFigure`'s lesson applies in miniature: replacing the figure must
+   * rebuild the row BODIES and not only their values, or `sync()` writes into inputs that no longer
+   * belong to the live type.
+   *
+   * ⚠️ **If the target type has no block, a DEFAULT one is authored — once, here, never on a read.**
+   * Without it the dropdown switches to a type the engine has nothing to draw, which reads as a black
+   * frame rather than as a choice.
+   */
+  private applyFigureType(next: FigureType): void {
+    const p = this.state?.workingPreset;
+    if (!p) return;
+    if (next === 'lsystem' && p.generators.lsystem === undefined) {
+      p.generators.lsystem = defaultLSystemConfig() as LSystemConfig;
+      this.controls.setLSystem(p.generators.lsystem);
+    }
+    p.generators.type = next;
+    this.controls.setFigureType(next);
+    this.render();
+    this.sync();
+  }
+
+  /** Commit a curve edit: `workingPreset` in place PLUS the engine, never `state.setWorkingPreset`. */
+  private commitLSystem(next: LSystemConfig): void {
+    const p = this.state?.workingPreset;
+    if (!p) return;
+    p.generators.lsystem = next;
+    this.controls.setLSystem(next);
+    this.sync();
+  }
+
+  private liveLSystem(): LSystemConfig {
+    return this.controls.getLSystem() ?? (defaultLSystemConfig() as LSystemConfig);
+  }
+
+  /**
+   * v8 `36.11` — **the self-similar curve body**, shown in place of the three wave slots.
+   *
+   * ⚠️ **`Pitch` and `Roll` hide for a rule whose symbol set contains neither — DERIVED from the rule,
+   * never hand-listed.** A hand-written list and the productions drift apart in silence, and the result
+   * is a row that moves and changes nothing. **Measured: only 2 of the 13 shipped rules use either.**
+   *
+   * ⚠️ **Track bounds come from the RULE LIBRARY, not from the row.** A rule's useful sweep is centred
+   * on its own published angle and is not the same width for all of them, and recursion bounds differ
+   * because expansion factors differ by ~6x. One hard-coded range would either clip one rule's
+   * interesting territory or let another expand past its cost bound.
+   */
+  private buildLSystemSection(): HTMLElement {
+    const sec = document.createElement('div');
+    sec.className = 'sl-section';
+    const title = document.createElement('div');
+    title.className = 'sl-section-title';
+    title.textContent = 'Curve';
+    title.title = TAB_TIPS['composer.curve']!;
+    sec.appendChild(title);
+
+    const cfg = this.liveLSystem();
+    const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+
+    // ---- the rule, plus the provenance readout an author navigates FROM ----
+    const ruleRow = document.createElement('div');
+    ruleRow.className = 'sl-row';
+    const ruleLabel = document.createElement('label');
+    ruleLabel.textContent = 'Rule';
+    ruleLabel.title = TAB_TIPS['composer.rule']!;
+    ruleRow.appendChild(ruleLabel);
+    const ruleSel = document.createElement('select');
+    ruleSel.setAttribute('aria-label', 'Rule');
+    for (const r of LSYSTEM_RULES) {
+      const opt = document.createElement('option');
+      opt.value = r.key;
+      opt.textContent = r.name;
+      ruleSel.appendChild(opt);
+    }
+    ruleSel.value = rule.key;
+    ruleSel.addEventListener('change', () => {
+      const live = this.liveLSystem();
+      const next = LSYSTEM_RULE_BY_KEY[ruleSel.value as RuleKey] ?? rule;
+      /*
+       * ⚠️⚠️ **THE ANGLES ARE RE-SEATED ON THE NEW RULE'S PUBLISHED LANDMARK, AND THAT IS NOT A
+       * CONVENIENCE.** Each rule's `angleRange` is its own, so carrying a 120° terdragon yaw onto a 26°
+       * plant would clamp at the plant's ceiling and hand back a figure that is neither — a control that
+       * silently discards the number it was given. ⚠️ The breathing AMPLITUDE and RATE survive, because
+       * those are the author's gesture rather than the rule's identity.
+       */
+      const seat = (mv: ModulatedValue): ModulatedValue =>
+        ({ base: next.publishedAngle, amplitude: mv.amplitude, frequency: mv.frequency });
+      this.commitLSystem({
+        ...live,
+        rule: next.key,
+        recursion: {
+          ...live.recursion,
+          base: Math.min(next.recursionRange[1], Math.max(next.recursionRange[0], live.recursion.base)),
+        },
+        yaw: seat(live.yaw), pitch: seat(live.pitch), roll: seat(live.roll),
+      });
+      this.render();
+      this.sync();
+    });
+    ruleRow.appendChild(ruleSel);
+    sec.appendChild(ruleRow);
+
+    const prov = document.createElement('p');
+    prov.className = 'sl-row-note';
+    sec.appendChild(prov);
+    this.ruleProvenanceEl = prov;
+    this.lsysSync.push(() => {
+      const r = LSYSTEM_RULE_BY_KEY[this.liveLSystem().rule as RuleKey];
+      if (!r || !this.ruleProvenanceEl) return;
+      // ⚠️ The published angle is a LANDMARK, not a limit — the model's whole idea, and not guessable
+      // from the controls. The readout says where the named fractal lives so the author navigates FROM it.
+      this.ruleProvenanceEl.textContent = `Named at ${r.publishedAngle}°`
+        + `  ·  recursion ${r.recursionRange[0]}–${r.recursionRange[1]}`
+        + `  ·  ${r.closed ? 'closed loop' : 'open curve'}`;
+    });
+
+    const usage = ruleAngleUsage(rule);
+    sec.appendChild(this.buildModulatedRow('recursion', 'Recursion',
+      TAB_TIPS['composer.recursion']!, rule.recursionRange[0], rule.recursionRange[1], 0.015625));
+    if (usage.yaw) sec.appendChild(this.buildModulatedRow('yaw', 'Yaw',
+      TAB_TIPS['composer.yaw']!, rule.angleRange[0], rule.angleRange[1], 0.5));
+    if (usage.pitch) sec.appendChild(this.buildModulatedRow('pitch', 'Pitch',
+      TAB_TIPS['composer.pitch']!, rule.angleRange[0], rule.angleRange[1], 0.5));
+    if (usage.roll) sec.appendChild(this.buildModulatedRow('roll', 'Roll',
+      TAB_TIPS['composer.roll']!, rule.angleRange[0], rule.angleRange[1], 0.5));
+    /*
+     * ⚠️⚠️ **`Descend` HIDES WHERE THE RULE HAS NO INVERSE INDEX MAP (`36.D13`), BECAUSE IT WOULD BE A
+     * CONTROL THAT LIES.** On a rule without one the index band is not contiguous, so a zoom selects a
+     * SCATTERED SUBSET of the curve — a picture, but not a zoom. `36.D7`'s inertness test applied to a
+     * correct precondition: the band's existence, not a `locality` adjective.
+     */
+    if (rule.zoomInverse) sec.appendChild(this.buildModulatedRow('descend', 'Descend',
+      TAB_TIPS['composer.descend']!, DESCEND_MIN, DESCEND_MAX, 0.015625));
+
+    sec.appendChild(this.buildCurveStaticRow('Smoothness', TAB_TIPS['composer.smoothness']!, 0, 1,
+      0.015625, () => this.liveLSystem().smoothness,
+      (v) => this.commitLSystem({ ...this.liveLSystem(), smoothness: v })));
+
+    /*
+     * ⚠️ A gated precondition, inline (invariant 25). With the bracket bypassed a breathing angle
+     * rebuilds the point list every frame — the control is not wrong, no per-row note can own it, and the
+     * author needs it before the first drag rather than after. **Measured, and a property of the RULE.**
+     */
+    const cost = document.createElement('p');
+    cost.className = 'sl-composer-precondition';
+    cost.textContent = 'On this rule a breathing angle rebuilds the curve every frame, which costs more '
+      + 'than on the others. Recursion and Smoothness are unaffected.';
+    const br = LSYSTEM_ANGLE_BRACKET[rule.key];
+    cost.style.display = (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG
+      || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG) ? '' : 'none';
+    sec.appendChild(cost);
+
+    return sec;
+  }
+
+  /**
+   * One modulated curve parameter: the value, plus the breathe pair the Composer already uses elsewhere.
+   *
+   * ⚠️⚠️ **THE STEP MUST BE A NEGATIVE POWER OF TWO WHERE THE RANGE TOP HAS TO BE REACHABLE, AND ONLY A
+   * BROWSER SEES THE ALTERNATIVE FAIL.** A form control steps in base-10 `Decimal` and **refuses an
+   * overshooting stop rather than clamping**, so `1/90` once made +90° unreachable in Chromium (readout
+   * `89°`) while every `trackcheck` clause stayed green — `sanitize()` both clamps to max and computes in
+   * IEEE doubles, where the same expression is exactly 1. `0.015625` is `2^-6`; the 0.5° angle step is
+   * exact in binary too.
+   *
+   * ⚠️ **`set` FIRST, then re-read into BOTH the readout and the input (`32.14`).** `tripletRow`'s handler
+   * once formatted the dragged value and threw the setter's result away, so a snapping setter moved the
+   * ENGINE while the panel reported the raw drag — a dead zone nobody can see does not exist. Every
+   * clamping setter routed through a row needs this order.
+   */
+  private buildModulatedRow(
+    key: 'recursion' | 'yaw' | 'pitch' | 'roll' | 'descend',
+    label: string, tip: string, lo: number, hi: number, step: number,
+  ): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'sl-row-group';
+
+    const mk = (
+      name: string, part: 'base' | 'amplitude' | 'frequency',
+      rlo: number, rhi: number, rstep: number, rtip: string,
+    ): void => {
+      const row = document.createElement('div');
+      row.className = 'sl-row';
+      const lab = document.createElement('label');
+      lab.textContent = name;
+      lab.title = rtip;
+      row.appendChild(lab);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = String(rlo);
+      input.max = String(rhi);
+      input.step = String(rstep);
+      input.setAttribute('aria-label', name);
+      const out = document.createElement('span');
+      out.className = 'sl-value';
+      const refresh = (): void => {
+        const v = this.liveLSystem()[key][part];
+        input.value = String(v);
+        out.textContent = part === 'frequency' ? `${v.toFixed(2)}` : v.toFixed(2);
+      };
+      input.addEventListener('input', () => {
+        const live = this.liveLSystem();
+        const nextMv: ModulatedValue = { ...live[key], [part]: Number(input.value) };
+        this.commitLSystem({ ...live, [key]: nextMv });
+        // `set` first, THEN re-read — see the header.
+        refresh();
+      });
+      this.lsysSync.push(refresh);
+      refresh();
+      row.appendChild(input);
+      row.appendChild(out);
+      wrap.appendChild(row);
+    };
+
+    mk(label, 'base', lo, hi, step, tip);
+    // The breathe pair. ⚠️ `Depth` keeps Phase 34's family word on purpose (`36.D15`): changing it would
+    // be a five-operator rename for one new row's benefit, and the recursion control is called
+    // `Recursion` precisely so `Depth` can keep meaning *breathing amplitude*.
+    mk(`${label} Depth`, 'amplitude', 0, (hi - lo) / 2, step, TAB_TIPS['composer.curveDepth']!);
+    mk(`${label} Rate`, 'frequency', 0, OP_RATE_MAX, 0.015625, TAB_TIPS['composer.curveRate']!);
+    return wrap;
+  }
+
+  /** A static (non-breathing) curve row. */
+  private buildCurveStaticRow(
+    label: string, tip: string, lo: number, hi: number, step: number,
+    get: () => number, set: (v: number) => void,
+  ): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'sl-row';
+    const lab = document.createElement('label');
+    lab.textContent = label;
+    lab.title = tip;
+    row.appendChild(lab);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(lo);
+    input.max = String(hi);
+    input.step = String(step);
+    input.setAttribute('aria-label', label);
+    const out = document.createElement('span');
+    out.className = 'sl-value';
+    const refresh = (): void => {
+      const v = get();
+      input.value = String(v);
+      out.textContent = v.toFixed(2);
+    };
+    input.addEventListener('input', () => { set(Number(input.value)); refresh(); });
+    this.lsysSync.push(refresh);
+    refresh();
+    row.appendChild(input);
+    row.appendChild(out);
+    return row;
   }
 }

@@ -1,4 +1,5 @@
 import type { TabModule } from '../../../exploration/tab-module.ts';
+import type { FigureType, LSystemConfig } from '../../../core/interfaces.ts';
 import type { ExplorationState, TabId } from '../../../exploration/state.ts';
 import type { RibbonMode } from '../../../renderers/ribbon-renderer.ts';
 import type { RenderMode, WaveConfig } from '../../../core/interfaces.ts';
@@ -1175,6 +1176,23 @@ export interface VisualFxControls {
    */
   getWaves(): WaveConfig[];
   setWaves(waves: WaveConfig[]): void;
+
+  /*
+   * ───── v8 `36.11` — the self-similar curve figure type ─────────────────────────────────────────
+   *
+   * ⚠️⚠️ **THESE THREE FOLLOW `getWaves`/`setWaves`'s SHAPE EXACTLY AND FOR THE SAME REASONS**: they read
+   * and write `preset.generators` rather than an `overlay` twin (a second source for the same data would
+   * be invariant 17's shape), and the setter must NOT go through `state.setWorkingPreset` (which re-inits
+   * the generator and resets `pos`, snapping the figure to its opening pose on every stepper click).
+   *
+   * ⚠️ **`setLSystem` accepts `null`** — that means *this preset has no curve block*, which is a real
+   * state and not an error: `36.2`'s non-destructive switching requires the dormant case to be
+   * representable.
+   */
+  getFigureType(): FigureType;
+  setFigureType(type: FigureType): void;
+  getLSystem(): LSystemConfig | null;
+  setLSystem(config: LSystemConfig | null): void;
   /**
    * `generators.waveSpeed` — how fast the figure's modulators sweep. ⚠️ **NOT `WaveConfig.speed`**, which is
    * required by the type, interpolated by the Mixer, and read by nothing (invariant 13 if it were exposed).
