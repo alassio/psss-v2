@@ -122,6 +122,22 @@ import type { FigureType, LSystemConfig, ModulatedValue } from '../../../core/in
 // ⚠️ The rate unit is Phase 34's `OP_RATE_*`, NOT the wave-slot `frequency` scale (`36.D6c`) — the two
 // fields share a NAME and not a unit, and `LSystemConfig`'s own declaration states which is which.
 import { OP_RATE_MAX } from '../../../core/deform-limits.ts';
+
+/**
+ * v8 `36.18` — the curve rows' step.
+ *
+ * ⚠️⚠️ **A STEP MUST BE EXACTLY REPRESENTABLE AND `max/step` MUST BE AN INTEGER, AND ONLY A BROWSER SEES
+ * THE ALTERNATIVE FAIL.** A form control steps in base-10 `Decimal` and **refuses an overshooting stop
+ * rather than clamping**, so `1/90` once made +90° unreachable in Chromium (readout `89°`) while every
+ * `trackcheck` clause stayed green — `sanitize()` both clamps to max and computes in IEEE doubles, where
+ * the same expression is exactly 1. `0.015625` is `2^-6`; every range it is used on is a whole multiple
+ * of it, and `0.5` is exact in binary too.
+ */
+const CURVE_STEP = 0.015625;
+const ANGLE_STEP = 0.5;
+
+/** The five `ModulatedValue` members of `LSystemConfig`, so a row cannot name a field that is not one. */
+type CurveKey = 'recursion' | 'yaw' | 'pitch' | 'roll' | 'descend';
 import type { Collapsible } from '../collapsible.ts';
 import {
   readFigure, writeFigure, applyStack, seedFigure, applyMutes, blankAxisCell,
@@ -532,9 +548,11 @@ export class ComposerTab implements TabModule {
   private figureTypeSelect: HTMLSelectElement | null = null;
   private figureTypeDescEl: HTMLElement | null = null;
   private dormantNoticeEl: HTMLElement | null = null;
-  private ruleProvenanceEl: HTMLElement | null = null;
-  /** One refresher per curve row, so `sync()` needs a single line rather than knowledge of each row. */
-  private lsysSync: Array<() => void> = [];
+  /*
+   * ⚠️ **THERE IS NO SEPARATE CURVE-ROW SYNC LIST, AND THAT IS THE POINT OF REUSING `framingRow()`.**
+   * Every numeric curve row is built by that method, which registers itself in `framingSliders` — the
+   * list `sync()` already drives. A parallel list would have been a second owner of one behaviour.
+   */
 
   constructor(controls: VisualFxControls) {
     this.controls = controls;
@@ -888,8 +906,6 @@ export class ComposerTab implements TabModule {
     this.figureTypeSelect = null;
     this.figureTypeDescEl = null;
     this.dormantNoticeEl = null;
-    this.ruleProvenanceEl = null;
-    this.lsysSync = [];
 
     const desc = document.createElement('p');
     desc.className = 'sl-tab-desc';
@@ -3061,9 +3077,8 @@ export class ComposerTab implements TabModule {
    */
   private sync(): void {
     if (!this.container) return;
-    // v8 `36.11` — every curve row refreshes itself; see `lsysSync`.
+    // v8 `36.11` — the type row; the curve's numeric rows sync through `framingSliders` like the rest.
     this.syncFigureType();
-    for (const f of this.lsysSync) f();
 
     /*
      * The Region D precondition, re-evaluated on every sync.
@@ -3489,14 +3504,24 @@ export class ComposerTab implements TabModule {
     const sec = document.createElement('div');
     sec.className = 'sl-section';
 
+    /*
+     * ⚠️ **THE TAB'S OWN ROW AND DROPDOWN CLASSES, not a bare `<label>` + `<select>`.** The first version
+     * used neither and rendered as a white browser-default control above a tab of styled blue ones —
+     * reported by the owner, and **no checker reads a stylesheet**, so a screenshot is the only
+     * instrument for this class.
+     */
     const row = document.createElement('div');
-    row.className = 'sl-row';
-    const label = document.createElement('label');
+    row.className = 'sl-vfx-row';
+    row.title = TAB_TIPS['composer.figureType']!;
+    const label = document.createElement('span');
+    label.className = 'sl-vfx-label';
     label.textContent = 'Figure type';
     label.title = TAB_TIPS['composer.figureType']!;
     row.appendChild(label);
 
     const select = document.createElement('select');
+    select.className = 'sl-dropdown';
+    select.title = TAB_TIPS['composer.figureType']!;
     select.setAttribute('aria-label', 'Figure type');
     for (const entry of FIGURE_TYPES) {
       // ⚠️ `selectable` filters the reserved `attractor` member out: promoting it would create a second
@@ -3585,17 +3610,29 @@ export class ComposerTab implements TabModule {
     return this.controls.getLSystem() ?? (defaultLSystemConfig() as LSystemConfig);
   }
 
+
   /**
    * v8 `36.11` — **the self-similar curve body**, shown in place of the three wave slots.
+   *
+   * ⚠️⚠️ **EVERY NUMERIC ROW IS A `framingRow()` CALL AND THE SELECTS CARRY `sl-dropdown`, SO THIS BODY
+   * LOOKS LIKE THE REST OF THE TAB RATHER THAN LIKE A SECOND IMPLEMENTATION.** The first version
+   * hand-rolled `<input type="range">` and a bare `<select>`, which rendered as white browser-default
+   * widgets with their own spacing beside the wave rows' styled blue ones — reported by the owner, and
+   * **invisible to every checker, because none of them reads a stylesheet.** ✅ **Reusing the tab's own
+   * row builder also buys the `sync()` registration**, which is why there is no curve-specific sync list.
+   *
+   * ⚠️ **`framingRow`'s `min`/`max` ARE POSITIONS, and the track owns the mapping.** The linear rows pass
+   * the identity pair (the documented answer for an unmapped control); **`Descend` passes a LOG track**,
+   * because octaves are multiplicative and a linear position under a geometric readout looks right at
+   * both ends and is wrong everywhere between them — the same reason `36.13` lerps it geometrically.
    *
    * ⚠️ **`Pitch` and `Roll` hide for a rule whose symbol set contains neither — DERIVED from the rule,
    * never hand-listed.** A hand-written list and the productions drift apart in silence, and the result
    * is a row that moves and changes nothing. **Measured: only 2 of the 13 shipped rules use either.**
    *
-   * ⚠️ **Track bounds come from the RULE LIBRARY, not from the row.** A rule's useful sweep is centred
-   * on its own published angle and is not the same width for all of them, and recursion bounds differ
-   * because expansion factors differ by ~6x. One hard-coded range would either clip one rule's
-   * interesting territory or let another expand past its cost bound.
+   * ⚠️ **Track bounds come from the RULE LIBRARY, not from the row.** A rule's useful sweep is centred on
+   * its own published angle and is not the same width for all of them, and recursion bounds differ
+   * because expansion factors differ by ~6x.
    */
   private buildLSystemSection(): HTMLElement {
     const sec = document.createElement('div');
@@ -3609,14 +3646,17 @@ export class ComposerTab implements TabModule {
     const cfg = this.liveLSystem();
     const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
 
-    // ---- the rule, plus the provenance readout an author navigates FROM ----
+    // ---- Rule, in the tab's own select row shape ----
     const ruleRow = document.createElement('div');
-    ruleRow.className = 'sl-row';
-    const ruleLabel = document.createElement('label');
+    ruleRow.className = 'sl-vfx-row';
+    ruleRow.title = TAB_TIPS['composer.rule']!;
+    const ruleLabel = document.createElement('span');
+    ruleLabel.className = 'sl-vfx-label';
     ruleLabel.textContent = 'Rule';
-    ruleLabel.title = TAB_TIPS['composer.rule']!;
     ruleRow.appendChild(ruleLabel);
     const ruleSel = document.createElement('select');
+    ruleSel.className = 'sl-dropdown';
+    ruleSel.title = TAB_TIPS['composer.rule']!;
     ruleSel.setAttribute('aria-label', 'Rule');
     for (const r of LSYSTEM_RULES) {
       const opt = document.createElement('option');
@@ -3632,8 +3672,8 @@ export class ComposerTab implements TabModule {
        * ⚠️⚠️ **THE ANGLES ARE RE-SEATED ON THE NEW RULE'S PUBLISHED LANDMARK, AND THAT IS NOT A
        * CONVENIENCE.** Each rule's `angleRange` is its own, so carrying a 120° terdragon yaw onto a 26°
        * plant would clamp at the plant's ceiling and hand back a figure that is neither — a control that
-       * silently discards the number it was given. ⚠️ The breathing AMPLITUDE and RATE survive, because
-       * those are the author's gesture rather than the rule's identity.
+       * silently discards the number it was given. ⚠️ The wobble SIZE and RATE survive, because those are
+       * the author's gesture rather than the rule's identity.
        */
       const seat = (mv: ModulatedValue): ModulatedValue =>
         ({ base: next.publishedAngle, amplitude: mv.amplitude, frequency: mv.frequency });
@@ -3652,156 +3692,133 @@ export class ComposerTab implements TabModule {
     ruleRow.appendChild(ruleSel);
     sec.appendChild(ruleRow);
 
+    /*
+     * ⚠️ The published angle is a LANDMARK, not a limit — the model's whole idea, and not guessable from
+     * the controls. The readout says where the named fractal lives so an author navigates FROM it.
+     * Rebuilt by `render()` on a rule change, so it needs no sync entry.
+     */
     const prov = document.createElement('p');
     prov.className = 'sl-row-note';
+    prov.textContent = `Named at ${rule.publishedAngle}°`
+      + `  ·  recursion ${rule.recursionRange[0]}\u2013${rule.recursionRange[1]}`
+      + `  ·  ${rule.closed ? 'closed loop' : 'open curve'}`;
     sec.appendChild(prov);
-    this.ruleProvenanceEl = prov;
-    this.lsysSync.push(() => {
-      const r = LSYSTEM_RULE_BY_KEY[this.liveLSystem().rule as RuleKey];
-      if (!r || !this.ruleProvenanceEl) return;
-      // ⚠️ The published angle is a LANDMARK, not a limit — the model's whole idea, and not guessable
-      // from the controls. The readout says where the named fractal lives so the author navigates FROM it.
-      this.ruleProvenanceEl.textContent = `Named at ${r.publishedAngle}°`
-        + `  ·  recursion ${r.recursionRange[0]}–${r.recursionRange[1]}`
-        + `  ·  ${r.closed ? 'closed loop' : 'open curve'}`;
-    });
 
+    // ---- the modulated parameters, each a value plus its wobble pair ----
     const usage = ruleAngleUsage(rule);
-    sec.appendChild(this.buildModulatedRow('recursion', 'Recursion',
-      TAB_TIPS['composer.recursion']!, rule.recursionRange[0], rule.recursionRange[1], 0.015625));
-    if (usage.yaw) sec.appendChild(this.buildModulatedRow('yaw', 'Yaw',
-      TAB_TIPS['composer.yaw']!, rule.angleRange[0], rule.angleRange[1], 0.5));
-    if (usage.pitch) sec.appendChild(this.buildModulatedRow('pitch', 'Pitch',
-      TAB_TIPS['composer.pitch']!, rule.angleRange[0], rule.angleRange[1], 0.5));
-    if (usage.roll) sec.appendChild(this.buildModulatedRow('roll', 'Roll',
-      TAB_TIPS['composer.roll']!, rule.angleRange[0], rule.angleRange[1], 0.5));
+    const deg = (v: number): string => `${v.toFixed(1)}°`;
+    const num = (v: number): string => v.toFixed(2);
+
+    this.appendCurveTriple(sec, 'Recursion', TAB_TIPS['composer.recursion']!, 'recursion',
+      rule.recursionRange[0], rule.recursionRange[1], CURVE_STEP, num);
+    if (usage.yaw) {
+      this.appendCurveTriple(sec, 'Yaw', TAB_TIPS['composer.yaw']!, 'yaw',
+        rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
+    }
+    if (usage.pitch) {
+      this.appendCurveTriple(sec, 'Pitch', TAB_TIPS['composer.pitch']!, 'pitch',
+        rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
+    }
+    if (usage.roll) {
+      this.appendCurveTriple(sec, 'Roll', TAB_TIPS['composer.roll']!, 'roll',
+        rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
+    }
     /*
      * ⚠️⚠️ **`Descend` HIDES WHERE THE RULE HAS NO INVERSE INDEX MAP (`36.D13`), BECAUSE IT WOULD BE A
      * CONTROL THAT LIES.** On a rule without one the index band is not contiguous, so a zoom selects a
-     * SCATTERED SUBSET of the curve — a picture, but not a zoom. `36.D7`'s inertness test applied to a
-     * correct precondition: the band's existence, not a `locality` adjective.
+     * SCATTERED SUBSET of the curve — a picture, but not a zoom.
+     *
+     * ⚠️ **A LOG track, and the one row on this body that is not linear.** `toPos` is `log2(v)/log2(max)`,
+     * so each screen octave is one octave of zoom.
      */
-    if (rule.zoomInverse) sec.appendChild(this.buildModulatedRow('descend', 'Descend',
-      TAB_TIPS['composer.descend']!, DESCEND_MIN, DESCEND_MAX, 0.015625));
+    if (rule.zoomInverse) {
+      const span = Math.log2(DESCEND_MAX);
+      sec.appendChild(this.framingRow('Descend', TAB_TIPS['composer.descend']!, {
+        min: 0, max: 1, step: 1 / 128,
+        get: () => this.liveLSystem().descend.base,
+        set: (v) => {
+          const live = this.liveLSystem();
+          this.commitLSystem({ ...live, descend: { ...live.descend, base: v } });
+        },
+        toPos: (v) => Math.log2(Math.max(DESCEND_MIN, v)) / span,
+        fromPos: (q) => Math.pow(2, q * span),
+        fmt: (v) => `${v.toFixed(2)}\u00d7`,
+      }));
+      this.appendCurveWobble(sec, 'Descend', 'descend', 0, DESCEND_MAX / 2, CURVE_STEP, num);
+    }
 
-    sec.appendChild(this.buildCurveStaticRow('Smoothness', TAB_TIPS['composer.smoothness']!, 0, 1,
-      0.015625, () => this.liveLSystem().smoothness,
-      (v) => this.commitLSystem({ ...this.liveLSystem(), smoothness: v })));
+    // ---- Smoothness: static, and a BRANCH at 0 ----
+    sec.appendChild(this.framingRow('Smoothness', TAB_TIPS['composer.smoothness']!, {
+      min: 0, max: 1, step: CURVE_STEP,
+      get: () => this.liveLSystem().smoothness,
+      set: (v) => this.commitLSystem({ ...this.liveLSystem(), smoothness: v }),
+      toPos: (v) => v, fromPos: (q) => q, fmt: num,
+    }));
 
     /*
-     * ⚠️ A gated precondition, inline (invariant 25). With the bracket bypassed a breathing angle
-     * rebuilds the point list every frame — the control is not wrong, no per-row note can own it, and the
-     * author needs it before the first drag rather than after. **Measured, and a property of the RULE.**
+     * ⚠️ A gated precondition, inline (invariant 25). With the bracket bypassed a wobbling angle rebuilds
+     * the point list every frame — the control is not wrong, no per-row note can own it, and the author
+     * needs it before the first drag rather than after. **Measured, and a property of the RULE.**
      */
-    const cost = document.createElement('p');
-    cost.className = 'sl-composer-precondition';
-    cost.textContent = 'On this rule a breathing angle rebuilds the curve every frame, which costs more '
-      + 'than on the others. Recursion and Smoothness are unaffected.';
     const br = LSYSTEM_ANGLE_BRACKET[rule.key];
-    cost.style.display = (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG
-      || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG) ? '' : 'none';
-    sec.appendChild(cost);
+    if (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG) {
+      const cost = document.createElement('p');
+      cost.className = 'sl-composer-precondition';
+      cost.textContent = 'On this rule a wobbling angle rebuilds the curve every frame, which costs more '
+        + 'than on the others. Recursion and Smoothness are unaffected.';
+      sec.appendChild(cost);
+    }
 
     return sec;
   }
 
-  /**
-   * One modulated curve parameter: the value, plus the breathe pair the Composer already uses elsewhere.
-   *
-   * ⚠️⚠️ **THE STEP MUST BE A NEGATIVE POWER OF TWO WHERE THE RANGE TOP HAS TO BE REACHABLE, AND ONLY A
-   * BROWSER SEES THE ALTERNATIVE FAIL.** A form control steps in base-10 `Decimal` and **refuses an
-   * overshooting stop rather than clamping**, so `1/90` once made +90° unreachable in Chromium (readout
-   * `89°`) while every `trackcheck` clause stayed green — `sanitize()` both clamps to max and computes in
-   * IEEE doubles, where the same expression is exactly 1. `0.015625` is `2^-6`; the 0.5° angle step is
-   * exact in binary too.
-   *
-   * ⚠️ **`set` FIRST, then re-read into BOTH the readout and the input (`32.14`).** `tripletRow`'s handler
-   * once formatted the dragged value and threw the setter's result away, so a snapping setter moved the
-   * ENGINE while the panel reported the raw drag — a dead zone nobody can see does not exist. Every
-   * clamping setter routed through a row needs this order.
-   */
-  private buildModulatedRow(
-    key: 'recursion' | 'yaw' | 'pitch' | 'roll' | 'descend',
-    label: string, tip: string, lo: number, hi: number, step: number,
-  ): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.className = 'sl-row-group';
-
-    const mk = (
-      name: string, part: 'base' | 'amplitude' | 'frequency',
-      rlo: number, rhi: number, rstep: number, rtip: string,
-    ): void => {
-      const row = document.createElement('div');
-      row.className = 'sl-row';
-      const lab = document.createElement('label');
-      lab.textContent = name;
-      lab.title = rtip;
-      row.appendChild(lab);
-      const input = document.createElement('input');
-      input.type = 'range';
-      input.min = String(rlo);
-      input.max = String(rhi);
-      input.step = String(rstep);
-      input.setAttribute('aria-label', name);
-      const out = document.createElement('span');
-      out.className = 'sl-value';
-      const refresh = (): void => {
-        const v = this.liveLSystem()[key][part];
-        input.value = String(v);
-        out.textContent = part === 'frequency' ? `${v.toFixed(2)}` : v.toFixed(2);
-      };
-      input.addEventListener('input', () => {
+  /** The value row plus its wobble pair, all three through `framingRow()`. */
+  private appendCurveTriple(
+    sec: HTMLElement, label: string, tip: string, key: CurveKey,
+    lo: number, hi: number, step: number, fmt: (v: number) => string,
+  ): void {
+    sec.appendChild(this.framingRow(label, tip, {
+      min: lo, max: hi, step,
+      get: () => this.liveLSystem()[key].base,
+      set: (v) => {
         const live = this.liveLSystem();
-        const nextMv: ModulatedValue = { ...live[key], [part]: Number(input.value) };
-        this.commitLSystem({ ...live, [key]: nextMv });
-        // `set` first, THEN re-read — see the header.
-        refresh();
-      });
-      this.lsysSync.push(refresh);
-      refresh();
-      row.appendChild(input);
-      row.appendChild(out);
-      wrap.appendChild(row);
-    };
-
-    mk(label, 'base', lo, hi, step, tip);
-    // The breathe pair. ⚠️ `Depth` keeps Phase 34's family word on purpose (`36.D15`): changing it would
-    // be a five-operator rename for one new row's benefit, and the recursion control is called
-    // `Recursion` precisely so `Depth` can keep meaning *breathing amplitude*.
-    mk(`${label} Depth`, 'amplitude', 0, (hi - lo) / 2, step, TAB_TIPS['composer.curveDepth']!);
-    mk(`${label} Rate`, 'frequency', 0, OP_RATE_MAX, 0.015625, TAB_TIPS['composer.curveRate']!);
-    return wrap;
+        this.commitLSystem({ ...live, [key]: { ...live[key], base: v } });
+      },
+      toPos: (v) => v, fromPos: (q) => q, fmt,
+    }));
+    this.appendCurveWobble(sec, label, key, 0, (hi - lo) / 2, step, fmt);
   }
 
-  /** A static (non-breathing) curve row. */
-  private buildCurveStaticRow(
-    label: string, tip: string, lo: number, hi: number, step: number,
-    get: () => number, set: (v: number) => void,
-  ): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'sl-row';
-    const lab = document.createElement('label');
-    lab.textContent = label;
-    lab.title = tip;
-    row.appendChild(lab);
-    const input = document.createElement('input');
-    input.type = 'range';
-    input.min = String(lo);
-    input.max = String(hi);
-    input.step = String(step);
-    input.setAttribute('aria-label', label);
-    const out = document.createElement('span');
-    out.className = 'sl-value';
-    const refresh = (): void => {
-      const v = get();
-      input.value = String(v);
-      out.textContent = v.toFixed(2);
-    };
-    input.addEventListener('input', () => { set(Number(input.value)); refresh(); });
-    this.lsysSync.push(refresh);
-    refresh();
-    row.appendChild(input);
-    row.appendChild(out);
-    return row;
+  /**
+   * The wobble pair for one curve parameter.
+   *
+   * ⚠️ **`Size` and `Rate`, matching the wave rows' own words** — the owner's vocabulary for this is
+   * *wobble size* and *wobble rate*, and `composercheck` §N asserts the retired synonyms stay absent.
+   * ⚠️ **`Depth` is NOT used as a row label here even though the stored field keeps Phase 34's family
+   * word**: on this tab `Depth` is already four other things, and `36.D15` keeps the STORED name while
+   * the UI says what the row does.
+   */
+  private appendCurveWobble(
+    sec: HTMLElement, label: string, key: CurveKey,
+    lo: number, hi: number, step: number, fmt: (v: number) => string,
+  ): void {
+    sec.appendChild(this.framingRow(`${label} size`, TAB_TIPS['composer.curveDepth']!, {
+      min: lo, max: hi, step,
+      get: () => this.liveLSystem()[key].amplitude,
+      set: (v) => {
+        const live = this.liveLSystem();
+        this.commitLSystem({ ...live, [key]: { ...live[key], amplitude: v } });
+      },
+      toPos: (v) => v, fromPos: (q) => q, fmt,
+    }));
+    sec.appendChild(this.framingRow(`${label} rate`, TAB_TIPS['composer.curveRate']!, {
+      min: 0, max: OP_RATE_MAX, step: CURVE_STEP,
+      get: () => this.liveLSystem()[key].frequency,
+      set: (v) => {
+        const live = this.liveLSystem();
+        this.commitLSystem({ ...live, [key]: { ...live[key], frequency: v } });
+      },
+      toPos: (v) => v, fromPos: (q) => q, fmt: (v) => v.toFixed(2),
+    }));
   }
 }

@@ -572,6 +572,20 @@
 
    ⚠️ The precondition banner is styled as a WARNING, and its `display` is toggled from `sync()` — the rule
    is that an inert-pipeline notice must be impossible to mistake for ordinary help text. */
+/* ---- v8 `36.11` — the quiet explanatory note under a row -------------------------------------------
+
+   ⚠️ **A GENERIC CLASS RATHER THAN BORROWING `.sl-mix-note`, WHOSE VALUES THESE ARE.** That class is
+   named for the Mixer, and a Composer row using it would read as a cross-tab dependency the next
+   reader has to untangle. ⚠️ **It is deliberately NOT `.sl-composer-precondition`**: that one is amber
+   with a left border because it describes a state in which a control is LYING (invariant 25), and using
+   it for ordinary explanation would spend the alarm on something that is not one.                     */
+.sl-row-note {
+  margin: 4px 0 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #777;
+}
+
 .sl-composer-precondition {
   margin: 0 0 10px;
   padding: 6px 8px;
