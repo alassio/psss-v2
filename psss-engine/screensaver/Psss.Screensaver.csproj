@@ -45,6 +45,30 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
+    <!--
+      The version and the identity Windows shows in the file's Properties → Details and that the
+      Settings window prints in its title.
+
+      ⚠️⚠️ THERE IS NO VERSION NUMBER WRITTEN IN THIS FILE, AND THAT IS THE POINT. The ONE version
+      surface is `psss-engine/package.json` (CLAUDE.md, *Versioning and releases*);
+      `scripts/build-screensaver.mjs` reads it and passes `-p:Version=<x.y.z>` through `build.bat`,
+      and then READS THE PUBLISHED .scr BACK and fails the build if it does not carry that number.
+      A second hand-written number here would drift on the first bump — silently, because nothing
+      else in the build reads it.
+
+      ⚠️ The default below is DELIBERATELY not a real version. A bare `build.bat` run (no -p:Version)
+      must not produce a binary that claims to be a release; `0.0.0-local` says plainly that it is not.
+      ⚠️ `IncludeSourceRevisionInInformationalVersion=false`: the .NET 8 SDK otherwise appends
+      `+<commit>` to the product version, and this tree's commit is the UPSTREAM one (2934077), which
+      would print a hash that identifies nothing about this build.
+    -->
+    <Version Condition="'$(Version)' == ''">0.0.0-local</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>PSSS screensaver</Product>
+    <AssemblyTitle>PSSS screensaver — 3D particle systems on modulated sine waves</AssemblyTitle>
+    <Description>The PSSS engine as a Windows screensaver: plays the main reel full screen.</Description>
+    <Copyright>GPL-3.0 — see LICENSE and NOTICE</Copyright>
+
     <!-- D1: one self-contained file. See the deviation note above. -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>

@@ -153,8 +153,21 @@ if (unclaimed.length > 0) {
 // linker command line (screensaver/README.md §1). Never substitute one for the other here.
 console.log(`${TAG} embedded per ${basename(CSPROJ)}: ${embedded.join(', ')}`);
 console.log(`${TAG} on disk per dist/index.html: ${onDisk.join(', ')}`);
-console.log(`${TAG} publishing the host — screensaver/build.bat`);
-const publish = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', BUILD_BAT], {
+/*
+ * ⚠️⚠️ **THE VERSION COMES FROM `package.json` AND NOWHERE ELSE** — the one version surface (CLAUDE.md,
+ * *Versioning and releases*). It is passed to `dotnet publish` through `build.bat`'s `%*`, so the .csproj
+ * carries no number of its own (its default is the deliberately non-release `0.0.0-local`), and it is READ
+ * BACK from the published .scr in step 2b, because a property that silently fails to land produces a
+ * binary that looks right and reports the wrong release — the class of defect nothing else here would see.
+ * ⚠️ A strict `x.y.z` is required: `AssemblyVersion` refuses a pre-release suffix and the failure arrives
+ * as an unrelated-looking compiler error several screens up.
+ */
+const VERSION = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version;
+if (!/^\d+\.\d+\.\d+$/.test(VERSION)) {
+  fail(`package.json version ${JSON.stringify(VERSION)} is not a plain x.y.z, which the .NET build needs`);
+}
+console.log(`${TAG} publishing the host at version ${VERSION} — screensaver/build.bat`);
+const publish = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', BUILD_BAT, `-p:Version=${VERSION}`], {
   cwd: SCREENSAVER,
   stdio: 'inherit',
 });
@@ -239,6 +252,23 @@ if (orphanPayload.length > 0) {
  * bundle and the PE, and a defect in the parser is indistinguishable from a defect in the build. A
  * substring search has no state to get wrong. It proves presence, not that nothing else is stale.
  */
+/*
+ * 2b. ⚠️⚠️ **THE PUBLISHED .scr MUST CARRY `package.json`'s VERSION — READ BACK, NOT ASSUMED.** Windows shows
+ * this number in the file's Properties → Details, and the Settings window prints it in its title; both read
+ * the binary, so the binary is what is checked. `VersionInfo` is Windows' own reader of the version
+ * resource, which is the reader the user's Explorer uses — a home-made PE parser would be a second reader
+ * that could disagree with it.
+ */
+const versionRead = spawnSync('powershell', ['-NoProfile', '-Command',
+  `(Get-Item -LiteralPath '${resolve(PUBLISH, SCR).replace(/'/g, "''")}').VersionInfo.ProductVersion`],
+{ encoding: 'utf8' });
+const scrVersion = (versionRead.stdout || '').trim().split('+')[0];
+if (versionRead.status !== 0 || scrVersion !== VERSION) {
+  fail(`the published ${SCR} reports version ${JSON.stringify(scrVersion)}, not package.json's ${VERSION} — `
+    + 'the -p:Version property did not reach the binary');
+}
+console.log(`${TAG}   ${SCR} carries version ${scrVersion}, read back from the binary`);
+
 const SLICE_BYTES = 256;
 const scrBlob = readFileSync(resolve(PUBLISH, SCR));
 const notInBinary = embedded.filter((name) => {

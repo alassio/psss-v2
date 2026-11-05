@@ -448,7 +448,9 @@ const AUTHORED_INDEX_PALETTES = {
    */
   'Curve Lattice': 'Prismatic',
   'Curve Descent': 'Cycle: Azure',
-  'Curve Gasket': 'Pastel',
+  // ⚠️ Was `Pastel`; the owner's finetuned export `Curve Gasket_20261105_075416.json` moved it to
+  // `Cycle: Starfield` — an owner-authored palette, declared here from that export.
+  'Curve Gasket': 'Cycle: Starfield',
   'Curve Island': 'Ocean',
   'Curve Thicket': 'Warm',
   'Curve Volume': 'Neon',
@@ -464,8 +466,10 @@ const AUTHORED_INDEX_PALETTES = {
    * is measured inert with its review owed, and `Peano` would be the third square maze.
    *
    * ⚠️ All five author `index` for the reason the block above states, and all five author the pair
-   * EXPLICITLY — none of their looks is `Customize`, so adoption was available and was declined on
-   * purpose: the palette is the demo's own choice and must not move when a look's bundle changes.
+   * EXPLICITLY: the palette is the demo's own choice and must not move when a look's bundle changes.
+   * As authored none of their looks was `Customize`; the owner's 2026-11-05 finetunes moved `Curve
+   * Weave` and `Curve Plane Dive` to it, which adopts nothing — so for those two the explicit pair is
+   * now the ONLY palette they have, not merely the preferred one.
    *
    * ⚠️ **`Classic: ice` arrives here as a palette with ONE carrier**, which the NOTE below flags for
    * the 21.3 review. That is the note working, not a defect — but if `Curve Plane Dive` is ever cut,

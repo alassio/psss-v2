@@ -126,6 +126,18 @@ A green build is **not** a silent build, and treating these as noise is how the 
 
 **Nothing else should appear.** A new `IL` warning naming *this host's own* assembly is a real finding.
 
+### The version it carries
+
+**The `.scr` carries `psss-engine/package.json`'s version, and nothing in this folder writes one.**
+`scripts/build-screensaver.mjs` passes it to `dotnet publish` as `-p:Version=<x.y.z>` (through
+`build.bat`'s `%*`) and then **reads it back** from the published binary with Windows' own `VersionInfo`,
+failing the build if the two disagree. It appears in the file's Properties → Details, in the Settings
+window's title, and at the start of the host's log line.
+
+⚠️ **Never write a number into the `.csproj`.** Its default is `0.0.0-local` on purpose, so a bare
+`build.bat` run produces a binary that says plainly it is not a release; a hand-written version there would
+be a second version surface that drifts on the first bump.
+
 ### The output
 
 **`dist/screensaver/` is the installable set — three files, and it is what to copy anywhere.** The

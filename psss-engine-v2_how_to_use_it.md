@@ -374,6 +374,11 @@ separately from any browser you have used — so a main reel you chose in the La
 to the screensaver, and vice versa. Set the screensaver's own reel through its **Settings** button in
 the screensaver configuration dialog.
 
+**Which version you have.** The screensaver's **Settings** window shows its version in the title bar, and
+so does Windows: right-click `psss.scr` → **Properties** → **Details** lists the product version. It is the
+same number as the release on GitHub, so it is the quickest way to tell whether an installed copy is
+current.
+
 **Updating it.** If you install a newer build, copy all three files over the installed ones. Nothing
 updates an installed copy automatically, and an old copy will keep running happily on its old library.
 
@@ -2618,7 +2623,7 @@ material, no warp and no liquid.
 ![The Mixer: the two decks, the source buttons with Reset, the crossfader, and one row per category](manual-images/lab-mixer.png)
 
 *The Mixer. **Deck A** is the preset blended *from*, **Deck B** the one blended *to*. Under them, the two
-source buttons and **Reset**, with a line saying in words where everything currently comes from. Then
+source buttons, **All ⇄** and **Reset**, with a line saying in words where everything currently comes from. Then
 the master **Crossfader**, and under **Categories** one row per part of a preset — each with its lock
 chip, its **A ⇄ B** buttons, a *follow* tick and its own fader.*
 
@@ -2632,11 +2637,19 @@ Mixer, and the most common:
 |---|---|
 | **Figure from B, look from A** | Deck A's colours, grade, materials, image warp and other effects, on Deck **B**'s figure. The figure brings its **motion** (rotation and speed) and its **attractor** with it |
 | **Look from B, figure from A** | the other way round |
+| **All ⇄** | hands every row back to the crossfader, leaving the crossfader where it is — the way back from a mix you built row by row to blending everything at once, without resetting anything |
 | **Reset** | everything back to how it was when you opened the Mixer — the preview returns to the preset you came in with, every row takes its settings from Deck A again, the crossfader goes back to A and any locks are released. **Deck B stays chosen**, so you can try a different mix of the same pair straight away |
 
+**After a source button, the crossfader still works — on the part you took.** **Figure from B, look from
+A** holds the look at Deck A and hands the figure to the crossfader, which it moves all the way to B.
+Drag the crossfader back and the figure fades from Deck B's towards Deck A's while the look stays
+exactly as it is. So the crossfader then means *how much of the other deck's figure* — or, after **Look
+from B**, *how much of its look*.
+
 A typical session: open the Mixer on a preset whose look you like, pick a preset whose **figure** you
-want as Deck B, press **Figure from B, look from A**. If it is not right, press **Reset** and try another
-Deck B, or set the rows by hand.
+want as Deck B, press **Figure from B, look from A**, then pull the crossfader back until the blend of
+the two figures is right. If it is not right, press **Reset** and try another Deck B, or set the rows by
+hand.
 
 **The categories** are the seven parts a preset is made of — **Figure**, **Colour**, **Motion**,
 **Transmap**, **Attractor**, **Materials** and **Visual FX** — and each row decides where its part comes
@@ -2644,15 +2657,17 @@ from:
 
 | Buttons / controls | What the row does |
 |---|---|
-| **A** | takes this part from Deck A, whatever the crossfader does |
-| **B** | takes it from Deck B, whatever the crossfader does |
+| **A** | holds this part at Deck A, whatever the crossfader does |
+| **B** | holds it at Deck B, whatever the crossfader does |
 | **⇄** | follows the master **Crossfader** — this is how every row starts |
 | untick *follow*, then drag the row's fader | blends this part on its own, independently of the others |
 | click the category chip | **freezes** the part at whatever is on screen, while the faders move |
 
-The line under the buttons says the current state in words, for example *"From Deck B: Figure, Motion,
-Attractor. From Deck A: Colour, Transmap, Materials, Visual FX."* When every row is set to A or B, the
-master crossfader has nothing left to move, and the line says so.
+**The rule is one sentence: the crossfader moves every row set to ⇄, and nothing else.** The line under
+the buttons says the current state in words, for example *"Following the crossfader, now at B: Figure,
+Motion, Attractor. Held at Deck A: Colour, Transmap, Materials, Visual FX."* When no row follows it, the
+crossfader is **switched off** (greyed out) and the line says how to hand a row back — click **⇄** on a
+row, or **All ⇄**.
 
 **Visual FX is the catch-all.** Trail length, glow, bloom, the symmetry fold and every Visual FX field
 system answer to it — nearly half of all settings — which is why it is usually the row to lock when you

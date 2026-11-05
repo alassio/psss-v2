@@ -22595,6 +22595,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * ⚠️ `paletteMapping: 'index'` is load-bearing here rather than decorative: on a locality-preserving
    * rule the curve visits each sub-cube as a CONTIGUOUS index range, so `index` is a smooth 3-D gradient.
    * That is the colour structure this figure type inherits for free.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -22758,8 +22762,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'hilbert3d',
           recursion: {
             base: 3,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 90,
@@ -22768,18 +22772,18 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           pitch: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 1,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           smoothness: 0,
           centre: [0, 0, 0],
@@ -22792,7 +22796,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       renderer: {
         mode: 'star',
         glow: 2,
-        decayFactor: 0.58,
+        decayFactor: 0.561,
         blurRadius: 2,
         depthSize: 0,
         streaks: 0,
@@ -22839,14 +22843,27 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: false,
         lineWidth: 2,
-        filmLook: 'Void',
+        filmLook: 'Customize',
         palette: 'Prismatic',
         paletteMapping: 'index',
         attractorIndex: -1,
         attractorBlend: 0.6,
         renderMode: 'star',
-        transMapEnabled: false,
-        transMapStyle: 0,
+        transMapEnabled: true,
+        transMapStyle: 7,
+        transMapChain: [
+          {
+            style: 7,
+            enabled: true,
+            weight: 1,
+            refraction: {
+              strength: 0.49,
+              reach: 2.3,
+              invert: false,
+              source: 'density',
+            },
+          },
+        ],
         curlNoise: {
           enabled: false,
           turbulence: 0,
@@ -22855,6 +22872,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         },
         speedFactor: 1,
         figureScale: 1,
+        particleSize: 1.8,
         physarum: {
           blend: 0,
           sensorAngle: 30,
@@ -22868,6 +22886,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         fluidAdvection: {
           blend: 0,
           returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 4,
+          depthSize: 0.4,
+          depthBrightness: 0.4,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.15,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.15,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
         },
       },
     },
@@ -22887,6 +22928,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * ⚠️ **`descend` BREATHES rather than drifts, which departs from the spec's "drifting over 90-150 s".**
    * The reason is measured: the cost ceiling is `recursionRange + 2`, about TWO octaves, so a long drift
    * would spend most of its time parked against the wall. A breath visits the usable range twice a cycle.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -23050,23 +23095,23 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'hilbert3d',
           recursion: {
             base: 3,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           pitch: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 3.5,
@@ -23078,7 +23123,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         },
         colorBase: [128, 128, 128],
         colorAmp: [128, 128, 128],
-        colorFreq: [1, 1, 1],
+        colorFreq: [4.424, 1, 1],
         colorShift: [0.1, 0.2, 0.3],
       },
       renderer: {
@@ -23131,14 +23176,38 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: false,
         lineWidth: 2,
-        filmLook: 'Cinematic',
+        filmLook: 'Customize',
         palette: 'Cycle: Azure',
         paletteMapping: 'index',
         attractorIndex: -1,
         attractorBlend: 0.6,
         renderMode: 'star',
-        transMapEnabled: false,
-        transMapStyle: 0,
+        transMapEnabled: true,
+        transMapStyle: 12,
+        transMapChain: [
+          {
+            style: 12,
+            enabled: true,
+            weight: 1,
+            conformal: {
+              map: 'mobius',
+              power: 2,
+              mobius: {
+                aRe: 1,
+                aIm: 0,
+                bRe: 0,
+                bIm: 0,
+                cRe: 0.4,
+                cIm: 0,
+              },
+              centre: {
+                x: 0.5,
+                y: 0.5,
+              },
+            },
+          },
+        ],
+        transMapWarpMix: 0.23,
         curlNoise: {
           enabled: false,
           turbulence: 0,
@@ -23161,6 +23230,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           blend: 0,
           returnForce: 0.5,
         },
+        customFilmLookParams: {
+          glow: 6.5,
+          depthSize: 0.8,
+          depthBrightness: 0.6,
+          depthDof: 0.4,
+          depthColorShift: 0.5,
+          lightingMode: 1,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.2,
+          bloomIntensity: 0.65,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.9,
+          lift: [0, 0, 0.02],
+          gamma: [1, 0.98, 0.95],
+          gain: [1, 1, 1],
+          saturation: 1.3,
+          vignette: 0.3,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
       },
     },
   },
@@ -23171,9 +23263,14 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * density stays at **1.05-1.29 across its WHOLE sweep**, so it is the one demo whose range is safe
    * everywhere. The yaw breathes 54 deg to 78 deg, which is the interval §1.1 measured.
    *
-   * ⚠️ `Pastel` is deliberate and the reason is a measurement: **a FLAT-luminance palette (Pastel reads
-   * 178-179) beats a greyscale RAMP wherever the subject is a SHAPE**, because a ramp puts shape
-   * information into brightness. This figure type's entire subject is shape.
+   * ⚠️ **The palette is `Cycle: Starfield` (owner's finetune, 2026-11-05), replacing an authored `Pastel`.**
+   * The authored choice rested on *a FLAT-luminance palette beats a greyscale RAMP wherever the subject is
+   * a SHAPE*; the owner's eye overrules that here, and the export also raised `colorFreq` to 12.74 on X, so
+   * the colour now cycles many times along the index rather than once.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -23197,7 +23294,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         type: 'lsystem',
         particleCount: 30000,
         waveSpeed: 0.05,
-        rotation: [0.15, 4, -1.22],
+        rotation: [0.56, 6.93, -2.59],
         angle: [0, 0, 0],
         waves: [
           {
@@ -23337,36 +23434,36 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'arrowhead',
           recursion: {
             base: 7,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 66,
             amplitude: 12,
-            frequency: 0.5,
+            frequency: 1.6875,
           },
           pitch: {
             base: 60,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 60,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 1,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           smoothness: 0,
           centre: [0, 0, 0],
         },
         colorBase: [128, 128, 128],
         colorAmp: [128, 128, 128],
-        colorFreq: [1, 1, 1],
-        colorShift: [0.1, 0.2, 0.3],
+        colorFreq: [12.74, 0.8084, 1],
+        colorShift: [0.594, 0.461, 0.3],
       },
       renderer: {
         mode: 'star',
@@ -23418,8 +23515,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: false,
         lineWidth: 2,
-        filmLook: 'Void',
-        palette: 'Pastel',
+        filmLook: 'Customize',
+        palette: 'Cycle: Starfield',
         paletteMapping: 'index',
         attractorIndex: -1,
         attractorBlend: 0.6,
@@ -23448,6 +23545,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           blend: 0,
           returnForce: 0.5,
         },
+        customFilmLookParams: {
+          glow: 6.5,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.2,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.2,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
       },
     },
   },
@@ -23461,6 +23581,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * and a stutter twice in 25 s is exactly the defect a still frame cannot show. **So the smoothness is
    * STATIC at 0.4 and the demo shows the relaxed coast rather than the transition.** Stated rather than
    * discovered: if the crossing is ever wanted, it needs specified behaviour AT the branch and a clause.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -23624,28 +23748,28 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'gosper',
           recursion: {
             base: 4,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 60,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           pitch: {
             base: 60,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 60,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 1,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           smoothness: 0.4,
           centre: [0, 0, 0],
@@ -23658,7 +23782,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       renderer: {
         mode: 'star',
         glow: 2,
-        decayFactor: 0.8,
+        decayFactor: 0.882,
         blurRadius: 2,
         depthSize: 0,
         streaks: 0,
@@ -23705,14 +23829,39 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: false,
         lineWidth: 2,
-        filmLook: 'Cinematic',
+        filmLook: 'Customize',
         palette: 'Ocean',
         paletteMapping: 'index',
         attractorIndex: -1,
         attractorBlend: 0.6,
         renderMode: 'star',
-        transMapEnabled: false,
+        transMapEnabled: true,
         transMapStyle: 0,
+        transMapChain: [
+          {
+            style: 0,
+            enabled: true,
+            weight: 1,
+            staticField: {
+              pattern: 'Fine Mesh',
+              strength: 0.5,
+              detail: 1,
+              drift: 0,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'sine',
+              shapeMix: 0,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 0,
+              angleY: 0,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+        ],
+        transMapWarpMix: 0.06,
         curlNoise: {
           enabled: false,
           turbulence: 0,
@@ -23735,6 +23884,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           blend: 0,
           returnForce: 0.5,
         },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 0,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.2,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
       },
     },
   },
@@ -23756,6 +23928,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * ⚠️ Its acceptance question is a GENERATOR question in disguise: the Euler tour draws every edge TWICE
    * -- does that read as weight, or as a double-struck line? **If it reads as a defect the retrace needs a
    * half-offset on the return leg, which is a generator change and not a preset one.**
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -23919,8 +24095,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'plant',
           recursion: {
             base: 4,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 38,
@@ -23929,18 +24105,18 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           pitch: {
             base: 26,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 26,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 1,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           smoothness: 0.2,
           centre: [0, 0, 0],
@@ -24001,29 +24177,6 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         linesEnabled: false,
         lineWidth: 2,
         filmLook: 'Customize',
-        customFilmLookParams: {
-                  glow: 7.5,
-                  depthSize: 0.65,
-                  depthBrightness: 0.55,
-                  depthDof: 0.45,
-                  depthColorShift: 0.5,
-                  lightingMode: 2,
-                  lightDir: [0.5, -0.7, 0.3],
-                  rimPower: 6.5,
-                  bloomEnabled: true,
-                  bloomThreshold: 0.15,
-                  bloomIntensity: 0.75,
-                  toneMapEnabled: true,
-                  toneMapCurve: 'aces',
-                  exposure: 2.5,
-                  lift: [0, 0, 0],
-                  gamma: [1, 1, 1],
-                  gain: [1, 1, 1],
-                  saturation: 1.45,
-                  vignette: 0,
-                  palette: 'Warm',
-                  paletteMapping: 'depth',
-                },
         palette: 'Warm',
         paletteMapping: 'index',
         attractorIndex: -1,
@@ -24039,6 +24192,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         },
         speedFactor: 1,
         figureScale: 1,
+        symmetryFold: 5,
+        symmetryMirror: false,
         physarum: {
           blend: 0,
           sensorAngle: 30,
@@ -24052,6 +24207,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         fluidAdvection: {
           blend: 0,
           returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 7.5,
+          depthSize: 0.65,
+          depthBrightness: 0.55,
+          depthDof: 0.45,
+          depthColorShift: 0.5,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 6.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.15,
+          bloomIntensity: 0.75,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.5,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.45,
+          vignette: 0,
+          palette: 'Warm',
+          paletteMapping: 'depth',
         },
       },
     },
@@ -24071,6 +24249,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    *
    * ⚠️ 50 000 particles is the spec's own choice for this body and it is the only demo in the set that
    * needs them -- the claim is about ACCUMULATION, which is a function of count.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -24234,27 +24416,27 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'hilbert3d',
           recursion: {
             base: 4,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           pitch: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           roll: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           descend: {
             base: 2.2,
-            amplitude: 1.0,
+            amplitude: 1,
             frequency: 0.4,
           },
           smoothness: 0.85,
@@ -24346,7 +24528,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           returnForce: 0.5,
         },
         customFilmLookParams: {
-          glow: 7.5,
+          glow: 5.5,
           depthSize: 0.65,
           depthBrightness: 0.55,
           depthDof: 0.45,
@@ -24354,16 +24536,16 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           lightingMode: 2,
           lightDir: [0.5, -0.7, 0.3],
           rimPower: 6.5,
-          bloomEnabled: true,
-          bloomThreshold: 0.15,
-          bloomIntensity: 0.75,
+          bloomEnabled: false,
+          bloomThreshold: 0.25,
+          bloomIntensity: 0.55,
           toneMapEnabled: true,
           toneMapCurve: 'aces',
-          exposure: 2.5,
+          exposure: 2.4,
           lift: [0, 0, 0],
           gamma: [1, 1, 1],
           gain: [1, 1, 1],
-          saturation: 1.45,
+          saturation: 1.2,
           vignette: 0,
           palette: 'Warm',
           paletteMapping: 'depth',
@@ -24391,6 +24573,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
    * ⚠️ **It rebuilds the curve EVERY FRAME and that is expected, not a defect.** `Hilbert 3D`'s
    * multi-axis bracket solves to 0.04 deg, far below the usable threshold, so the bracket is bypassed --
    * recursion 3 keeps that affordable (512 entries). The Composer states the cost in a gated notice.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -24554,13 +24740,13 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           rule: 'hilbert3d',
           recursion: {
             base: 3,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           yaw: {
             base: 90,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           pitch: {
             base: 90,
@@ -24574,8 +24760,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           descend: {
             base: 1,
-            amplitude: 0.0,
-            frequency: 0.0,
+            amplitude: 0,
+            frequency: 0,
           },
           smoothness: 0.25,
           centre: [0, 0, 0],
@@ -24588,7 +24774,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       renderer: {
         mode: 'star',
         glow: 2,
-        decayFactor: 0.7,
+        decayFactor: 0.802,
         blurRadius: 2,
         depthSize: 0,
         streaks: 0,
@@ -24635,7 +24821,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: false,
         lineWidth: 2,
-        filmLook: 'Void',
+        filmLook: 'Customize',
         palette: 'Prismatic',
         paletteMapping: 'index',
         attractorIndex: -1,
@@ -24664,6 +24850,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         fluidAdvection: {
           blend: 0,
           returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 0,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.3,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.2,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
         },
       },
     },
@@ -25346,7 +25555,16 @@ export const VARIANT_PRESETS: VariantPreset[] = [
     },
   },
   /**
-   * **Curve Weave** -- moore, the only CLOSED rule — a static loop, because closure is the subject and its 0.85 deg bracket makes an animated angle a per-frame rebuild.
+   * **Curve Weave** -- moore, the only CLOSED rule — closure is the subject.
+   *
+   * ⚠️ **No longer a static loop (owner's finetune, 2026-11-05): yaw, pitch and roll each breathe ±4-4.5°.**
+   * The authored body held every angle still because `moore`'s 0.85° bracket makes ANY animated angle a
+   * per-frame list rebuild. The owner's body accepts that cost; if this preset is ever reported as slow,
+   * that rebuild is the first suspect, not the renderer.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -25515,18 +25733,18 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           yaw: {
             base: 90,
-            amplitude: 0,
-            frequency: 0,
+            amplitude: 4,
+            frequency: 15.046875,
           },
           pitch: {
             base: 90,
-            amplitude: 0,
-            frequency: 0,
+            amplitude: 4,
+            frequency: 14.734375,
           },
           roll: {
             base: 90,
-            amplitude: 0,
-            frequency: 0,
+            amplitude: 4.5,
+            frequency: 14.78125,
           },
           descend: {
             base: 1,
@@ -25591,7 +25809,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         ribbonWidth: 3,
         linesEnabled: true,
         lineWidth: 2,
-        filmLook: 'Cinematic',
+        filmLook: 'Customize',
         palette: 'Cycle: Indigo',
         paletteMapping: 'index',
         attractorIndex: -1,
@@ -25621,11 +25839,38 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           blend: 0,
           returnForce: 0.5,
         },
+        customFilmLookParams: {
+          glow: 5,
+          depthSize: 0.8,
+          depthBrightness: 0.6,
+          depthDof: 0.4,
+          depthColorShift: 0.5,
+          lightingMode: 1,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.1,
+          bloomIntensity: 0.6,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.1,
+          lift: [0, 0, 0.02],
+          gamma: [1, 0.98, 0.95],
+          gain: [1, 1, 1],
+          saturation: 1,
+          vignette: 0.3,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
       },
     },
   },
   /**
    * **Curve Triad** -- terdragon at 120 deg — the ONLY triangular-grid texture the engine can produce, wobbling inside its generous 6.3 deg bracket.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -25876,8 +26121,32 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         attractorIndex: -1,
         attractorBlend: 0.6,
         renderMode: 'star',
-        transMapEnabled: false,
+        transMapEnabled: true,
         transMapStyle: 0,
+        transMapChain: [
+          {
+            style: 0,
+            enabled: true,
+            weight: 1,
+            staticField: {
+              pattern: 'Grid Lattice',
+              strength: 0.1,
+              detail: 0.25,
+              drift: 0,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'square',
+              shapeMix: 1,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 0,
+              angleY: 0,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+        ],
         curlNoise: {
           enabled: false,
           turbulence: 0,
@@ -25905,6 +26174,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
   },
   /**
    * **Curve Dragonfold** -- the Heighway dragon at recursion 10 — the paperfolding turn sequence, softened by a little curl.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -26073,8 +26346,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           yaw: {
             base: 90,
-            amplitude: 1.75,
-            frequency: 0.05,
+            amplitude: 6.5,
+            frequency: 6.90625,
           },
           pitch: {
             base: 90,
@@ -26083,8 +26356,8 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           },
           roll: {
             base: 90,
-            amplitude: 0,
-            frequency: 0,
+            amplitude: 7,
+            frequency: 16.203125,
           },
           descend: {
             base: 1,
@@ -26102,7 +26375,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       renderer: {
         mode: 'star',
         glow: 2.2,
-        decayFactor: 0.93,
+        decayFactor: 0.605,
         blurRadius: 2,
         depthSize: 0,
         streaks: 0,
@@ -26144,11 +26417,11 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         },
       },
       overlay: {
-        ribbonMode: 'hybrid',
+        ribbonMode: 'off',
         splatShear: 'tangent',
-        ribbonWidth: 2.5,
-        linesEnabled: false,
-        lineWidth: 2,
+        ribbonWidth: 1.5,
+        linesEnabled: true,
+        lineWidth: 0.5,
         filmLook: 'Plasma',
         palette: 'Fire',
         paletteMapping: 'index',
@@ -26463,6 +26736,10 @@ export const VARIANT_PRESETS: VariantPreset[] = [
   },
   /**
    * **Curve Plane Dive** -- hilbert2d — the second and last rule with a zoomInverse, so the ONLY place the Descend zoom is legible as a plane rather than a tangle.
+   *
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S FINETUNED EXPORT, VERBATIM (2026-11-05), replacing the authored one.**
+   * Where a sentence above describes a value, the body below is the authority (CLAUDE.md: *a
+   * hand-tuned preset the user accepted outranks any refinement rule*).
    */
   {
     after: 'Cylinder',
@@ -26702,12 +26979,12 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         },
       },
       overlay: {
-        ribbonMode: 'adaptive',
+        ribbonMode: 'off',
         splatShear: 'tangent',
         ribbonWidth: 2,
         linesEnabled: false,
-        lineWidth: 2,
-        filmLook: 'Legacy Graded',
+        lineWidth: 0.5,
+        filmLook: 'Customize',
         palette: 'Classic: ice',
         paletteMapping: 'index',
         attractorIndex: -1,
@@ -26721,7 +26998,7 @@ export const VARIANT_PRESETS: VariantPreset[] = [
           scale: 1,
           evolutionSpeed: 0.5,
         },
-        speedFactor: 1,
+        speedFactor: 1.2,
         figureScale: 0.76,
         physarum: {
           blend: 0,
@@ -26736,6 +27013,29 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         fluidAdvection: {
           blend: 0,
           returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.5,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 0,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.35,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
         },
       },
     },

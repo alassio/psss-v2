@@ -11,6 +11,7 @@
 // ⚠️ SCOPE LINE: WHICH REEL IS MAIN IS THE ONLY SETTING. No monitor picker (D2), no
 // grace-period slider, no label toggle (D6 removed the label entirely).
 using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -83,7 +84,7 @@ internal sealed class ConfigWindow : IDisposable
 
         // A non-child window's hWndParent is its OWNER, which is what `/c:<hwnd>` supplies:
         // the Screen Saver dialog wants the config window on top of it and closed with it.
-        _hwnd = Win32.CreateWindowExW(0, ConfigClass, "psss screensaver — choose the main reel",
+        _hwnd = Win32.CreateWindowExW(0, ConfigClass, $"psss screensaver {ProductVersion()} — choose the main reel",
             Win32.WS_OVERLAPPEDWINDOW | Win32.WS_VISIBLE | Win32.WS_CLIPCHILDREN,
             x, y, width, height, owner, IntPtr.Zero, Win32.GetModuleHandleW(null), IntPtr.Zero);
         if (_hwnd == IntPtr.Zero) throw new InvalidOperationException("CreateWindowExW failed for the config window");
@@ -109,6 +110,24 @@ internal sealed class ConfigWindow : IDisposable
         };
         Win32.GetClientRect(_hwnd, out RECT client);
         await _web.AttachAsync(_hwnd, client, ConfigQuery);
+    }
+
+    /// <summary>
+    /// The version the build stamped, for the window title.
+    ///
+    /// ⚠️ READ FROM THE ASSEMBLY, NEVER WRITTEN HERE: the number comes from `psss-engine/package.json`
+    /// through `scripts/build-screensaver.mjs` (`-p:Version=`), so this title cannot drift from the
+    /// release it belongs to. A bare local `build.bat` run prints `0.0.0-local`, which is the honest
+    /// answer for a binary that is not a release. `+` metadata is stripped in case a future SDK
+    /// setting appends a source revision again.
+    /// </summary>
+    internal static string ProductVersion()
+    {
+        string? v = typeof(ConfigWindow).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrWhiteSpace(v)) return "(version unknown)";
+        int plus = v.IndexOf('+');
+        return plus > 0 ? v[..plus] : v;
     }
 
     private static (RECT Work, uint Dpi) WorkAreaAndDpi()

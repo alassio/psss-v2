@@ -893,7 +893,8 @@ function uiViolations(mix, pan) {
    * sets `title = "undefined"`, a thing nothing else in the project can see.
    */
   const tipKeys = ['mixer.crossfader', 'mixer.categoryFader', 'mixer.followMaster', 'mixer.categoryLocks',
-    'mixer.sourceFigure', 'mixer.sourceLook', 'mixer.rowSource', 'mixer.sourceLine', 'mixer.reset'];
+    'mixer.sourceFigure', 'mixer.sourceLook', 'mixer.rowSource', 'mixer.sourceLine', 'mixer.reset',
+    'mixer.allFollow'];
   const unread = tipKeys.filter((k) => !mixerText.includes(`TAB_TIPS['${k}']!`));
   chk(`all ${tipKeys.length} Mixer tooltip keys are read with the whole-subscript shape tipcheck §H requires`,
     unread.length === 0, unread.join(', ') || tipKeys.join(', '));

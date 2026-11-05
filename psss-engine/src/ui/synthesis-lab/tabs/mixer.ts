@@ -394,6 +394,14 @@ export class MixerTab implements TabModule {
   private syncFollowers(): void {
     this.updateSourceLine();
     if (!this.crossfader) return;
+    /*
+     * ⚠️⚠️ **A CROSSFADER THAT CAN MOVE NOTHING IS DISABLED, AND THE STATUS LINE SAYS WHY.** With every
+     * row held at A or B it used to stay draggable and do nothing — the project's *dead control* defect,
+     * the one `26.D4` answers with *disabled and says why*. The reason lives in the status line rather
+     * than a tooltip because the user needs it BEFORE trying the slider, not after.
+     */
+    const anyFollow = LOCKS.some((l) => this.rows.get(l)!.follow);
+    this.crossfader.disabled = !anyFollow;
     const master = parseInt(this.crossfader.value);
     for (const lock of LOCKS) {
       const entry = this.rows.get(lock)!;
@@ -596,6 +604,28 @@ export class MixerTab implements TabModule {
      * the master and remembering which preset you came in with. Absent when no reset is wired -- a
      * button that did nothing would be worse than none.
      */
+    /*
+     * ⚠️ **`All ⇄` is the owner's first idea made EXPLICIT**: every row back to following the crossfader,
+     * the crossfader left where it is, the preview and Deck B untouched. A deliberate click instead of a
+     * side effect of the first drag, so nothing is ever discarded by touching a slider.
+     */
+    const allFollow = document.createElement('button');
+    allFollow.type = 'button';
+    allFollow.className = 'sl-btn sl-mix-recipe sl-mix-all';
+    allFollow.textContent = 'All \u21c4';
+    allFollow.title = TAB_TIPS['mixer.allFollow']!;
+    allFollow.setAttribute('aria-label', 'Hand every row back to the crossfader');
+    allFollow.addEventListener('click', () => {
+      for (const lock of LOCKS) {
+        const entry = this.rows.get(lock)!;
+        entry.follow = true;
+        if (entry.followBox) entry.followBox.checked = true;
+      }
+      this.syncFollowers();
+      this.applyCrossfade();
+    });
+    row.appendChild(allFollow);
+
     if (this.resetToEntry !== null) {
       const reset = document.createElement('button');
       reset.type = 'button';
@@ -633,17 +663,31 @@ export class MixerTab implements TabModule {
   private applyRecipe(figureFrom: 'A' | 'B'): void {
     if (!this.state) return;
     this.refreshDeckAFromLive();
+    /*
+     * ⚠️⚠️ **THE SWAPPED PART IS HANDED TO THE CROSSFADER, NOT PINNED TO B — owner decision 2026-11-05.**
+     * The rule the whole tab now follows: **the crossfader moves every row set to follow; rows set to A or B
+     * are held.** The first version pinned all seven rows, so after a recipe the crossfader moved nothing —
+     * the control the tab is named after was dead in the state the tab's own buttons produce. Now the KEPT
+     * part is held at A and the TAKEN part follows a crossfader moved to B: the picture at that moment is
+     * identical to the pinned version, and the crossfader stays meaningful afterwards as *"how much of the
+     * other deck's figure"* (or look).
+     *
+     * ⚠️ **The owner's own first idea was a reset on the first crossfader move.** Rejected with the owner
+     * because one touch would discard a hand-built mix with no undo, *"first move"* is a mode nobody can
+     * see, and it would make the crossfader and the rows exclusive. `All ⇄` is that reset made explicit.
+     */
     for (const lock of LOCKS) {
       const entry = this.rows.get(lock)!;
-      const fromB = FIGURE_CATEGORIES.includes(lock) === (figureFrom === 'B');
-      entry.follow = false;
-      entry.value = fromB ? 100 : 0;
-      if (entry.followBox) entry.followBox.checked = false;
+      const taken = FIGURE_CATEGORIES.includes(lock) === (figureFrom === 'B');
+      entry.follow = taken;
+      entry.value = 0;   // only read while a row does NOT follow, and a held row is held at A
+      if (entry.followBox) entry.followBox.checked = taken;
     }
+    if (this.crossfader) this.crossfader.value = '100';
     this.syncFollowers();
     this.applyCrossfade();
     /*
-     * W **The Deck B picker is focused only when it is EMPTY.** Stealing focus on every click would
+     * ⚠️ **The Deck B picker is focused only when it is EMPTY.** Stealing focus on every click would
      * fight a user who is pressing the two recipes alternately to compare them, which is the obvious
      * way to use a pair of buttons.
      */
@@ -697,12 +741,18 @@ export class MixerTab implements TabModule {
     const fromB: string[] = [];
     const fromA: string[] = [];
     const following: string[] = [];
+    /*
+     * ⚠️ **A row blended on its OWN fader is its own bucket.** It used to be listed under *"Following the
+     * crossfader"* with its percentage — false, because a row whose follow box is unticked ignores the
+     * crossfader entirely.
+     */
+    const ownBlend: string[] = [];
     for (const lock of LOCKS) {
       const e = this.rows.get(lock)!;
       if (e.follow) following.push(CATEGORY_LABELS[lock]);
       else if (e.value >= 100) fromB.push(CATEGORY_LABELS[lock]);
       else if (e.value <= 0) fromA.push(CATEGORY_LABELS[lock]);
-      else following.push(`${CATEGORY_LABELS[lock]} (${e.value}%)`);
+      else ownBlend.push(`${CATEGORY_LABELS[lock]} (${e.value}% towards B)`);
     }
     /*
      * ⚠️ **THE ENTRY STATE GETS ITS OWN SENTENCE.** On entry every row FOLLOWS a master at A, so the
@@ -719,11 +769,16 @@ export class MixerTab implements TabModule {
           : `Every row follows the crossfader, at ${master}% of the way from Deck A to Deck B.`;
       return;
     }
+    const where = master <= 0 ? 'now at A' : master >= 100 ? 'now at B' : `now ${master}% towards B`;
     const parts: string[] = [];
-    if (fromB.length > 0) parts.push(`From Deck B: ${fromB.join(', ')}.`);
-    if (fromA.length > 0) parts.push(`From Deck A: ${fromA.join(', ')}.`);
-    if (following.length > 0) parts.push(`Following the crossfader: ${following.join(', ')}.`);
-    else parts.push('Every row is pinned, so the master crossfader does nothing until you hand one back.');
+    if (following.length > 0) parts.push(`Following the crossfader, ${where}: ${following.join(', ')}.`);
+    if (fromA.length > 0) parts.push(`Held at Deck A: ${fromA.join(', ')}.`);
+    if (fromB.length > 0) parts.push(`Held at Deck B: ${fromB.join(', ')}.`);
+    if (ownBlend.length > 0) parts.push(`Blended on their own: ${ownBlend.join(', ')}.`);
+    if (following.length === 0) {
+      parts.push('No row follows the crossfader, so it is switched off — click ⇄ on a row, or All ⇄, to '
+        + 'hand it back.');
+    }
     el.textContent = parts.join(' ');
   }
 }

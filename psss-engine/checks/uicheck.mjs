@@ -789,10 +789,57 @@ if (await loadByTile(MIX_LOOK)) {
     mix1 === null ? '(no snapshot)' : `particles ${entry?.preview.pts} -> ${mix1.preview.pts} (the figure moved); `
       + `mode/material ${mix1.preview.mode}/${mix1.preview.mat} (the look stayed)`);
 
-  chk('...and every row is pinned to the deck the recipe names, Motion and Attractor with the Figure',
-    mix1 !== null && mix1.rows === 'BABABAA',
-    `rows "${mix1?.rows}" in CATEGORY_LOCKS order (Figure Colour Motion Transmap Attractor Materials `
-    + 'Visual FX); ⚠️ owner decision 2026-11-04: motion and attractor travel with the figure');
+  /*
+   * ⚠️⚠️ **THE RECIPE HANDS THE TAKEN PART TO THE CROSSFADER (owner, 2026-11-05).** The KEPT rows are held
+   * at A; the TAKEN rows (Figure, Motion, Attractor — owner decision 2026-11-04) follow a crossfader moved to
+   * B. This clause used to assert `BABABAA` — every row pinned — which was the state in which the crossfader
+   * moved nothing. CATEGORY_LOCKS order: Figure Colour Motion Transmap Attractor Materials Visual FX.
+   */
+  chk('...and the recipe HOLDS the look at A and hands the figure rows to the crossfader, moved to B',
+    mix1 !== null && mix1.rows === '⇄A⇄A⇄AA' && mix1.master === '100',
+    `rows "${mix1?.rows}", crossfader ${mix1?.master}`);
+
+  /*
+   * ⚠️⚠️ **THE PROPERTY THE CHANGE EXISTS FOR: after a recipe the crossfader is LIVE.** Dragging it back to
+   * A must return the FIGURE to Deck A's (the particle count is the figure discriminator) while the LOOK
+   * stays exactly as it was. Before 2026-11-05 this drag did nothing at all.
+   */
+  await page.evaluate((MX) => {
+    const r = document.querySelector(`${MX} input[type="range"].sl-slider`);
+    r.value = '0'; r.dispatchEvent(new Event('input', { bubbles: true }));
+  }, MX);
+  await page.waitForTimeout(1500);
+  const back = await mixSnap();
+  chk('...and dragging the crossfader back to A fades the FIGURE back to Deck A while the LOOK stays',
+    back !== null && entry !== null
+    && back.preview.pts === entry.preview.pts
+    && back.preview.mode === mix1?.preview.mode && back.preview.mat === mix1?.preview.mat,
+    `particles ${mix1?.preview.pts} -> ${back?.preview.pts} (entry ${entry?.preview.pts}); `
+    + `mode/material held at ${back?.preview.mode}/${back?.preview.mat}`);
+
+  /*
+   * ⚠️ **With every row held, the crossfader is DISABLED and the status line says why** — a slider that can
+   * move nothing and stays draggable is the dead-control defect `26.D4` answers.
+   */
+  for (const lab of ['Figure', 'Motion', 'Attractor']) {
+    await page.locator(`${MX} button[aria-label="${lab} from Deck A"]`).click();
+  }
+  await page.waitForTimeout(600);
+  const dead = await page.evaluate((MX) => ({
+    disabled: document.querySelector(`${MX} input[type="range"].sl-slider`)?.disabled ?? null,
+    line: document.querySelector(`${MX} .sl-mix-source-line`)?.textContent ?? '',
+  }), MX);
+  chk('with every row held at a deck, the crossfader is DISABLED and the line says why',
+    dead.disabled === true && /switched off/.test(dead.line),
+    `disabled ${dead.disabled}; "${dead.line}"`);
+
+  await page.locator(`${MX} button[aria-label="Hand every row back to the crossfader"]`).click();
+  await page.waitForTimeout(800);
+  const all = await mixSnap();
+  chk('`All ⇄` hands every row back and re-enables the crossfader',
+    all !== null && all.rows === '⇄⇄⇄⇄⇄⇄⇄'
+    && (await page.locator(`${MX} input[type="range"].sl-slider`).first().isDisabled()) === false,
+    `rows "${all?.rows}"`);
 
   // Make Reset undo more than the recipe: a lock and a moved master.
   await page.locator(`${MX} .sl-mix-cat-chip`).first().click();

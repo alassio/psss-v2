@@ -1070,14 +1070,18 @@ export const TAB_TIPS: Record<string, string> = {
     + '— render mode, curl noise, symmetry fold, material, TransMap style — cannot be half-way, so they SNAP '
     + 'to Deck B past the midpoint. At 0 you get Deck A exactly, at 100 Deck B exactly.',
   'mixer.sourceFigure': 'Keep this preset\u2019s look \u2014 colour, grade, materials, image warp \u2014 and take the '
-    + 'FIGURE from Deck B. Rotation and the attractor come with the figure. Every row below is pinned to '
-    + 'one deck or the other, so what you see is exactly what this button says; the master crossfader '
-    + 'does nothing until you hand a row back to it.',
+    + 'FIGURE from Deck B. Rotation and the attractor come with the figure. The look rows are held at Deck A '
+    + 'and the figure rows are handed to the crossfader, which moves to B — so dragging the crossfader '
+    + 'back fades the figure towards Deck A’s while the look stays exactly as it is.',
   'mixer.reset': 'Go back to exactly how things were when you opened the Mixer: the preview returns to the '
     + 'preset you came in with, every row below takes its settings from Deck A again, the crossfader '
     + 'returns to A and any locks are released. Deck B stays chosen, so you can start a new mix from the '
     + 'same pair.',
-  'mixer.sourceLook': 'The other way round: keep Deck A\u2019s figure and take Deck B\u2019s look. Same pinning.',
+  'mixer.sourceLook': 'The other way round: keep Deck A\u2019s figure and take Deck B\u2019s look. The figure rows '
+    + 'are held at A and the crossfader then fades the look.',
+  'mixer.allFollow': 'Hand every row back to the crossfader, keeping where the crossfader is. Use it to go '
+    + 'from a mix you built row by row back to blending everything at once \u2014 without resetting the '
+    + 'preview or Deck B.',
   'mixer.rowSource': 'Where this one group of settings comes from: Deck A, Deck B, or the master '
     + 'crossfader. Picking a deck pins the row; the double arrow hands it back to the master.',
   'mixer.sourceLine': 'What the rows add up to right now, in one sentence \u2014 the faders say it in numbers '

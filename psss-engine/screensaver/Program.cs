@@ -33,7 +33,7 @@ internal static class Program
         try
         {
             (HostMode mode, IntPtr hwnd, string how) = ParseArguments(args);
-            Log($"--- pid {Environment.ProcessId} args [{string.Join(' ', args)}] -> {mode} ({how})");
+            Log($"--- psss {ConfigWindow.ProductVersion()} pid {Environment.ProcessId} args [{string.Join(' ', args)}] -> {mode} ({how})");
             return mode switch
             {
                 HostMode.Show => RunShow(),
