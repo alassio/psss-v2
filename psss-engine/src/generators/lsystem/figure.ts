@@ -197,10 +197,17 @@ export function resolveFigure(
   const rMin = rule.recursionRange[0];
   const rMax = rule.recursionRange[1];
   const zoomCeiling = rMax + 2;
+  /*
+   * ⚠️⚠️ **`zoomCeiling` IS THE ONLY CEILING AND IT IS PASSED IN — see `effectiveRecursion`'s header.**
+   * A flat `ZOOM_MAX_EFFECTIVE_RECURSION = 8` used to be applied inside that function as well, which
+   * capped the USER's Recursion row (not just the zoom) and silently cost `levyC`/`knopp` levels 9-14
+   * and `dragon` levels 9-13. Two ceilings in two places with `zoomClamped` OR-ing the second is what
+   * made it survive; one ceiling applied once is what makes `clamped` trustworthy.
+   */
   const userRec = Math.min(rMax, Math.max(rMin, pose.recursion));
-  const eff = effectiveRecursion(userRec, pose.descend);
-  const rec = Math.min(zoomCeiling, eff.order);
-  cache.zoomClamped = eff.clamped || rec < eff.order - 1e-9;
+  const eff = effectiveRecursion(userRec, pose.descend, zoomCeiling);
+  const rec = eff.order;
+  cache.zoomClamped = eff.clamped;
   const depthLo = Math.min(zoomCeiling, Math.floor(rec));
   const depthFrac = rec - depthLo;
   const needHi = depthFrac > 0 && depthLo + 1 <= zoomCeiling;

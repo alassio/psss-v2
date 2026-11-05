@@ -764,6 +764,58 @@ for (const group of CATEGORY_LOCKS) {
     leaked.length === 0, leaked.join(', ') || 'nothing leaks from the unlocked side into a held group');
 }
 
+/*
+ * ⚠️⚠️ **A LOCK MUST HOLD ITS WHOLE CATEGORY, AND `shape` HELD ONLY HALF OF ITS OWN — SHIPPED, MEASURED,
+ * FIXED 2026-11-04.** `shape` is resolved by TWO separate blocks in `interpolate.ts`: the first owns
+ * `particleCount` / `waves` / the design box and has an `else` restoring the locked snapshot; the second
+ * is `36.13`'s `generators.type` + `generators.lsystem` and had **no `else` at all**, so a locked `shape`
+ * kept `deepCopy(a)`'s figure type and curve block instead of the snapshot's.
+ *
+ * ⚠️⚠️ **THE HALF IT DROPPED IS THE HALF THAT DECIDES WHICH KIND OF FIGURE YOU ARE LOOKING AT**, so the
+ * failure reads as "the Mixer ignored my lock" on exactly the presets where a lock matters most. This is
+ * `36.D1`'s cost for the fifth time: a non-`overlay` block gets no automatic law, and **being on the list
+ * of hand-written sites is not the same as every branch in the listed file being on it** — this is a
+ * second missed branch inside a file that had already been taught about the block once.
+ *
+ * ⚠️ The clause uses a THIRD preset as the snapshot, because a snapshot equal to deck A cannot tell a
+ * held value from a defaulted one — the defect was invisible to any fixture where the lock was taken on
+ * the deck it was being compared against.
+ */
+/** A short, comparable stand-in for a long value, so the report stays readable. */
+const cut = (v) => {
+  const s = JSON.stringify(v) ?? 'undefined';
+  return s.length <= 44 ? s : `${s.slice(0, 40)}… (${s.length} chars)`;
+};
+for (const [what, read] of [
+  ['particleCount', (p) => p.generators.particleCount],
+  ['waves', (p) => JSON.stringify(p.generators.waves)],
+  ['generators.type', (p) => p.generators.type],
+  ['generators.lsystem', (p) => JSON.stringify(p.generators.lsystem ?? null)],
+]) {
+  const snapSrc = clone(PB);
+  snapSrc.generators.type = 'lsystem';
+  snapSrc.generators.lsystem = {
+    rule: 'dragon',
+    recursion: { base: 7, amplitude: 0, frequency: 0 },
+    yaw: { base: 90, amplitude: 0, frequency: 0 },
+    pitch: { base: 90, amplitude: 0, frequency: 0 },
+    roll: { base: 90, amplitude: 0, frequency: 0 },
+    descend: { base: 1, amplitude: 0, frequency: 0 },
+    smoothness: 0.25,
+    centre: [0, 0, 0],
+  };
+  snapSrc.generators.particleCount = 4321;
+  const r = interpolatePreset(clone(PA), clone(PB), 1, new Set(['shape']),
+    new Map([['shape', snapSrc]]));
+  const got = read(r);
+  chk(`a locked \`shape\` holds ${what} at the SNAPSHOT, not at deck A`,
+    JSON.stringify(got) === JSON.stringify(read(snapSrc)),
+    // The wave table is 2 kB of JSON, so the detail shows a FINGERPRINT rather than the value: the
+    // clause compares in full and only the report is abbreviated.
+    `got ${cut(got)}; snapshot ${cut(read(snapSrc))}; deck A ${cut(read(clone(PA)))} `
+    + `— every weight is 1, so an unlocked blend would be deck B`);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n=== G. the UI half (23.5) — the tab must read the shared array and send WEIGHTS ===\n');
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -792,7 +844,17 @@ const panelText = stripComments(rd('src/ui/synthesis-lab/panel.ts'));
 /** One gate, factored out so §H can re-run it over a seeded source. */
 function uiViolations(mix, pan) {
   const v = [];
-  if (!/import \{ CATEGORY_LOCKS \}/.test(mix)) v.push('mixer.ts does not import CATEGORY_LOCKS');
+  /*
+   * ⚠⚠ **THE PATTERN TOLERATES A MULTI-SYMBOL, MULTI-LINE IMPORT, AND THAT IS A CORRECTION.** It was
+   * `/import \{ CATEGORY_LOCKS \}/` — exact, single-line — and it went RED the moment the tab also
+   * imported `CATEGORY_LABELS` and `FIGURE_CATEGORIES` beside it, over code that still reads the shared
+   * owner. **A source-shaped clause must assert the OWNER is read, not the formatting of the line that
+   * reads it**; this project's own rule is that most checkers are text greps and a behaviour-neutral
+   * edit breaks them, so read the assertion before believing the failure.
+   */
+  if (!/import \{[\s\S]*?CATEGORY_LOCKS[\s\S]*?\} from '[^']*overlay-rules\.ts'/.test(mix)) {
+    v.push('mixer.ts does not import CATEGORY_LOCKS from overlay-rules.ts');
+  }
   if (!/const LOCKS: readonly CategoryLock\[\] = CATEGORY_LOCKS;/.test(mix))
     v.push('LOCKS is not an alias of the shared CATEGORY_LOCKS');
   if (/const LOCKS[^=]*=\s*\[/.test(mix)) v.push('LOCKS is a hand-written literal array (defect 1)');
@@ -824,9 +886,16 @@ function uiViolations(mix, pan) {
    * so a quoted-word scan cannot tell copy from code and would report the honest sentence as the defect. The
    * array's SHAPE is the checkable property; the words are not.
    */
-  const tipKeys = ['mixer.crossfader', 'mixer.categoryFader', 'mixer.followMaster', 'mixer.categoryLocks'];
+  /*
+   * ⚠ **The four 2026-11-04 keys are the source recipes and the per-row A/⇄/B selector.** They are listed
+   * here for the same reason as the first four: `tipcheck` §H needs the WHOLE subscript to be a literal at
+   * its own site, and a key read through a variable is invisible to it — which resolves to `undefined` and
+   * sets `title = "undefined"`, a thing nothing else in the project can see.
+   */
+  const tipKeys = ['mixer.crossfader', 'mixer.categoryFader', 'mixer.followMaster', 'mixer.categoryLocks',
+    'mixer.sourceFigure', 'mixer.sourceLook', 'mixer.rowSource', 'mixer.sourceLine', 'mixer.reset'];
   const unread = tipKeys.filter((k) => !mixerText.includes(`TAB_TIPS['${k}']!`));
-  chk('all 4 Mixer tooltip keys are read with the whole-subscript shape tipcheck §H requires',
+  chk(`all ${tipKeys.length} Mixer tooltip keys are read with the whole-subscript shape tipcheck §H requires`,
     unread.length === 0, unread.join(', ') || tipKeys.join(', '));
 
   /*

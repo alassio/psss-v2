@@ -373,6 +373,26 @@ export const LSYSTEM_DEFAULT_RULE: RuleKey = 'hilbert3d';
  * and `yaw` applies when they are constant. ⚠️ **Both were solved at the PUBLISHED angles; a rule driven
  * far from its landmark may be more non-linear than its number says.**
  *
+ * ⚠️⚠️ **EVERY WIDTH HERE WAS ORIGINALLY SOLVED AT `min(rMax, rMin + 1)`, AND THAT IS NOT DEEP ENOUGH:
+ * THE ERROR IS MONOTONE IN RECURSION AT A FIXED WIDTH.** Measured on `levyC` at its old 4.4°, the error
+ * ran 9.9e-3 / 2.7e-2 / 5.4e-2 / 9.1e-2 / 1.2e-1 at depths 7 / 9 / 11 / 13 / 14 — inside budget only at
+ * the depth it was solved at, and **11.6x over at the top of its own declared range.** A deeper curve
+ * composes more rotations, so a width solved shallow is a promise the rule cannot keep.
+ *
+ * ⚠️⚠️ **THE THREE BASE-2 RULES ARE NOW SOLVED AT THEIR RANGE MAXIMUM** (`dragon` 2.10 -> **1.17**,
+ * `levyC` and `knopp` 4.40 -> **1.43**), which holds the budget at EVERY depth in range precisely
+ * because the error is monotone. They stay above `LSYSTEM_MIN_USEFUL_BRACKET_DEG`, so they remain
+ * bracketed rather than rebuilding per frame. **This was forced by the removal of the flat recursion
+ * cap**: those three rules are exactly the ones whose deep end the cap had been hiding, and shipping the
+ * cap removal without this would have traded a coarse figure for a visibly jittering one.
+ *
+ * ⚠️⚠️ **THE OTHER BRACKET-USING RULES ARE STILL SOLVED SHALLOW AND STILL OVER BUDGET AT THE DEPTHS
+ * THEIR OWN DEMOS RUN AT — PRE-EXISTING, MEASURED, AND DELIBERATELY NOT TOUCHED HERE**: `terdragon` 6.3°
+ * (`Curve Triad` at 6), `kochQuad` 12° (`Curve Morph` at 4), `arrowhead` 4.5° (`Curve Gasket` at 7),
+ * `gosper` 4.2° (`Curve Island` at 4), and `hilbert2d` 1.4° (over at depth 2 only). `plant` and `bush3d`
+ * hold across their whole range. **Re-solving those five is a separate change with five shipped demos in
+ * its blast radius; do not fold it into an unrelated sitting.**
+ *
  * ⚠️ **`bush3d`'s `yaw` figure solved to the 32° ceiling and is CAPPED at 12 here, because the ceiling
  * is an artefact rather than a tolerance: its yaw symbols sit inside the `{…}` polygon-fill block, whose
  * `f` moves emit no points once `f` is correct, so YAW IS INERT ON THAT RULE and a zero displacement
@@ -382,7 +402,7 @@ export const LSYSTEM_DEFAULT_RULE: RuleKey = 'hilbert3d';
 export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number }> = {
   hilbert3d: { yaw: 0.22, multi: 0.04 },
   hilbert2d: { yaw: 1.40, multi: 1.40 },
-  dragon: { yaw: 2.10, multi: 2.10 },
+  dragon: { yaw: 1.17, multi: 1.17 },
   terdragon: { yaw: 6.30, multi: 6.30 },
   kochQuad: { yaw: 12.00, multi: 12.00 },
   arrowhead: { yaw: 4.50, multi: 4.50 },
@@ -390,8 +410,8 @@ export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number
   plant: { yaw: 12.00, multi: 12.00 },
   moore: { yaw: 0.85, multi: 0.85 },
   peano: { yaw: 0.69, multi: 0.69 },
-  levyC: { yaw: 4.40, multi: 4.40 },
-  knopp: { yaw: 4.40, multi: 4.40 },
+  levyC: { yaw: 1.43, multi: 1.43 },
+  knopp: { yaw: 1.43, multi: 1.43 },
   bush3d: { yaw: 12.00, multi: 0.72 },
 };
 

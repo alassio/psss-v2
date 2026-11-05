@@ -996,6 +996,10 @@ export const CHROME_TIPS = {
   import: 'Load a preset from a JSON file, or a whole bundle exported with Export All. You confirm the name '
     + 'first, and a clash is offered a version suffix rather than overwriting.',
   grid: 'Switch to the Preview Grid, which animates every preset in the library as a live tile.',
+  settingsSearch: 'Find any setting in the Lab by name, or by what it does — it reads the tooltips as '
+    + 'well as the labels. Results show the tab and section each one lives in; click to go there. '
+    + 'Named values are searchable too, so Neon finds the film look, the palette and the section. A '
+    + 'setting that is switched off or unavailable on this preset says so rather than being hidden.',
 
   // ---- Preview Grid header ----
   lab: 'Switch to the Synthesis Lab to edit the current preset across eight tabs of controls.',
@@ -1065,6 +1069,19 @@ export const TAB_TIPS: Record<string, string> = {
   'mixer.crossfader': 'The master blend. Continuous values move smoothly between the decks; categorical ones '
     + '— render mode, curl noise, symmetry fold, material, TransMap style — cannot be half-way, so they SNAP '
     + 'to Deck B past the midpoint. At 0 you get Deck A exactly, at 100 Deck B exactly.',
+  'mixer.sourceFigure': 'Keep this preset\u2019s look \u2014 colour, grade, materials, image warp \u2014 and take the '
+    + 'FIGURE from Deck B. Rotation and the attractor come with the figure. Every row below is pinned to '
+    + 'one deck or the other, so what you see is exactly what this button says; the master crossfader '
+    + 'does nothing until you hand a row back to it.',
+  'mixer.reset': 'Go back to exactly how things were when you opened the Mixer: the preview returns to the '
+    + 'preset you came in with, every row below takes its settings from Deck A again, the crossfader '
+    + 'returns to A and any locks are released. Deck B stays chosen, so you can start a new mix from the '
+    + 'same pair.',
+  'mixer.sourceLook': 'The other way round: keep Deck A\u2019s figure and take Deck B\u2019s look. Same pinning.',
+  'mixer.rowSource': 'Where this one group of settings comes from: Deck A, Deck B, or the master '
+    + 'crossfader. Picking a deck pins the row; the double arrow hands it back to the master.',
+  'mixer.sourceLine': 'What the rows add up to right now, in one sentence \u2014 the faders say it in numbers '
+    + 'and this says it in words.',
   'mixer.categoryFader': 'This category’s own blend position. Untick “follow master” and this group of '
     + 'settings fades independently — Deck A’s colour at 0 under Deck B’s shape at 100, from one pair.',
   'mixer.followMaster': 'While ticked, this category sits wherever the master crossfader is. Untick it to '

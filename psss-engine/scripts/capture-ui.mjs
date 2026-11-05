@@ -106,6 +106,13 @@ const EXTRA_SHOTS = [
    * why this anchor is named in a comment rather than left to be rediscovered.
    */
   { tab: 'visual-fx', file: 'lab-visual-fx-figure-2', group: 'Figure', scrollTo: 'Blend' },
+  /*
+   * The cross-tab settings search, open over Visual FX. ⚠️ **`symme` is chosen because it shows all three
+   * kinds of row the manual explains**: two controls with the SAME name told apart only by their path
+   * (Visual FX's and Sliders' `Symmetry`), and two rows that matched only on their TOOLTIP, each carrying
+   * the matching fragment (the Mixer's crossfader, `Particle Number`).
+   */
+  { tab: 'visual-fx', file: 'lab-search', search: 'symme' },
   { tab: 'visual-fx', file: 'lab-visual-fx-particles', group: 'Particles' },
   { tab: 'visual-fx', file: 'lab-visual-fx-colour', group: 'Colour', options: ['Ethereal'] },
   /*
@@ -1138,6 +1145,21 @@ if (MODE === 'panels' || MODE === 'all') {
           await target.scrollIntoViewIfNeeded();
         }
         await page.waitForTimeout(800);
+      }
+      /*
+       * `search` types into the Lab header's settings search and waits for its results list.
+       *
+       * ⚠️ **LAST, after `scrollTo`, and nothing may move focus between it and the shot.** The results
+       * list closes on the field's `blur`, so any later step that clicks or blurs would photograph an empty
+       * header. ⚠️ **The FIRST keystroke builds every unbuilt tab** (`TabRegistry.buildAll()`), so the wait
+       * is for the results ROW rather than a fixed delay — measured several seconds under SwiftShader.
+       */
+      if (extra.search) {
+        await page.locator('.sl-search-field').fill(extra.search);
+        try {
+          await page.waitForSelector('.sl-search-results .sl-search-row', { timeout: 60_000 });
+        } catch { problems.push(`${extra.file}: search ${JSON.stringify(extra.search)} returned no rows`); }
+        await page.waitForTimeout(700);
       }
       await prep(page, extra.file);
       await shoot(page, '.right-panel', extra.file);

@@ -3,7 +3,9 @@ import type { ExplorationState, TabId, CategoryLock } from '../../../exploration
 import type { OverlayState, UnifiedPreset } from '../../../presets/types.ts';
 import type { MixWeights } from '../../../exploration/overlay-rules.ts';
 import { interpolatePreset } from '../../../exploration/interpolate.ts';
-import { CATEGORY_LOCKS } from '../../../exploration/overlay-rules.ts';
+import {
+  CATEGORY_LABELS, CATEGORY_LOCKS, FIGURE_CATEGORIES,
+} from '../../../exploration/overlay-rules.ts';
 import { deepCopy } from '../../../exploration/state.ts';
 import { TAB_TIPS, LOCK_CATEGORY_TIPS } from '../tooltips.ts';
 
@@ -28,6 +30,14 @@ interface CategoryRow {
   followBox: HTMLInputElement | null;
   lockBtn: HTMLElement | null;
   readout: HTMLElement | null;
+  /**
+   * The row's three source buttons.
+   *
+   * ⚠ A RECORD over the three states rather than three fields, so `syncFollowers` can mark the active
+   * one in a loop and a fourth state would be a compile error at the record rather than a forgotten
+   * `if` in the sync.
+   */
+  srcBtns: Record<'A' | 'follow' | 'B', HTMLElement | null>;
 }
 
 export class MixerTab implements TabModule {
@@ -53,20 +63,39 @@ export class MixerTab implements TabModule {
    * absent the fallback is the working preset, which is what the tab did before 23.5 — a stated degradation,
    * not a silent one.
    */
+  private deckBSelect: HTMLSelectElement | null = null;
+  /**
+   * The PANEL's reset for this tab, handed in rather than re-implemented.
+   *
+   * ⚠️⚠️ **THE MIXER'S `Reset` BUTTON IS THE HEADER'S `Reset`, NOT A SECOND ONE.** The panel already
+   * owns "the state as this tab was entered": it captures `tabEntryPresets` on every switch, restores the
+   * working preset from it, re-applies its overlays through `resetOverlays`, and then calls this tab's
+   * own `reset()`, which puts every row back to *follow at 0*. A tab-local reset would have to repeat
+   * all three, and the one it forgot -- most likely the overlay re-apply -- would leave the preview
+   * showing a look the rows no longer describe. **One owner, two buttons.**
+   */
+  private resetToEntry: (() => void) | null = null;
+  /** The sentence under the recipes; see `updateSourceLine`. */
+  private sourceLine: HTMLParagraphElement | null = null;
   private getLiveOverlay: (() => OverlayState) | null;
   private rows: Map<CategoryLock, CategoryRow> = new Map(
-    LOCKS.map((l) => [l, { follow: true, value: 0, slider: null, followBox: null, lockBtn: null, readout: null }]));
+    LOCKS.map((l) => [l, {
+      follow: true, value: 0, slider: null, followBox: null, lockBtn: null, readout: null,
+      srcBtns: { A: null, follow: null, B: null },
+    }]));
 
   constructor(
     presetNames: string[],
     getPreset: (name: string) => UnifiedPreset | undefined,
     sendToEvolution?: () => void,
     getLiveOverlay?: () => OverlayState,
+    resetToEntry?: () => void,
   ) {
     this.presetNames = presetNames;
     this.getPreset = getPreset;
     this.sendToEvolution = sendToEvolution ?? null;
     this.getLiveOverlay = getLiveOverlay ?? null;
+    this.resetToEntry = resetToEntry ?? null;
   }
 
   init(container: HTMLElement, state: ExplorationState): void {
@@ -106,14 +135,23 @@ export class MixerTab implements TabModule {
     }
 
     // Deck B
-    const { section: deckBSection } = this.createDeckSection('B', (name) => {
+    /*
+     * ⚠️ **THE DEFAULT IS THE DECK B THE MIXER ALREADY HOLDS.** `reset()` re-renders the whole tab, and
+     * this dropdown was rebuilt with NO default -- so after any reset (the header's too, before this
+     * fix) it showed empty while `state.deckB` still held the old preset, and the next crossfade blended
+     * against a deck the UI said was not there. A dropdown that disagrees with the state it controls is
+     * the invariant-17 shape.
+     */
+    const { section: deckBSection, select: deckBSelect } = this.createDeckSection('B', (name) => {
       const preset = this.getPreset(name);
       if (preset && this.state) {
         this.state.deckB = deepCopy(preset);
         this.applyCrossfade();
       }
-    });
+    }, this.state?.deckB?.metadata.name);
+    this.deckBSelect = deckBSelect;
     el.appendChild(deckBSection);
+    el.appendChild(this.buildSourceSection());
 
     // Crossfader
     const faderSection = document.createElement('div');
@@ -194,7 +232,13 @@ export class MixerTab implements TabModule {
 
     const chip = document.createElement('span');
     chip.className = `sl-lock-chip sl-mix-cat-chip${this.state!.isLocked(lock) ? ' locked' : ''}`;
-    chip.textContent = lock;
+    /*
+     * WW **THE LABEL, NOT THE KEY.** This printed the raw `lock` -- so the UI said `shape`, `color`,
+     * `visual` in lowercase while every other tab calls the first of those **the figure**. The owner's
+     * figure-swap request was about a row nobody could name. `CATEGORY_LABELS` is the one owner, and the
+     * stored value is still the bare word.
+     */
+    chip.textContent = CATEGORY_LABELS[lock];
     chip.setAttribute('role', 'button');
     chip.setAttribute('aria-label', `Lock ${lock} category`);
     // The lock's SCOPE comes from the shared table; the verb is this tab's own — the Randomiser excludes
@@ -214,6 +258,34 @@ export class MixerTab implements TabModule {
     });
     entry.lockBtn = chip;
     row.appendChild(chip);
+
+    /*
+     * WW **THE SOURCE SELECTOR, AND IT IS THE WHOLE POINT OF THIS PASS.** The capability to take one
+     * category from one deck already existed and nobody could find it: it needed unticking `follow`,
+     * knowing that the row called `shape` is the figure, dragging to 100, and knowing to leave the
+     * master at 0 -- five steps, each a guess. **The question a user has is "where does this come
+     * from", not "what blend position is this at"**, so the endpoints get one click each and the fader
+     * stays for when a real blend is wanted.
+     */
+    const src = document.createElement('div');
+    src.className = 'sl-mix-src';
+    src.title = TAB_TIPS['mixer.rowSource']!;
+    for (const [key, text, aria] of [
+      ['A', 'A', `${CATEGORY_LABELS[lock]} from Deck A`],
+      ['follow', '\u21c4', `${CATEGORY_LABELS[lock]} follows the master crossfader`],
+      ['B', 'B', `${CATEGORY_LABELS[lock]} from Deck B`],
+    ] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `sl-mix-src-btn sl-mix-src-${key}`;
+      b.textContent = text;
+      b.title = TAB_TIPS['mixer.rowSource']!;
+      b.setAttribute('aria-label', aria);
+      b.addEventListener('click', () => this.setRowSource(lock, key));
+      src.appendChild(b);
+      entry.srcBtns[key] = b;
+    }
+    row.appendChild(src);
 
     const followLabel = document.createElement('label');
     followLabel.className = 'sl-mix-follow';
@@ -293,9 +365,16 @@ export class MixerTab implements TabModule {
      * to exactly those three. **A fader that reaches more than its note claims is the harder defect of the
      * two**, because nothing the user does will reveal it; they simply never drag that one.
      */
-    note.textContent = 'Each fader moves its own category, and "visual" is the catch-all: trail length, glow, '
-      + 'bloom, the symmetry fold and every Visual FX field system answer to it — nearly half of all settings. '
-      + 'Lock it to hold the look still while the figure, its colour and its material blend across.';
+    /*
+     * ⚠️ **THE CATCH-ALL IS NAMED BY ITS LABEL, NOT ITS KEY.** This read `"visual"` in quotes, which was
+     * the row's own text until `CATEGORY_LABELS` arrived — so the sentence pointed at a word that is no
+     * longer on screen. **Copy that names a control must use the word the control shows**, and the two
+     * drifting apart is invisible to every checker here: `mixercheck` deliberately does not scan this
+     * prose, because a quoted-word scan cannot tell copy from code.
+     */
+    note.textContent = 'Each fader moves its own category, and Visual FX is the catch-all: trail length, '
+      + 'glow, bloom, the symmetry fold and every Visual FX field system answer to it — nearly half of all '
+      + 'settings. Lock it to hold the look still while the figure, its colour and its material blend across.';
     return note;
   }
 
@@ -306,7 +385,14 @@ export class MixerTab implements TabModule {
    * all while the lock's snapshot wins at each of the category's keys — a disabled slider with a stale number
    * beside it would be describing a blend that is not happening.
    */
+  /*
+   * ⚠️ **THE SENTENCE IS UPDATED FROM `syncFollowers()` AND NOWHERE ELSE.** Every path that can change
+   * a row -- the fader, the follow box, the source buttons, a recipe, a lock -- already calls this, so
+   * one call site cannot go stale. Updating it from each of those instead would be six writers of one
+   * fact, and the one that got forgotten would leave a sentence describing a state that is gone.
+   */
   private syncFollowers(): void {
+    this.updateSourceLine();
     if (!this.crossfader) return;
     const master = parseInt(this.crossfader.value);
     for (const lock of LOCKS) {
@@ -319,6 +405,20 @@ export class MixerTab implements TabModule {
       }
       if (entry.followBox) entry.followBox.disabled = locked;
       if (entry.readout) entry.readout.textContent = locked ? 'held' : `${shown}%`;
+      /*
+       * ⚠️ **THE ACTIVE SOURCE IS DERIVED, NEVER STORED.** A fourth field saying "which button is on"
+       * would be a second copy of what `follow` and `value` already say, and the two would disagree the
+       * first time a fader was dragged to 50 — which is exactly the state that must light NEITHER deck.
+       * ⚠️ `>= 100` / `<= 0` rather than `===`, because the row is an integer slider the user can also
+       * drag: 99 is a blend and must not read as "from B".
+       */
+      const active = entry.follow ? 'follow' : entry.value >= 100 ? 'B' : entry.value <= 0 ? 'A' : null;
+      for (const key of ['A', 'follow', 'B'] as const) {
+        const btn = entry.srcBtns[key];
+        if (btn === null) continue;
+        btn.classList.toggle('active', key === active);
+        btn.toggleAttribute('disabled', locked);
+      }
     }
   }
 
@@ -454,5 +554,176 @@ export class MixerTab implements TabModule {
     btn.style.marginTop = '12px';
     btn.addEventListener('click', () => this.sendToEvolution!());
     parent.appendChild(btn);
+  }
+
+  /**
+   * The one-click source recipes and the sentence that says where things stand.
+   *
+   * ⚠️⚠️ **A RECIPE IS A PRESET OF THE FADER STATE AND NOTHING ELSE -- NO NEW ENGINE PATH.** Measured
+   * before building: with `shape` at 100 and the rest at 0, `interpolatePreset` already returns deck
+   * B's waves, figure type, curve block and particle count while every meaningful overlay key
+   * (`customFilmLookParams`, `material`, `palette`, `paletteMapping`, `renderMode`, `splatShear`),
+   * the transmap, the renderer and the colour curves come from deck A. **The capability existed; only
+   * the UX was missing**, which is why this adds buttons rather than arithmetic.
+   */
+  private buildSourceSection(): HTMLElement {
+    const sec = document.createElement('div');
+    sec.className = 'sl-section';
+    const title = document.createElement('div');
+    title.className = 'sl-section-title';
+    title.textContent = 'Take one part from the other deck';
+    title.title = TAB_TIPS['mixer.sourceFigure']!;
+    sec.appendChild(title);
+
+    const row = document.createElement('div');
+    row.className = 'sl-mix-recipes';
+    for (const [tip, text, figureFrom] of [
+      [TAB_TIPS['mixer.sourceFigure']!, 'Figure from B, look from A', 'B'],
+      [TAB_TIPS['mixer.sourceLook']!, 'Look from B, figure from A', 'A'],
+    ] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sl-btn sl-mix-recipe';
+      b.textContent = text;
+      b.title = tip;
+      b.setAttribute('aria-label', text);
+      b.addEventListener('click', () => this.applyRecipe(figureFrom));
+      row.appendChild(b);
+    }
+    /*
+     * ⚠️ **`Reset` sits WITH the recipes because it is their undo** (owner, 2026-11-04): a recipe pins
+     * seven rows, and getting back to the entry state by hand means un-pinning seven rows, re-centring
+     * the master and remembering which preset you came in with. Absent when no reset is wired -- a
+     * button that did nothing would be worse than none.
+     */
+    if (this.resetToEntry !== null) {
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'sl-btn sl-mix-recipe sl-mix-reset';
+      reset.textContent = 'Reset';
+      reset.title = TAB_TIPS['mixer.reset']!;
+      reset.setAttribute('aria-label', 'Reset the Mixer to how it was on entry');
+      reset.addEventListener('click', () => this.resetToEntry?.());
+      row.appendChild(reset);
+    }
+    sec.appendChild(row);
+
+    this.sourceLine = document.createElement('p');
+    this.sourceLine.className = 'sl-mix-source-line';
+    this.sourceLine.title = TAB_TIPS['mixer.sourceLine']!;
+    sec.appendChild(this.sourceLine);
+    return sec;
+  }
+
+  /**
+   * Pin every category to one deck or the other.
+   *
+   * ⚠️⚠️ **IT PINS ALL SEVEN ROWS, NOT JUST THE THREE IT MOVES (owner decision).** The alternative was to
+   * leave the look rows following the master, so a later drag would fade deck B's look in on top -- a
+   * useful second move, but it means the state stops matching the button that produced it. **A named
+   * action whose result silently drifts is worse than no named action**, so the master goes inert and
+   * the sentence below says so.
+   *
+   * ⚠️⚠️ **DECK A IS REFRESHED FROM THE LIVE PRESET FIRST, AND THAT IS NOT A CONVENIENCE.** Deck A is
+   * pre-selected when the tab is BUILT; if the preset changed since, it is stale -- the same latent
+   * shape as the Composer body defect, where a tab built at one moment answered about another. The
+   * gesture this feature exists for is *"I like what I am looking at, now give me that one's figure"*,
+   * and that is a lie if Deck A is whatever was loaded when the tab first opened.
+   */
+  private applyRecipe(figureFrom: 'A' | 'B'): void {
+    if (!this.state) return;
+    this.refreshDeckAFromLive();
+    for (const lock of LOCKS) {
+      const entry = this.rows.get(lock)!;
+      const fromB = FIGURE_CATEGORIES.includes(lock) === (figureFrom === 'B');
+      entry.follow = false;
+      entry.value = fromB ? 100 : 0;
+      if (entry.followBox) entry.followBox.checked = false;
+    }
+    this.syncFollowers();
+    this.applyCrossfade();
+    /*
+     * W **The Deck B picker is focused only when it is EMPTY.** Stealing focus on every click would
+     * fight a user who is pressing the two recipes alternately to compare them, which is the obvious
+     * way to use a pair of buttons.
+     */
+    if (!this.state.deckB && this.deckBSelect) this.deckBSelect.focus();
+  }
+
+  /** Put the live working preset on Deck A, and move the picker with it. */
+  private refreshDeckAFromLive(): void {
+    const live = this.state?.workingPreset;
+    if (!live || !this.state) return;
+    this.state.deckA = deepCopy(live);
+    const name = live.metadata.name;
+    if (this.deckASelect && name) {
+      const has = Array.from(this.deckASelect.options).some((o) => o.value === name);
+      if (has) this.deckASelect.value = name;
+    }
+  }
+
+  /**
+   * One row's source: a deck pins it, the double arrow hands it back to the master.
+   *
+   * ⚠️ **Picking a deck sets BOTH `follow` and the value**, because either alone is a half-state: an
+   * unticked row at the master's position looks pinned and is not, and a value with `follow` still on
+   * is ignored by `readWeights()` entirely.
+   */
+  private setRowSource(lock: CategoryLock, source: 'A' | 'follow' | 'B'): void {
+    const entry = this.rows.get(lock);
+    if (!entry) return;
+    if (source === 'follow') {
+      entry.follow = true;
+    } else {
+      entry.follow = false;
+      entry.value = source === 'B' ? 100 : 0;
+    }
+    if (entry.followBox) entry.followBox.checked = entry.follow;
+    this.syncFollowers();
+    this.applyCrossfade();
+  }
+
+  /**
+   * The sentence under the recipes.
+   *
+   * ⚠️⚠️ **IT NAMES THE CATEGORIES RATHER THAN COUNTING THEM**, for the reason a badge that counts is
+   * wrong here: "3 from B" does not tell you WHICH three, and the whole question this tab answers is
+   * which part came from where. W It also says when the master is inert, because a fader that does
+   * nothing and does not say so is the defect this project calls a dead control.
+   */
+  private updateSourceLine(): void {
+    const el = this.sourceLine;
+    if (el === null) return;
+    const fromB: string[] = [];
+    const fromA: string[] = [];
+    const following: string[] = [];
+    for (const lock of LOCKS) {
+      const e = this.rows.get(lock)!;
+      if (e.follow) following.push(CATEGORY_LABELS[lock]);
+      else if (e.value >= 100) fromB.push(CATEGORY_LABELS[lock]);
+      else if (e.value <= 0) fromA.push(CATEGORY_LABELS[lock]);
+      else following.push(`${CATEGORY_LABELS[lock]} (${e.value}%)`);
+    }
+    /*
+     * ⚠️ **THE ENTRY STATE GETS ITS OWN SENTENCE.** On entry every row FOLLOWS a master at A, so the
+     * generic form read *"Following the crossfader: Figure, Colour, Motion, Transmap, Attractor,
+     * Materials, Visual FX."* -- true, and no help to someone checking that `Reset` worked. **The
+     * question after a reset is "is everything from A again", so the line answers it in those words.**
+     */
+    const master = this.crossfader ? parseInt(this.crossfader.value) : 0;
+    if (following.length === LOCKS.length && fromA.length === 0 && fromB.length === 0) {
+      el.textContent = master <= 0
+        ? 'Everything comes from Deck A — the crossfader is at A, and every row follows it.'
+        : master >= 100
+          ? 'Everything comes from Deck B — the crossfader is at B, and every row follows it.'
+          : `Every row follows the crossfader, at ${master}% of the way from Deck A to Deck B.`;
+      return;
+    }
+    const parts: string[] = [];
+    if (fromB.length > 0) parts.push(`From Deck B: ${fromB.join(', ')}.`);
+    if (fromA.length > 0) parts.push(`From Deck A: ${fromA.join(', ')}.`);
+    if (following.length > 0) parts.push(`Following the crossfader: ${following.join(', ')}.`);
+    else parts.push('Every row is pinned, so the master crossfader does nothing until you hand one back.');
+    el.textContent = parts.join(' ');
   }
 }

@@ -482,9 +482,10 @@ exploration.** The Lab opens on the first one.
 | **Export** | saves the current preset to a `.json` file |
 | **Import** | loads one |
 | **Grid** | goes back to the preview grid |
+| **Find a setting…** | the search field at the right — see *Finding a setting* below |
 
-These six are always present, whichever tab you are on, and the tab bar below them is always in the
-same order.
+These are always present, whichever tab you are on, and the tab bar below them is always in the same
+order.
 
 **Changes are live but not saved.** Everything you do shows immediately in the main view, and nothing
 is written to the library. Use **Snapshot** to keep a state, or **Export** to keep a file.
@@ -509,6 +510,30 @@ conventions are shared between them, and knowing them once is enough for all thr
 > **Hiding is never forgetting.** A closed group, an unticked feature and a switched-off wave all still
 > export, still snapshot, still take a **Reset**, and still blend in the Mixer. Nothing you cannot see
 > has been dropped from the preset.
+
+**Finding a setting.** Type into **Find a setting…** at the right of the header and a list of matching
+settings drops down — from **every** tab, not only the one you are on. Click one, or move to it with the
+arrow keys and press Enter, and the Lab takes you there: it opens the tab, opens every closed group and
+section on the way, scrolls the setting into view and briefly lights its row. **Escape** closes the list.
+
+![Searching for "symme": three controls named Symmetry, and two rows whose tooltips mention it](manual-images/lab-search.png)
+
+*Each result shows the setting's name and, under it, **where it lives** — the tab first, then the group
+and section. That second line is usually what tells two results apart: there is a **Symmetry** in Visual
+FX and another in Sliders, and only the path says which is which.*
+
+- **It reads what a setting does, not only its name.** A word from a tooltip finds the setting too. When
+  a row matched only on its tooltip, the matching phrase is shown under it with the word picked out, so
+  you can see *why* it is there — searching **symme** also finds the Mixer's crossfader, because the
+  crossfader treats the symmetry fold specially.
+- **Named values are searchable.** Film looks, palettes, materials, render modes and curve rules are
+  found by name and marked **VALUE**; clicking one takes you to the dropdown that sets it.
+- **Some results cannot be jumped to, and say so.** A setting switched off by another control in its
+  section names that control, and clicking takes you to it instead. A setting that does not exist for
+  the current preset — **Pitch** on a curve rule that never turns in that plane, for instance — is shown
+  dimmed with its reason, rather than left out, so the list never suggests a control is missing from
+  the program.
+- **Two words narrow the list**: every word you type must match.
 
 ---
 
@@ -1134,7 +1159,7 @@ The panel is divided into three labelled groups: **Particles**, **Bloom** and **
 | **Glow** | Size and softness of each particle's halo. This is a **shape** control, not a brightness one — low gives a tight bright core, high a wide diffuse bloom. Used only by the *Star* and *Blend* render modes |
 | **Depth Sz** | How much larger near particles are drawn than far ones. This is the main cue that makes a 3D figure read as having depth rather than as a flat pattern |
 | **Depth Br** | How much brighter near particles are drawn. Use it with Depth Size when the figure looks uniformly lit and therefore flat |
-| **DoF** | Depth of field — blurs particles away from the focal depth, so only the middle of the figure is sharp. A photographic cue: it makes the figure read as an object being photographed |
+| **DoF** | Depth of field — blurs particles away from the focal depth, so only the middle of the figure is sharp. A photographic cue: it makes the figure read as an object being photographed. It blurs the near and the far side alike, so it does **not** say which part is in front — use **Depth Sz** and **Depth Br** for that |
 | **Color Sh** | Tints distant particles away from near ones — aerial perspective. Adds depth separation without changing size or brightness, which is useful when both are already committed |
 
 The last two of that group give the figure a surface rather than leaving it as emissive dust:
@@ -2054,6 +2079,18 @@ and a **Rate** that make it wobble over time, exactly as the wave rows work.
   frame when an angle moves, because their shape is not a smooth function of the angle at any useful
   step. Recursion and Smoothness are unaffected on every rule.
 
+> **Worked examples, one per thing to look at.** Fourteen presets ship on this figure type, and each was
+> built to show one row doing its job:
+>
+> | To see | Load |
+> |---|---|
+> | **Yaw** sweeping between two named fractals | `Curve Morph` — the Koch production travelling from its own 90° to the 117° where it becomes a Sierpiński triangle |
+> | **Recursion** subdividing | `Curve Subdivide` — new detail appearing between existing strokes, not the figure growing |
+> | **Descend** travelling into the curve | `Curve Descent` and `Curve Volume` in three dimensions, `Curve Plane Dive` flat, where the zoom is easiest to read |
+> | **Pitch** and **Roll**, the two rows most rules do not have | `Curve Tilt` |
+> | a rule that **closes into a loop** | `Curve Weave` — the one shipped curve you can trace all the way round |
+> | what the **different rules** look like | `Curve Lattice` (a cube-filling lattice), `Curve Gasket` (a triangle), `Curve Island` (a coastline), `Curve Thicket` (a branching plant), `Curve Triad` (a triangular grid, the only rule that turns at 120°), `Curve Dragonfold` (a folded ribbon) and `Curve Scroll` (a curve that overlaps itself) |
+
 #### A wave slot, control by control
 
 ![Body in full, Structure switched off, Detail in full](manual-images/lab-composer-2.png)
@@ -2578,36 +2615,58 @@ material, no warp and no liquid.
 
 ### 6.7 Mixer — blending two presets
 
-![The Mixer. A master crossfader at the top, then one row per category.](manual-images/lab-mixer.png)
+![The Mixer: the two decks, the source buttons with Reset, the crossfader, and one row per category](manual-images/lab-mixer.png)
 
-*The Mixer. The two dropdowns at the top are deck A, the preset blended *from*, and deck B, the preset
-blended *to*. The **Crossfader** below them is the master fader, and under **Categories** each row has
-its own lock chip, *follow master* tick and fader. **Send to Evolution** hands the result on.*
+*The Mixer. **Deck A** is the preset blended *from*, **Deck B** the one blended *to*. Under them, the two
+source buttons and **Reset**, with a line saying in words where everything currently comes from. Then
+the master **Crossfader**, and under **Categories** one row per part of a preset — each with its lock
+chip, its **A ⇄ B** buttons, a *follow* tick and its own fader.*
 
+Load two presets as **Deck A** and **Deck B**. Deck A is filled with the preset you came in with; Deck B
+you choose.
 
-Load two presets as **Deck A** and **Deck B** and crossfade between them. Deck A follows whatever
-preset you have selected; Deck B you choose.
+**Take one part from the other deck.** The two buttons at the top are the quickest way to use the
+Mixer, and the most common:
 
-**A master crossfader** moves everything at once. Below it, **one fader per category** — Shape,
-Colour, Motion, TransMap, Attractor, Material, Visual — lets one category cross over while the others
-stay put. That is how you get *deck B's colour on deck A's shape*.
+| Button | What you get |
+|---|---|
+| **Figure from B, look from A** | Deck A's colours, grade, materials, image warp and other effects, on Deck **B**'s figure. The figure brings its **motion** (rotation and speed) and its **attractor** with it |
+| **Look from B, figure from A** | the other way round |
+| **Reset** | everything back to how it was when you opened the Mixer — the preview returns to the preset you came in with, every row takes its settings from Deck A again, the crossfader goes back to A and any locks are released. **Deck B stays chosen**, so you can try a different mix of the same pair straight away |
 
-**Each category is in exactly one of three states:**
+A typical session: open the Mixer on a preset whose look you like, pick a preset whose **figure** you
+want as Deck B, press **Figure from B, look from A**. If it is not right, press **Reset** and try another
+Deck B, or set the rows by hand.
 
-| State | How to get there | What you see |
-|---|---|---|
-| **Following** | the default | the row mirrors the master fader |
-| **Independent** | untick *follow master* | the row has its own fader |
-| **Frozen** | click the category chip | the chip lights, the fader greys, and the category is pinned at whatever is on screen |
+**The categories** are the seven parts a preset is made of — **Figure**, **Colour**, **Motion**,
+**Transmap**, **Attractor**, **Materials** and **Visual FX** — and each row decides where its part comes
+from:
 
-**Two things to know.** Some settings are categorical — a material, a render mode, a palette — and
-cannot be half-way between two values. Those **snap** at the fader's midpoint rather than blending.
-And **each fader has its own midpoint**, so snapping happens per category, not all at once at the
-master.
+| Buttons / controls | What the row does |
+|---|---|
+| **A** | takes this part from Deck A, whatever the crossfader does |
+| **B** | takes it from Deck B, whatever the crossfader does |
+| **⇄** | follows the master **Crossfader** — this is how every row starts |
+| untick *follow*, then drag the row's fader | blends this part on its own, independently of the others |
+| click the category chip | **freezes** the part at whatever is on screen, while the faders move |
+
+The line under the buttons says the current state in words, for example *"From Deck B: Figure, Motion,
+Attractor. From Deck A: Colour, Transmap, Materials, Visual FX."* When every row is set to A or B, the
+master crossfader has nothing left to move, and the line says so.
+
+**Visual FX is the catch-all.** Trail length, glow, bloom, the symmetry fold and every Visual FX field
+system answer to it — nearly half of all settings — which is why it is usually the row to lock when you
+want the look to stay still.
+
+**Two things to know.** Some settings are categorical — a material, a render mode, a palette, a curve
+rule — and cannot be half-way between two values. Those **snap** at the fader's midpoint rather than
+blending. And **each fader has its own midpoint**, so snapping happens per category, not all at once at
+the master.
 
 > **The category chips are shared with the Randomise and Evolution tabs, where they mean something
 > different.** Here a lit chip *freezes* a category. There it *excludes* it from change. Locking
-> something here will also stop Randomise touching it until you unlock it.
+> something here will also stop Randomise touching it until you unlock it. The chips carry the same
+> seven names in all three tabs.
 
 ---
 
@@ -2632,7 +2691,7 @@ history buttons.
 | **Medium** | substantial change | **Yes** — about one press in four re-skins **one** of them |
 | **Wild** | large, structure-breaking | Yes. Expect most results to be unusable and the occasional one to be worth keeping — that is the intended hit rate |
 
-**Keep untouched.** Seven chips — Shape, Colour, Motion, TransMap, Attractor, Material, Visual. A lit
+**Keep untouched.** Seven chips — Figure, Colour, Motion, Transmap, Attractor, Materials, Visual FX. A lit
 chip **excludes** that category from mutation. This is how the tab becomes a precision tool rather than
 a slot machine: lock everything except Colour and press *Medium* repeatedly to audition grades on a
 figure you have settled.

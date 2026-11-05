@@ -43,6 +43,35 @@ export class TabRegistry {
     this.tabs.set(tab.id, tab);
   }
 
+  /**
+   * Build every registered tab that has not been built yet, leaving each one hidden.
+   *
+   * ⚠️⚠️ **THIS EXISTS FOR THE SETTINGS SEARCH AND IT IS ADDITIVE: `show()` IS UNTOUCHED.** The search
+   * scans the rendered panel, so a tab that has never been opened contributes nothing — the same fact
+   * `CLAUDE.md` records as *"`[data-tab="X"]` matches nothing until X has been opened"*. Changing
+   * `show()` to build eagerly would have altered the behaviour every Phase 17 spec, every
+   * `capture-ui.mjs` recipe and every `uicheck` clause is written against; a separate verb that the
+   * search calls once changes nothing for anybody else.
+   *
+   * ⚠️⚠️ **`activate()` IS NOT CALLED AND MUST NOT BE.** `init()` builds the DOM; `activate()` is what
+   * starts a tab's per-frame work, and the whole reason `suspend()`/`resume()` exist is that an
+   * inactive tab must cost nothing. Activating ten tabs here would put nine tabs' per-frame cost on
+   * every frame, which is the opposite of what the registry is for — and it would be invisible except
+   * as a frame-rate complaint, i.e. the hardest class to attribute.
+   *
+   * ⚠️ **The container is left `display: none`** so nothing flashes on screen, and the scan computes
+   * visibility RELATIVE to the container precisely so that this does not read as "everything hidden".
+   */
+  buildAll(): void {
+    for (const [tabId, tab] of this.tabs) {
+      if (this.initialized.has(tabId)) continue;
+      const container = this.createContainer(tabId);
+      container.style.display = 'none';
+      tab.init(container, this.state);
+      this.initialized.add(tabId);
+    }
+  }
+
   show(id: TabId): void {
     for (const [tabId, tab] of this.tabs) {
       if (tabId === id) {

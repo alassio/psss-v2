@@ -926,7 +926,16 @@ test.describe('§A13/§B13 · The `Preview only` section — steps 106a–106n',
       // A Sliders move rebuilds the working preset and emits — the same path a preset switch takes, with the
       // SAME name. That name equality is the whole discriminator.
       await composer.openTab('sliders');
-      const slider = composer.page.locator(`${SEL.tabContent} input[type="range"]`).first();
+      /*
+       * ⚠️⚠️ **SCOPED TO THE SLIDERS CONTAINER, AND IT WAS NOT — THE TEST TIMED OUT FOR 9 MINUTES ON A HIDDEN
+       * COMPOSER SLIDER.** `${SEL.tabContent} input[type="range"]` matches every BUILT tab, and containers sit in
+       * the DOM in the order the tabs were first shown: this test opens the Composer before Sliders, so `.first()`
+       * resolved to the Composer's `Figure Scale` — inside a container now `display: none` — and `fill` waited for
+       * it to become visible until the deadline. Proven pre-existing on 2026-11-05 by re-running it on the whole
+       * `src/` tree from the previous day's backup: identical failure. `CLAUDE.md`'s rule, reached in a spec:
+       * scope a tab's controls to `.tab-content[data-tab="X"]`.
+       */
+      const slider = composer.page.locator('.tab-content[data-tab="sliders"] input[type="range"]').first();
       await expect(slider, 'CALIBRATION: no range input on the Sliders tab, so nothing below was driven.')
         .toHaveCount(1);
       // ⚠️ **THE TRACK IS 0–100 WITH A CENTRE OF 50, AND `applyAllSliders` SKIPS ANY SLIDER STILL AT 0.5** —

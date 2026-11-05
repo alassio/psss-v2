@@ -3,7 +3,7 @@ import type { ExplorationState, TabId, CategoryLock } from '../../../exploration
 import type { PresetStatistics } from '../../../exploration/preset-stats.ts';
 import type { UnifiedPreset } from '../../../presets/types.ts';
 import { randomizePreset, type Intensity } from '../../../exploration/randomize.ts';
-import { CATEGORY_LOCKS } from '../../../exploration/overlay-rules.ts';
+import { CATEGORY_LABELS, CATEGORY_LOCKS } from '../../../exploration/overlay-rules.ts';
 import { deepCopy } from '../../../exploration/state.ts';
 import { TAB_TIPS, LOCK_CATEGORY_TIPS } from '../tooltips.ts';
 
@@ -130,7 +130,7 @@ export class RandomiserTab implements TabModule {
     for (const lock of LOCKS) {
       const chip = document.createElement('span');
       chip.className = `sl-lock-chip${this.state!.isLocked(lock) ? ' locked' : ''}`;
-      chip.textContent = lock;
+      chip.textContent = CATEGORY_LABELS[lock];   // the one label owner -- see overlay-rules.ts
       // Scope from the shared table, verb from this tab — the Mixer freezes a blended value instead.
       chip.title = `Leave ${LOCK_CATEGORY_TIPS[lock]} untouched when randomising.`;
       chip.addEventListener('click', () => {

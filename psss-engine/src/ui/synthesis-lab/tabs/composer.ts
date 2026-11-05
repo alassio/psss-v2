@@ -609,6 +609,20 @@ export class ComposerTab implements TabModule {
   private adoptExternalFigure(): void {
     this.resetMutes();
     this.rebuildModel();
+    /*
+     * ⚠️⚠️ **A TYPE CHANGE NEEDS THE WHOLE BODY, NOT THE SLOT BODIES.** The wave slots and the curve
+     * section are mutually exclusive, so `renderSlotBody` cannot convert one into the other — it fills
+     * slot bodies that are not there. Before this guard, a curve preset arriving over a wave body left
+     * the wave slots on screen under a dropdown reading "Self-similar curve".
+     *
+     * ⚠️ **ONLY on a mismatch, never unconditionally.** `render()` rebuilds the tab's whole DOM, which
+     * closes every collapsible group again — the state `32.13`'s fixture expander exists to deal with.
+     * Doing it on every external change would make an unrelated slider drag in Visual FX collapse the
+     * Composer, which is the kind of "why did it do that" the partial resync was chosen to avoid.
+     *
+     * ⚠️ `render()` ends with the slot bodies and `sync()`, so this returns rather than falling through.
+     */
+    if (this.liveFigureType() !== this.builtType) { this.render(); return; }
     for (let w = 0; w < MAX_WAVES; w++) this.renderSlotBody(w);
     this.sync();
   }
@@ -632,7 +646,19 @@ export class ComposerTab implements TabModule {
     this.muted = [false, false, false];
   }
 
-  activate(): void { this.sync(); }
+  /*
+   * ⚠️⚠️ **THE SAME GUARD ON SHOW, BECAUSE NOT EVERY PATH THAT CHANGES THE TYPE NOTIFIES.** The owner's
+   * sequence was: load a curve preset, change a Visual FX slider, THEN open the Composer — and the tab
+   * was already built, so whether the body is right depended entirely on something having fired
+   * `onExternalChange`. **A tab must be correct when shown, regardless of what did or did not notify**,
+   * and the comparison is one field read.
+   *
+   * ⚠️ `render()` ends with `sync()`, so the branches do not both run it.
+   */
+  activate(): void {
+    if (this.liveFigureType() !== this.builtType) this.render();
+    else this.sync();
+  }
   /** Nothing per-frame is owned here — no rAF, no interval, no `GridTileRenderer`. */
   deactivate(): void { /* intentionally empty */ }
 
@@ -876,6 +902,27 @@ export class ComposerTab implements TabModule {
   // Rendering
   // -------------------------------------------------------------------------------------------------
 
+  /**
+   * The figure type the CURRENT body was built for, or `null` before the first render.
+   *
+   * ⚠️⚠️ **THIS EXISTS BECAUSE THE TWO BODIES ARE MUTUALLY EXCLUSIVE AND NOTHING WAS COMPARING THEM.**
+   * `adoptExternalFigure()` rebuilt the three WAVE slot bodies and nothing else, so a preset arriving
+   * with a different `generators.type` left the previous body standing: the type dropdown read
+   * "Self-similar curve", the Score drew the curve, and the rows underneath were the Lissajous wave
+   * slots. **Owner-reported on `Curve Thicket`.**
+   *
+   * ⚠️⚠️ **IT IS `36.D1`'s COST ARRIVING FOR THE FOURTH TIME: a non-`overlay` block gets no automatic law
+   * of any kind.** `interpolate.ts`, `evolution-ops.ts`, `randomize.ts` and `preset-facets.ts` were each
+   * hand-written for the curve block and each was listed as a place that could be forgotten —
+   * `adoptExternalFigure` was a fifth such site and was not on the list. **Nothing failed when it was
+   * missed**, which is the signature.
+   *
+   * ⚠️ Compared rather than trusted: a boolean "did the type change" flag would need a writer at every
+   * site that can change the type, which is the enumeration problem again. One remembered value and one
+   * comparison cannot drift.
+   */
+  private builtType: FigureType | null = null;
+
   private render(): void {
     const el = this.container!;
     el.innerHTML = '';
@@ -1057,7 +1104,13 @@ export class ComposerTab implements TabModule {
      * `generators.waves`. **The test: is the hidden control capable of changing the picture in the
      * current state? If yes it must be visible. If no it must be hidden.**
      */
-    if (this.liveFigureType() === 'lsystem') el.appendChild(this.buildLSystemSection());
+    /*
+     * ⚠️ **RECORDED HERE, AT THE ONE PLACE THE BODY IS CHOSEN**, so the remembered value and the body on
+     * screen cannot disagree. Setting it in `init()` or in the type-switch handler would be a second
+     * writer of the same fact.
+     */
+    this.builtType = this.liveFigureType();
+    if (this.builtType === 'lsystem') el.appendChild(this.buildLSystemSection());
     else for (let w = 0; w < MAX_WAVES; w++) el.appendChild(this.buildSlotSection(w));
 
     // ⚠️ **NO FOOTER: THE `Figure-wide` SECTION WAS DELETED WITH ITS ONE ROW (owner, 2026-09-10).** The slot

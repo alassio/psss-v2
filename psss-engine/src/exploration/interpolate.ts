@@ -196,6 +196,36 @@ export function interpolatePreset(
         delete result.generators.lsystem;
       }
     }
+  } else {
+    /*
+     * ⚠️⚠️ **THIS `else` WAS MISSING AND A LOCKED `shape` SILENTLY DID NOT HOLD THE FIGURE.** The FIRST
+     * `shape` block above has one — it restores `particleCount`, `waves` and the design box from the
+     * locked snapshot — and this second one, `36.13`'s, had none. So `result` kept `deepCopy(a)`'s type
+     * and curve block: **measured with a third preset as the snapshot and every weight at 1, the lock
+     * held `particleCount` and `waves` correctly and ignored `generators.type` and
+     * `generators.lsystem` entirely.** A lock that holds half a category is worse than no lock, because
+     * the half it drops is the half that decides which KIND of figure you are looking at.
+     *
+     * ⚠️⚠️ **`36.D1`'s COST FOR THE FIFTH TIME: a non-`overlay` block gets no automatic law of any
+     * kind.** The named hand-written sites were `interpolate.ts`, `evolution-ops.ts`, `randomize.ts` and
+     * `preset-facets.ts`; the list was incomplete twice over — `composer.ts`'s `adoptExternalFigure`
+     * was one missed site, and this is a SECOND one inside `interpolate.ts` itself, where the file had
+     * already been "taught" about the block once. **Being on the list is not the same as every branch
+     * in the listed file being on it.**
+     *
+     * ⚠️ The delete-or-assign shape is the same as the unlocked branch's, and for the same reason: a
+     * result whose type is not `lsystem` must never carry a synthetic block, and one whose type IS
+     * `lsystem` must always have it.
+     */
+    const snap = lockedValues.get('shape');
+    if (snap) {
+      result.generators.type = snap.generators.type;
+      if (snap.generators.lsystem !== undefined) {
+        result.generators.lsystem = deepCopy(snap.generators.lsystem);
+      } else {
+        delete result.generators.lsystem;
+      }
+    }
   }
 
   if (!locks.has('transmap')) {

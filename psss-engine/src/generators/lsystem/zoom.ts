@@ -42,15 +42,32 @@
  * **`contiguous` below is that check, and it is reported rather than silently trusted.**
  */
 
-/**
- * The deepest effective recursion a band is allowed to index into.
+/*
+ * ⚠️⚠️ **THERE USED TO BE A FLAT `ZOOM_MAX_EFFECTIVE_RECURSION = 8` HERE AND IT WAS A DEFECT, BECAUSE IT
+ * BOUND THE USER'S BASE RECURSION AND NOT ONLY THE ZOOM.** It was written as an index wall — each octave
+ * of `descend` shrinks the window, so a band eventually holds fewer cells than the particle count can
+ * distinguish — but `effectiveRecursion` applied it to `base + octaves`, so it capped the Recursion row
+ * itself with `descend` at 1 and no zoom in sight.
  *
- * ⚠️ **THE INDEX WALL IS REAL AND IS SURFACED RATHER THAN HIDDEN.** Each octave of `descend` shrinks the
- * window geometrically, so the band eventually holds fewer cells than the particle count can
- * distinguish. **A documented wall beats a silent one**: `clamped` says so, and the readout shows it, so
- * a `Descend` that has stopped doing anything announces the fact instead of reading as a broken control.
+ * ⚠️⚠️ **ONE LEVEL OF RECURSION IS NOT THE SAME AMOUNT OF ANYTHING ACROSS THE RULE SET, WHICH IS WHY A
+ * FLAT CEILING COULD NEVER HAVE BEEN RIGHT.** Measured expansion base: `peano` 9.1x per level,
+ * `hilbert3d` 8.1x, down to `dragon` 2.1x and `levyC` 2.3x. Three levels of `levyC` are about one level
+ * of `hilbert3d`. The per-rule `recursionRange` already carries that difference and the per-rule
+ * `zoomCeiling` in `resolveFigure` already bounds the zoom, so the ceiling is now a PARAMETER and there
+ * is exactly one of them.
+ *
+ * ⚠️ **What it cost: `levyC` and `knopp` (range 6-14) lost levels 9-14 and `dragon` (6-13) lost 9-13 —
+ * six of nine levels on a shipped rule.** The three affected rules are exactly the base-2 ones, whose
+ * range tops out above 8; the other ten never reached the cap. **It never bound a rule that can ZOOM
+ * either**: only `hilbert3d` and `hilbert2d` have a `zoomInverse` and their `rMax + 2` ceilings are 6
+ * and 8, both already at or under the old flat value. So the cap's entire effect was damage.
+ *
+ * ⚠️ **It was invisible because the figure does not get SHORTER, it gets COARSER.** Owner-reported as
+ * *"this preset figure looks truncated"* on `Curve Scroll` (`levyC` at 11, rendering 8): nothing is
+ * clipped — 0 particles culled, 0 off-canvas, 81 916 symbols against a 900 000 budget — the curve was
+ * simply built with 257 segments instead of 2 049. **Measured: extent and arc length were byte-identical
+ * from order 8 to 14, which is what a dead control looks like from the outside.**
  */
-export const ZOOM_MAX_EFFECTIVE_RECURSION = 8;
 
 /** The smallest band, in list entries, still worth drawing. Below this the figure is a few dots. */
 export const ZOOM_MIN_BAND_ENTRIES = 16;
@@ -74,15 +91,26 @@ export interface ZoomBand {
 }
 
 /**
- * The effective integer recursion a zoom asks for, and whether the wall clamped it.
+ * The effective recursion a pose asks for, and whether `ceiling` clamped it.
  *
  * ⚠️ **Separated from the band so the UI can report the clamp without building a list** — the readout
  * needs the number on every frame and a band only when the window moves.
+ *
+ * ⚠️⚠️ **`ceiling` IS A PARAMETER AND THAT IS THE POINT: THERE IS NOW EXACTLY ONE CEILING AND ONE PLACE
+ * THAT APPLIES IT.** Before, a flat module constant was applied here AND a per-rule `rMax + 2` was
+ * applied again at the call site, with `clamped` reporting only the first of the two and the caller
+ * OR-ing in the second. Two ceilings, two places, and the resolved value recomputed afterwards — which
+ * is exactly the shape invariant 17 warns about, and exactly how the flat cap hid for a whole phase.
+ * **Pass the per-rule ceiling; do not reintroduce a module-level one.**
  */
-export function effectiveRecursion(baseRecursion: number, descend: number): { order: number; clamped: boolean } {
+export function effectiveRecursion(
+  baseRecursion: number,
+  descend: number,
+  ceiling: number,
+): { order: number; clamped: boolean } {
   const octaves = descend > 1 ? Math.log2(descend) : 0;
   const want = baseRecursion + octaves;
-  const order = Math.min(ZOOM_MAX_EFFECTIVE_RECURSION, want);
+  const order = Math.min(ceiling, want);
   return { order, clamped: order < want - 1e-9 };
 }
 

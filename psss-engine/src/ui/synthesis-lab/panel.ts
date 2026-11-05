@@ -1,6 +1,7 @@
 import './panel.css';
 import { ExplorationState, deepCopy, type TabId } from '../../exploration/state.ts';
 import { TabRegistry } from '../../exploration/tab-module.ts';
+import { SettingsSearch } from './settings-search-panel.ts';
 import type { UnifiedPreset } from '../../presets/types.ts';
 import type { PresetStatistics } from '../../exploration/preset-stats.ts';
 import { MixerTab } from './tabs/mixer.ts';
@@ -296,7 +297,27 @@ export class SynthesisLabPanel {
       header.appendChild(gridBtn);
     }
 
+    /*
+     * v8 — the cross-tab SETTINGS SEARCH field, LAST in the header.
+     *
+     * ⚠️ **Last on purpose: the six buttons before it are a fixed row whose positions specs and
+     * screenshots depend on, and a field inserted among them would move every one of them.** The
+     * field is also the only header item that grows with the panel's width.
+     *
+     * ⚠️ **The dropdown is appended to the PANEL, not to the header**, so it can overlay the tab
+     * content below rather than being clipped by the header's own box — and so its position does not
+     * depend on the header's overflow rules.
+     */
+    this.settingsSearch = new SettingsSearch({
+      tabContent: () => this.tabContent,
+      tabLabels: new Map(TAB_DEFS.map((d) => [d.id as string, d.label])),
+      buildAll: () => this.registry?.buildAll(),
+      openTab: (id) => this.switchTab(id),
+    });
+    header.appendChild(this.settingsSearch.buildField());
+
     this.container.appendChild(header);
+    this.container.appendChild(this.settingsSearch.buildDropdown());
 
     // Tab bar
     this.tabBar = document.createElement('div');
@@ -320,6 +341,15 @@ export class SynthesisLabPanel {
     const target = this.parentElement ?? document.body;
     target.appendChild(this.container);
   }
+
+  /**
+   * The cross-tab settings search.
+   *
+   * ⚠️ **Built in `buildDOM()` and never rebuilt**, because it remembers its own index across
+   * rescans — see `mergeIndex`. A second instance would start empty and would report a control that
+   * has since disappeared as simply missing rather than as unavailable.
+   */
+  private settingsSearch: SettingsSearch | null = null;
 
   private evolutionTab: EvolutionTab | null = null;
 
@@ -346,7 +376,9 @@ export class SynthesisLabPanel {
      */
     const vfx = this.config.visualFxControls;
     this.registry.register(new MixerTab(
-      presetNames, getPreset, sendToEvolution, vfx ? () => vfx.getSnapshot() : undefined));
+      presetNames, getPreset, sendToEvolution, vfx ? () => vfx.getSnapshot() : undefined,
+      // The header's own reset, so the Mixer's `Reset` button is the SAME operation, not a copy of it.
+      () => this.resetCurrentTab()));
     this.registry.register(new RandomiserTab(stats, sendToEvolution));
     // v8 26.8 — the strip is applied ENGINE-side, so the tab is handed the host's setter rather than
     // reaching for it: a panel built without `visualFxControls` then simply has no toggle, instead of a

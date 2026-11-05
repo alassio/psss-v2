@@ -4,7 +4,7 @@ import type { UnifiedPreset } from '../../../presets/types.ts';
 import type { PresetStatistics } from '../../../exploration/preset-stats.ts';
 import type { GridTileRenderer } from '../../preview-grid/grid-tile-renderer.ts';
 import { breedGeneration, mutatePreset } from '../../../exploration/evolution-ops.ts';
-import { CATEGORY_LOCKS } from '../../../exploration/overlay-rules.ts';
+import { CATEGORY_LABELS, CATEGORY_LOCKS } from '../../../exploration/overlay-rules.ts';
 import type { Intensity } from '../../../exploration/randomize.ts';
 import { deepCopy } from '../../../exploration/state.ts';
 import { LOCK_CATEGORY_TIPS, TAB_TIPS } from '../tooltips.ts';
@@ -31,15 +31,14 @@ const TILE_H = 192;
 const LOCKS: readonly CategoryLock[] = CATEGORY_LOCKS;
 
 /** Human labels for the chips; the stored value is the bare `CategoryLock` word. */
-const LOCK_LABELS: Record<CategoryLock, string> = {
-  shape: 'Shape',
-  color: 'Colour',
-  motion: 'Motion',
-  transmap: 'TransMap',
-  attractor: 'Attractor',
-  material: 'Material',
-  visual: 'Visual',
-};
+/*
+ * ⚠️⚠️ **THERE WAS A PRIVATE `LOCK_LABELS` HERE WITH DIFFERENT WORDS FROM THE OTHER TWO TABS.** One concept,
+ * three spellings: this tab said `Shape` / `TransMap` / `Material` / `Visual`, Randomise printed the raw keys
+ * (`shape`, `visual`), and the Mixer said `Figure` / `Transmap` / `Materials` / `Visual FX`. The chips are
+ * shared state -- a lock set in one tab is a lock in the other two -- so a chip that changes its name when
+ * you change tab reads as three different locks. **`CATEGORY_LABELS` in `overlay-rules.ts` is the one owner**,
+ * and a `Record` there makes a new category a compile error at the one place that names it.
+ */
 
 // Stable slot keys for the 9 evo tiles in GridTileRenderer
 function slotKey(i: number): string { return `evo-${i}`; }
@@ -196,7 +195,7 @@ export class EvolutionTab implements TabModule {
     for (const lock of LOCKS) {
       const chip = document.createElement('span');
       chip.className = 'sl-lock-chip';
-      chip.textContent = LOCK_LABELS[lock];
+      chip.textContent = CATEGORY_LABELS[lock];
       /**
        * ⚠️ **THE VERB HERE IS BOTH VERBS, AND THAT IS `25.D4` (`P3`'s accepted cost).** One `Set` now has
        * three meanings — freeze (Mixer), exclude from mutation (Randomiser) and **both** (here) — and
@@ -204,7 +203,7 @@ export class EvolutionTab implements TabModule {
        */
       chip.title = `Keep ${LOCK_CATEGORY_TIPS[lock]} exactly as your first pick has it — neither mutated nor `
         + 'inherited from another parent. Shared with the Mixer and Randomise tabs.';
-      chip.setAttribute('aria-label', `Keep ${LOCK_LABELS[lock]} untouched`);
+      chip.setAttribute('aria-label', `Keep ${CATEGORY_LABELS[lock]} untouched`);
       chip.addEventListener('click', () => {
         this.state!.toggleLock(lock);
         this.syncChips();

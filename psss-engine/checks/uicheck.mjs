@@ -30,6 +30,13 @@ await page.goto(URL, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 
 let pass = 0, fail = 0;
+/*
+ * A read-only snapshot of engine state, taken before the settings search is exercised in section S.
+ * `null` when the page was not opened with `?testhook=1`, in which case that clause is skipped rather
+ * than asserted over nothing.
+ */
+let hookBeforeSearch = null;
+
 const chk = (n, ok, d = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '   ' + d : ''}`); ok ? pass++ : fail++; };
 
 /*
@@ -46,6 +53,19 @@ if (await bar.count() === 0 || !(await bar.first().isVisible())) {
 }
 await page.locator('.sl-tab-btn[data-tab="visual-fx"]').click();
 await page.waitForTimeout(900);
+
+/*
+ * The pre-search snapshot for section S. Taken HERE, before anything in this file has typed into the
+ * settings field, because the clause it feeds asks whether USING the search moved engine state -- and
+ * that question is only answerable against a value captured first.
+ */
+hookBeforeSearch = await page.evaluate(() => {
+  const h = window.__psss;
+  return h === undefined ? null : {
+    mode: h.renderMode, mat: h.material, look: h.filmLook, pts: h.particleCount,
+    scale: h.figureScale, fold: h.symmetryFold, speed: h.speedFactor,
+  };
+});
 
 /** A row by its visible label. ⚠️ `slider()` sets no `aria-label`, so the label SPAN is the handle. */
 const row = (label) => page.locator('.sl-vfx-row')
@@ -470,6 +490,341 @@ await page.waitForTimeout(900);
     `body visible: ${shown2}; note: ${JSON.stringify(note2.slice(0, 34))}; box ticked: ${ticked2} - `
     + 'off-because-empty and off-because-switched-off share one tick and only one is clickable, which is '
     + "16.17's own defect reached in a new medium");
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== S. the cross-tab SETTINGS SEARCH: coverage, paths and the jump ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * ⚠️⚠️ **THIS IS THE HALF `searchcheck` CANNOT REACH, AND IT IS THE HALF THE FEATURE'S VALUE RESTS ON.**
+ * The index is SCANNED from the rendered panel, so "is every tab covered" is a DOM question. A search
+ * that silently stops indexing a tab answers **no match**, which is indistinguishable from *"that
+ * setting does not exist"* -- no error, no console line, no visual tell.
+ *
+ * ⚠️ The field builds every tab on first use (`TabRegistry.buildAll()`), so the clauses below type once
+ * and then read the live dropdown.
+ */
+const SEARCH_FIELD = '.sl-search-field';
+const SEARCH_ROW = '.sl-search-results .sl-search-row';
+
+const searchFor = async (q) => {
+  await page.locator(SEARCH_FIELD).fill(q);
+  await page.waitForSelector(`${SEARCH_ROW}, .sl-search-empty`, { timeout: 30000 });
+  return page.evaluate(() => Array.from(document.querySelectorAll('.sl-search-results .sl-search-row'))
+    .map((r) => ({
+      label: r.querySelector('.sl-search-row-label')?.textContent ?? '',
+      path: r.querySelector('.sl-search-row-path')?.textContent ?? '',
+      tab: r.querySelector('.sl-search-row-tab')?.textContent ?? '',
+      why: r.querySelector('.sl-search-row-why')?.textContent ?? '',
+      tag: r.querySelector('.sl-search-row-tag')?.textContent ?? '',
+    })));
+};
+
+await page.locator(SEARCH_FIELD).fill('e');
+await page.waitForSelector(`${SEARCH_ROW}, .sl-search-empty`, { timeout: 60000 });
+
+/*
+ * ⚠️⚠️ **EVERY TAB MUST CONTRIBUTE AT LEAST ONE ENTRY.** Measured when this was built: Randomise,
+ * Evolution and History hold ZERO labelled inputs between them -- their whole interface is buttons --
+ * which is why buttons are indexed at all. Without this clause those three tabs could fall out of the
+ * index and nothing would say so.
+ */
+const coverage = await page.evaluate(() => {
+  const out = {};
+  for (const c of document.querySelectorAll('.tab-content[data-tab]')) {
+    const id = c.dataset.tab;
+    out[id] = c.querySelectorAll('input[aria-label], select[aria-label], canvas[aria-label], button').length;
+  }
+  return out;
+});
+const emptyTabs = Object.entries(coverage).filter(([, n]) => n === 0).map(([id]) => id);
+chk(`all ${Object.keys(coverage).length} tabs are built and hold something indexable`,
+  Object.keys(coverage).length === 10 && emptyTabs.length === 0,
+  emptyTabs.length === 0
+    ? Object.entries(coverage).map(([k, v]) => `${k}:${v}`).join(' ')
+    : `INVISIBLE TO THE SEARCH: ${emptyTabs.join(', ')}`);
+
+/*
+ * The owner's own motivating case. W **`Symmetry` sits in a CLOSED section inside a CLOSED group**, so
+ * it is two separate clicks deep -- which is why it could not be found by looking.
+ */
+const symm = await searchFor('symmetry');
+const vfxSymm = symm.find((r) => r.path.startsWith('Visual FX') && r.label === 'Symmetry');
+chk('searching `symmetry` finds the Visual FX control, two closed containers deep',
+  vfxSymm !== undefined, symm.map((r) => `${r.label} [${r.path}]`).slice(0, 4).join(' | '));
+
+/*
+ * ⚠️⚠️ **THE PATH MUST NAME THE SECTION THE CONTROL IS ACTUALLY IN.** An earlier scanner climbed out of
+ * the collapsible and reported `Visual FX › Figure › Deformation › Curve Basis` -- a path naming two
+ * sections, the second of which it is not in. **A plausible wrong path is worse than a short one**,
+ * because the whole feature is an answer to "where does this live".
+ */
+/*
+ * ⚠⚠ **ASSERTED AS SEGMENTS, NOT AS THE RENDERED STRING, AND THIS CLAUSE ALREADY CAUGHT THE
+ * DIFFERENCE ONCE.** The row builds the path from spans so the TAB can carry more weight, and the
+ * separator's spacing is a CSS margin rather than text — so `textContent` reads
+ * `Visual FX›Figure›Deformation` with no spaces. The first version of this clause compared the
+ * spaced string and went red on correct code. **Splitting on the separator tests what matters (which
+ * sections the path names, in order) and is immune to how the gaps are drawn.**
+ */
+const segsOf = (s) => s.split('›').map((x) => x.trim()).filter((x) => x.length > 0);
+chk('...and its path is exactly its own chain, with no section it is not in',
+  vfxSymm !== undefined
+  && JSON.stringify(segsOf(vfxSymm.path)) === JSON.stringify(['Visual FX', 'Figure', 'Deformation']),
+  vfxSymm === undefined ? '(not found)' : `[${segsOf(vfxSymm.path).join(' | ')}]`);
+
+chk('...and the TAB is its own emphasised element, because it is the coarsest discriminator',
+  vfxSymm !== undefined && vfxSymm.tab === 'Visual FX',
+  vfxSymm === undefined ? '(not found)' : `tab span reads "${vfxSymm.tab}"; ⚠ the owner reported the `
+  + 'path as "barely readable" and the location is what decides which hit is the right one');
+
+/*
+ * ⚠️⚠️ **THE PRESET FILTER DRAWER MUST NOT BE IN THE INDEX.** The Reel tab hosts a copy of it and its
+ * chips carry a COMPOSED accessible name, so before the exclusion the results showed *"Symmetry fold,
+ * 2 presets, not filtered"* beside the real control. A filter chip is worth having only when enough
+ * PRESETS carry the feature; a settings entry is worth having for every CONTROL. Two universes.
+ */
+const chipRows = symm.filter((r) => /presets, (not )?filtered|presets, excluded/.test(r.label));
+chk('no preset-filter chip leaks into the settings results',
+  chipRows.length === 0,
+  chipRows.length === 0 ? 'none' : `LEAKED: ${chipRows.map((r) => r.label).join(' | ')}`);
+
+/* A named VALUE is findable and is tagged, so three different `Neon`s are distinguishable. */
+const neon = await searchFor('neon');
+const neonValue = neon.find((r) => r.tag === 'value');
+chk('a named value (a film look, a palette) is indexed and tagged',
+  neonValue !== undefined,
+  neon.map((r) => `${r.label}${r.tag ? ' <' + r.tag + '>' : ''}`).slice(0, 4).join(' | '));
+
+/*
+ * ⚠️⚠️ **THE JUMP MUST ACTUALLY REVEAL THE TARGET, AND THIS IS THE ONE CLAUSE A TEXT SCAN CANNOT BE.**
+ * Everything upstream can be right -- the entry, the path, the expand list -- and the control still be
+ * invisible, because an inner collapsible inside a collapsed body has no layout and opening it first
+ * measures nothing. The assertion is therefore `offsetParent`, after the click, in the live DOM.
+ */
+await searchFor('symmetry');
+const jumped = await page.evaluate(() => {
+  const rows = Array.from(document.querySelectorAll('.sl-search-results .sl-search-row'));
+  const row = rows.find((r) => (r.querySelector('.sl-search-row-path')?.textContent ?? '')
+    .includes('Deformation'));
+  if (!row) return { clicked: false };
+  row.click();
+  return { clicked: true };
+});
+await page.waitForTimeout(900);
+const revealed = await page.evaluate(() => {
+  const c = document.querySelector('.tab-content[data-tab="visual-fx"]');
+  const el = c?.querySelector('[aria-label="Symmetry"]');
+  return {
+    tabShown: c !== null && getComputedStyle(c).display !== 'none',
+    visible: !!(el && el.offsetParent !== null),
+    flashed: document.querySelectorAll('.sl-search-hit').length,
+  };
+});
+chk('clicking a result opens the tab, expands BOTH closed containers and reveals the control',
+  jumped.clicked && revealed.tabShown && revealed.visible,
+  `clicked ${jumped.clicked} · tab shown ${revealed.tabShown} · control visible ${revealed.visible}`);
+
+chk('...and the landing row is flashed, so the eye can find it after the scroll',
+  revealed.flashed === 1,
+  `${revealed.flashed} element(s) carry .sl-search-hit; ⚠️ the flash is 1600 ms, so a reader sampling `
+  + 'later measures 0 and that is not a defect -- it is why this reads immediately after the click');
+
+/*
+ * ⚠️⚠️ **THE SEARCH MUST NOT WRITE ENGINE STATE. NOT ONCE.** Building ten tabs runs ten `init()`s, and a
+ * tab that WROTE during init would apply nine tabs' worth of state the first time anyone typed in the
+ * field -- arriving as a changed picture with no action to attribute it to. Measured through
+ * `?testhook=1`, which is read-only by construction.
+ */
+if (hookBeforeSearch !== null) {
+  const after = await page.evaluate(() => {
+    const h = window.__psss;
+    return h === undefined ? null : {
+      mode: h.renderMode, mat: h.material, look: h.filmLook, pts: h.particleCount,
+      scale: h.figureScale, fold: h.symmetryFold, speed: h.speedFactor,
+    };
+  });
+  const moved = after === null ? ['no hook'] : Object.keys(after)
+    .filter((k) => JSON.stringify(after[k]) !== JSON.stringify(hookBeforeSearch[k]));
+  chk('using the search changed no engine state',
+    moved.length === 0,
+    moved.length === 0 ? 'nothing moved' : `WROTE: ${moved.join(', ')}`);
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== T. the Composer BODY must agree with the live figure type ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * ⚠️⚠️ **OWNER-REPORTED DEFECT, AND IT SHIPPED BECAUSE NOTHING COMPARED THE TWO.** On a curve preset the
+ * type dropdown read "Self-similar curve", the Score drew the curve, and the rows underneath were the
+ * Lissajous WAVE slots. `adoptExternalFigure()` rebuilt the three slot bodies and nothing else, so a
+ * preset arriving with a different `generators.type` left the previous body standing.
+ *
+ * ⚠️⚠️ **`composercheck` CANNOT SEE THIS: it runs under bare Node.** The defect is a DOM body that
+ * disagrees with the live type, which is why the clause is here, and why it is asserted in BOTH
+ * DIRECTIONS -- this class of defect is routinely one-directional, and the two bodies are mutually
+ * exclusive so curve->wave has to work as well as wave->curve.
+ *
+ * ⚠️ The first oracle for this hardcoded "curve body = correct" and then reported the reverse case as
+ * WRONG over a correct engine. **An oracle for a mutually exclusive pair must take the expectation as
+ * an argument**, which is what `expectBody` does.
+ */
+const CURVE_PRESET = 'Curve Thicket';
+const WAVE_PRESET = 'Cylinder';
+
+const readComposerBody = () => page.evaluate(() => {
+  const c = document.querySelector('.tab-content[data-tab="composer"]');
+  if (c === null) return { built: false };
+  const titles = Array.from(c.querySelectorAll('.sl-section-title'))
+    .map((e) => e.textContent?.trim() ?? '');
+  const typeSel = Array.from(c.querySelectorAll('select'))
+    .find((s) => Array.from(s.options).some((o) => /Self-similar/.test(o.textContent ?? '')));
+  return {
+    built: true,
+    dropdown: typeSel?.selectedOptions[0]?.textContent?.trim() ?? null,
+    curve: titles.includes('Curve') && !!c.querySelector('select[aria-label="Rule"]'),
+    wave: ['Body', 'Structure', 'Detail'].every((n) => titles.includes(n)),
+  };
+});
+
+const loadByTile = async (name) => {
+  const grid = page.locator('.sl-btn-grid');
+  if (await grid.count() > 0 && await grid.isVisible()) { await grid.click(); await page.waitForTimeout(1800); }
+  const tile = page.locator(`.pg-tile[data-preset="${name}"]`).first();
+  if (await tile.count() === 0) return false;
+  await tile.scrollIntoViewIfNeeded();
+  await tile.click();
+  await page.waitForTimeout(2500);
+  const bar = page.locator('.sl-tab-bar');
+  if (!(await bar.first().isVisible())) {
+    await page.locator('button.pg-mode-btn:has-text("Lab")').first().click();
+    await bar.first().waitFor({ state: 'visible', timeout: 30000 });
+  }
+  await page.waitForTimeout(500);
+  return true;
+};
+
+const expectBody = async (what, name, note) => {
+  await page.locator('.sl-tab-btn[data-tab="composer"]').click();
+  await page.waitForTimeout(1100);
+  const b = await readComposerBody();
+  const got = b.curve && !b.wave ? 'curve' : b.wave && !b.curve ? 'wave' : 'neither';
+  chk(`the Composer shows the ${what.toUpperCase()} body on ${name}${note ? ' ' + note : ''}`,
+    got === what,
+    `dropdown "${b.dropdown}" · body ${got}${got === what ? '' : `  <-- the dropdown and the body DISAGREE`}`);
+  return b;
+};
+
+if (await loadByTile(WAVE_PRESET)) {
+  await expectBody('wave', WAVE_PRESET, '(the starting state)');
+  /* The owner's sequence: the Composer is ALREADY BUILT for waves when the curve preset arrives. */
+  if (await loadByTile(CURVE_PRESET)) {
+    await expectBody('curve', CURVE_PRESET, '(arriving over an already-built wave body)');
+    /* And back, because the pair is mutually exclusive and the fix must not be one-directional. */
+    if (await loadByTile(WAVE_PRESET)) {
+      await expectBody('wave', WAVE_PRESET, '(arriving over an already-built curve body)');
+    }
+  }
+} else {
+  chk(`the tiles for ${WAVE_PRESET}/${CURVE_PRESET} exist`, false,
+    'INCONCLUSIVE, not a pass: without both presets this section asserts nothing');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== U. the Mixer: take the figure or the look from the other deck, and Reset ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * ⚠️⚠️ **ASSERTED AS THE OWNER'S OWN ACCEPTANCE SENTENCE, NOT AS "THE CONTROLS MOVED BACK".** The
+ * request was a Reset that lets you *"go back and choose a new set of settings mix from A and B which
+ * gives IDENTICAL results like after we just entered the Mixer tab"*. So two EQUALITIES are asserted:
+ * the state after Reset equals the state on entry, and a recipe after Reset equals the same recipe after
+ * entry. A Reset that put the rows back but left the preview on the mixed figure would pass any clause
+ * about the rows.
+ *
+ * ⚠️ **The preview is read through `?testhook=1`** (read-only by construction). The figure
+ * discriminator is the particle count: the look preset and the figure preset differ there, so "figure
+ * from B, look from A" is visible as a number rather than inferred from a picture.
+ */
+const MIX_LOOK = 'Aurora Borealis', MIX_FIG = 'Curve Thicket';
+const MX = '.tab-content[data-tab="mixer"]';
+const mixSnap = () => page.evaluate((MX) => {
+  const c = document.querySelector(MX);
+  const h = window.__psss;
+  const sels = c ? Array.from(c.querySelectorAll('select')) : [];
+  return c === null || h === undefined ? null : {
+    preview: { pts: h.particleCount, mode: h.renderMode, mat: h.material, look: h.filmLook },
+    master: c.querySelector('input[type="range"].sl-slider')?.value ?? null,
+    rows: Array.from(c.querySelectorAll('.sl-mix-src')).map((s) =>
+      s.querySelector('.sl-mix-src-btn.active')?.textContent ?? '-').join(''),
+    locked: c.querySelectorAll('.sl-mix-cat-chip.locked').length,
+    deckB: sels[1]?.value ?? null,
+    line: c.querySelector('.sl-mix-source-line')?.textContent ?? null,
+  };
+}, MX);
+
+if (await loadByTile(MIX_LOOK)) {
+  await page.locator('.sl-tab-btn[data-tab="mixer"]').click();
+  await page.waitForTimeout(1200);
+  const entry = await mixSnap();
+
+  await page.evaluate(({ MX, MIX_FIG }) => {
+    const b = document.querySelectorAll(`${MX} select`)[1];
+    b.value = MIX_FIG; b.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { MX, MIX_FIG });
+  await page.waitForTimeout(1200);
+  await page.locator(`${MX} button[aria-label="Figure from B, look from A"]`).click();
+  await page.waitForTimeout(1500);
+  const mix1 = await mixSnap();
+
+  chk('the recipe takes the FIGURE from Deck B and keeps the LOOK from Deck A',
+    entry !== null && mix1 !== null
+    && mix1.preview.pts !== entry.preview.pts
+    && mix1.preview.mode === entry.preview.mode && mix1.preview.mat === entry.preview.mat,
+    mix1 === null ? '(no snapshot)' : `particles ${entry?.preview.pts} -> ${mix1.preview.pts} (the figure moved); `
+      + `mode/material ${mix1.preview.mode}/${mix1.preview.mat} (the look stayed)`);
+
+  chk('...and every row is pinned to the deck the recipe names, Motion and Attractor with the Figure',
+    mix1 !== null && mix1.rows === 'BABABAA',
+    `rows "${mix1?.rows}" in CATEGORY_LOCKS order (Figure Colour Motion Transmap Attractor Materials `
+    + 'Visual FX); ⚠️ owner decision 2026-11-04: motion and attractor travel with the figure');
+
+  // Make Reset undo more than the recipe: a lock and a moved master.
+  await page.locator(`${MX} .sl-mix-cat-chip`).first().click();
+  await page.evaluate((MX) => {
+    const r = document.querySelector(`${MX} input[type="range"].sl-slider`);
+    r.value = '63'; r.dispatchEvent(new Event('input', { bubbles: true }));
+  }, MX);
+  await page.waitForTimeout(900);
+
+  await page.locator(`${MX} button[aria-label="Reset the Mixer to how it was on entry"]`).click();
+  await page.waitForTimeout(1800);
+  const after = await mixSnap();
+  const noB = (s) => (s === null ? null : JSON.stringify({ ...s, deckB: undefined }));
+  chk('after Reset the Mixer is IDENTICAL to how it was on entry — preview, rows, master, locks, sentence',
+    noB(after) !== null && noB(after) === noB(entry),
+    noB(after) === noB(entry) ? `"${after?.line}"`
+      : `entry ${noB(entry)} | after ${noB(after)}`);
+
+  chk('...and Deck B stays chosen AND SHOWN, so a new mix can start from the same pair',
+    after !== null && after.deckB === MIX_FIG,
+    `dropdown reads "${after?.deckB}"; ⚠️ before 2026-11-04 the re-render rebuilt it with no default, so it `
+    + 'showed EMPTY while the Mixer still held the old Deck B');
+
+  await page.locator(`${MX} button[aria-label="Figure from B, look from A"]`).click();
+  await page.waitForTimeout(1500);
+  const mix2 = await mixSnap();
+  chk('a recipe after Reset gives the IDENTICAL result to the same recipe after entry',
+    mix2 !== null && JSON.stringify(mix2) === JSON.stringify(mix1),
+    JSON.stringify(mix2) === JSON.stringify(mix1) ? 'byte-identical snapshots'
+      : `first ${JSON.stringify(mix1)} | second ${JSON.stringify(mix2)}`);
+} else {
+  chk(`the tile for ${MIX_LOOK} exists`, false, 'INCONCLUSIVE, not a pass: section U asserted nothing');
 }
 
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);

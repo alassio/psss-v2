@@ -248,15 +248,45 @@ void main() {
     color = texture(uPaletteTex, vec2(palC, 0.5)).rgb;
   }
 
-  // Depth-based brightness (atmospheric extinction)
+  /*
+   * Depth-based brightness (atmospheric extinction) and colour temperature (warm near, cool far).
+   *
+   * NOTE FOR THE READER: this comment is INSIDE A GLSL TEMPLATE LITERAL, so it carries no backticks at
+   * all -- one of them terminates the string and the whole module stops parsing. That is a documented
+   * trap in this project and it caught the first version of this very comment: fourteen backticks, and
+   * the page then failed to boot with eight TS1005s rather than anything about a shader.
+   *
+   * BOTH EXPRESSIONS BELOW READ vDepth DIRECTLY, AND BOTH USED TO READ (1.0 - vDepth), WHICH MADE THEM
+   * POINT THE WRONG WAY. Owner-reported 2026-11-04 on the Curve Subdivide preset as "the depth ordering
+   * of lines is not correct", and that is exactly what it was.
+   *
+   * vDepth == 0 is NEAR. That is not read off a comment, it is MEASURED (invariant 24): project()
+   * magnifies by abs(perspZ / (z - perspZ)) with perspectiveZ = -(w + h) / 2, and over 4000 particles
+   * depth 0.307 measured magnification 1.628 against depth 0.693's 0.722, correlation -0.974. So
+   * extinction has to GROW with vDepth, and the cool shift with it.
+   *
+   * THE DEFECT WAS INVISIBLE BECAUSE IT CANCELLED THE CUE ABOVE IT. uDepthSize is in the vertex shader
+   * and has always been correct ((1.0 - aDepth), so near is bigger). With the inverted brightness, a
+   * near line on Curve Subdivide was 21 % THICKER and 20 % DIMMER -- product 0.972, i.e. the two cues
+   * cancelled to within 3 %. The figure therefore read as having NO reliable front/back order rather
+   * than an obviously wrong one, which is why it survived into a shipped library. A DEPTH CUE CAN ONLY
+   * BE JUDGED AGAINST THE OTHER DEPTH CUES, NEVER ALONE.
+   *
+   * AND THERE IS NO OCCLUSION TO FALL BACK ON, BY DESIGN: DEPTH_TEST is never enabled in any particle
+   * pass and the only depth SORT is the crystal pass, so liquid is the one mode that occludes. These
+   * three cues plus the per-particle Opacity Spread channel are the ENTIRE front/back signal.
+   *
+   * uDepthDof is NOT a fourth one: its focus is pinned at 0.5, so it blurs near and far symmetrically
+   * and cues distance-from-focus. It cannot tell front from back and must not be reached for when that
+   * is the question.
+   */
   float brightness = 1.0;
   if (uDepthBrightness > 0.0) {
-    brightness = mix(1.0, 0.2, (1.0 - vDepth) * uDepthBrightness);
+    brightness = mix(1.0, 0.2, vDepth * uDepthBrightness);
   }
 
-  // Depth-based colour temperature shift (warm near, cool far)
   if (uDepthColorShift > 0.0) {
-    float t = (1.0 - vDepth) * uDepthColorShift;
+    float t = vDepth * uDepthColorShift;
     color.r *= 1.0 + t * 0.1;
     color.b *= 1.0 + t * 0.2;
     color.g *= 1.0 - t * 0.05;

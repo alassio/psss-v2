@@ -455,6 +455,30 @@ const AUTHORED_INDEX_PALETTES = {
   'Curve Tilt': 'Prismatic',
   'Curve Morph': 'Neon',
   /*
+   * ─── 2026-11-04 — the FIVE rule-coverage demos ────────────────────────────────────────────────
+   *
+   * Five of the thirteen rules carried a demo and `Hilbert 3D` carried five of the nine, so these
+   * five add `Moore`, `Terdragon`, `Dragon`, `Levy C` and `Hilbert 2D`. ⚠️ **Chosen on the RENDER,
+   * not on registry coverage:** four of the eight uncovered rules were refused — `Sierpinski-Knopp`
+   * is `Levy C` mirrored (its own `provenance` says so and the render confirms it), `Bush 3D`'s yaw
+   * is measured inert with its review owed, and `Peano` would be the third square maze.
+   *
+   * ⚠️ All five author `index` for the reason the block above states, and all five author the pair
+   * EXPLICITLY — none of their looks is `Customize`, so adoption was available and was declined on
+   * purpose: the palette is the demo's own choice and must not move when a look's bundle changes.
+   *
+   * ⚠️ **`Classic: ice` arrives here as a palette with ONE carrier**, which the NOTE below flags for
+   * the 21.3 review. That is the note working, not a defect — but if `Curve Plane Dive` is ever cut,
+   * the palette loses its only carrier and this row must go with it.
+   */
+  'Curve Weave': 'Cycle: Indigo',
+  'Curve Triad': 'Aurora',
+  // ⚠️ Declared `Cycle: Solar` first and the body moved to `Fire` during the look pass — this clause
+  // caught the stale declaration, which is the direction nobody expects it to work in.
+  'Curve Dragonfold': 'Fire',
+  'Curve Scroll': 'Pastel',
+  'Curve Plane Dive': 'Classic: ice',
+  /*
    * ─── v8 `35.7`, 2026-10-30 — the ORIENTATION-ANGLE demos ──────────────────────────────────────
    *
    * ⚠️ **ONE row, and it is `Warp Split Shapes`' case inherited rather than a new one.**

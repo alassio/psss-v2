@@ -275,6 +275,55 @@ const _LOCKS_COMPLETE: _LocksComplete = true;
 void _LOCKS_COMPLETE;
 
 /**
+ * The words these categories are shown by.
+ *
+ * ⚠️⚠️ **UNTIL THIS EXISTED THERE WERE THREE SPELLINGS OF ONE CONCEPT.** The Mixer and Randomise did
+ * `chip.textContent = lock` (raw keys: `shape`, `color`, `visual`), while Evolution kept a PRIVATE record
+ * with other words (`Shape`, `TransMap`, `Material`, `Visual`) — and every tab outside these three calls
+ * the first of them **the figure**. The chips are SHARED state (a lock set in one tab holds in the other
+ * two), so a chip that renames itself between tabs reads as three different locks. **All three tabs read
+ * this record.** A category you cannot name is a category you cannot
+ * find, and the Mixer's figure-swap row was the one people needed most.
+ *
+ * ⚠️ **A `Record<CategoryLock, string>`, so a new member is a compile error here** — the same reason
+ * `REEL_*_LABELS` are records rather than arrays. **Stored values stay the bare words**; this is the
+ * display side only, and a label must never be persisted or compared against.
+ *
+ * ⚠️ **These are the SHIPPED words from the tabs that own each subject**, not friendlier inventions:
+ * `Visual FX`, `Materials` and `Transmap` are tab names, and `Figure` is what the Composer and Visual FX
+ * both call the thing `shape` resolves.
+ *
+ * ⚠️ **`Transmap` rather than Visual FX's own `Translation Map`, and the reason is a PICTURE**: the longer
+ * name wrapped the Mixer's category chip onto two lines, making that one row taller than the other six.
+ * Both are shipped words; this is the one that fits, and the tab is the more prominent of the two sites.
+ */
+export const CATEGORY_LABELS: Record<CategoryLock, string> = {
+  shape: 'Figure',
+  color: 'Colour',
+  motion: 'Motion',
+  transmap: 'Transmap',
+  attractor: 'Attractor',
+  material: 'Materials',
+  visual: 'Visual FX',
+};
+
+/**
+ * Which categories make up the FIGURE, for the Mixer's one-click source recipes.
+ *
+ * ⚠️⚠️ **OWNER DECISION, 2026-11-04: `motion` AND `attractor` TRAVEL WITH THE FIGURE.** Neither is
+ * obvious and both were asked rather than assumed — `motion` is the rotation and speed (a figure
+ * arriving without its own spin reads as wrong), and `attractor` is a figure SOURCE, so leaving it
+ * behind would hand over the waves of one preset and the attractor of another.
+ *
+ * ⚠️ **Derived from, not parallel to, `CATEGORY_LOCKS`**: the complement is computed rather than listed,
+ * so the look side cannot fall out of step when a category is added. A second hand-written list of
+ * "everything else" is exactly the shape that hides a missing entry.
+ */
+export const FIGURE_CATEGORIES: readonly CategoryLock[] = ['shape', 'motion', 'attractor'];
+export const LOOK_CATEGORIES: readonly CategoryLock[] =
+  CATEGORY_LOCKS.filter((c) => !FIGURE_CATEGORIES.includes(c));
+
+/**
  * Per-category crossfade weights (23.5). `master` is the fallback for any category the caller leaves out,
  * and is REQUIRED so that a weights object cannot be built with no weight in it at all.
  *

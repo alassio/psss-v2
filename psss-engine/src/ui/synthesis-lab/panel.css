@@ -8,6 +8,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* ⚠️ **LOAD-BEARING FOR `.sl-search-results`, which is `position: absolute` against this box.**
+   * Without it the dropdown anchors to the nearest positioned ancestor — in practice the viewport —
+   * and appears somewhere else entirely with no error anywhere to say so. It changes nothing about
+   * this element's own layout (a flex column with `overflow: hidden`), which is why it is safe to
+   * add; do not remove it without re-anchoring that list. */
+  position: relative;
 }
 
 .sl-header {
@@ -1732,3 +1738,148 @@
   flex: 0 0 auto;
 }
 .sl-vfx-sub-head[aria-expanded='true']::before { transform: rotate(90deg); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+ * The cross-tab settings search: the header field and its results dropdown.
+ *
+ * ⚠️ The dropdown is `position: absolute` against `.synthesis-lab`, which is why that element is
+ * `position: relative` — if that ever changes the list will anchor to the viewport instead and
+ * appear in the wrong place with no error anywhere. The field itself is in the header's flex row.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.sl-search { margin-left: auto; display: flex; align-items: center; }
+
+.sl-search-field {
+  width: 150px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #dbe6f5;
+  background: #16202e;
+  border: 1px solid #2c3d55;
+  border-radius: 4px;
+  outline: none;
+}
+.sl-search-field::placeholder { color: #61708a; }
+.sl-search-field:focus { border-color: #4a7fb5; background: #1b2838; }
+
+.sl-search-results {
+  position: absolute;
+  top: 38px;
+  right: 8px;
+  z-index: 40;
+  /* ⚠️ Widened along with the path's weight: a cramped box forces `Visual FX > Figure › Framing &
+   * Timing` to wrap, and a wrapped path is exactly as hard to scan as a dim one. */
+  width: 430px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: 4px;
+  background: #121a26;
+  border: 1px solid #2c3d55;
+  border-radius: 5px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+}
+
+.sl-search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 6px;
+  width: 100%;
+  padding: 7px 9px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sl-search-row:hover, .sl-search-row.active { background: #1e2d40; }
+
+.sl-search-row-label { font-size: 13px; font-weight: 600; color: #eef5ff; }
+.sl-search-row-tag {
+  justify-self: end;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7d8ca5;
+}
+/* ⚠️⚠️ **THE PATH IS NOT SMALL PRINT -- owner-reported as "barely readable", and the reason given
+ * was the right one: "the location of the functionality is an important information to decide which of
+ * the hits is the right one". Three rows called `Symmetry` are distinguished by nothing else.** So it
+ * sits ONE step below the label rather than two: 11.5px against the label's 13px, at a contrast that is
+ * read rather than squinted at. The TAB is bolder still, because it is the coarsest discriminator --
+ * ten tabs, and `Enable`, `Strength` and `Amount` each appear in several. */
+.sl-search-row-path {
+  grid-column: 1 / -1;
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #9db2cf;
+}
+.sl-search-row-tab { font-weight: 600; color: #cfe0f5; }
+/* Dimmer than both neighbours on purpose, so the segments read as units rather than one run of text. */
+.sl-search-row-sep { margin: 0 5px; color: #5a6b85; }
+
+.sl-search-row-why { grid-column: 1 / -1; margin-top: 2px; font-size: 11px; color: #d8a455; }
+
+/* ⚠️ `absent` is DIMMED rather than hidden — the search must not lie by omission (see
+ * `settings-search.ts`' header), so the row stays and says why instead of disappearing. */
+.sl-search-row.absent .sl-search-row-label { color: #8c97a8; }
+
+.sl-search-empty { padding: 8px 9px; font-size: 11px; line-height: 1.45; color: #8c97a8; }
+
+/* The jump flash. ⚠️ A transition OUT only, so the highlight arrives instantly on a scroll and
+ * fades rather than blinking off — a hard removal reads as a glitch. */
+.sl-search-hit {
+  background: #26405c !important;
+  border-radius: 4px;
+  transition: background 600ms ease-out;
+}
+
+/* The tooltip fragment on a row that matched only its tooltip — the evidence that turns an apparent
+ * false positive into a judgeable one. ⚠️ `<b>` inside it is the matched term; the emphasis is built
+ * from DOM nodes rather than `innerHTML` (see `tipSnippet`). */
+.sl-search-row-tip {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #93a7c2;
+}
+/* ⚠️ The matched term is the whole point of the fragment, so it must be the BRIGHTEST thing in it --
+ * otherwise the row still cannot be judged at a glance, which is the defect the fragment exists to fix. */
+.sl-search-row-tip b { font-weight: 600; color: #e8f1fd; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+ * The Mixer's source recipes and per-row A / ⇄ / B selector.
+ *
+ * ⚠️ The selector sits BEFORE the follow checkbox and the fader in the row, because it is the coarse
+ * answer ("which deck") and they are the fine one ("how far between them") — reading left to right
+ * should go from the decision to the adjustment.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.sl-mix-recipes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.sl-mix-recipe { font-size: 11.5px; }
+
+.sl-mix-source-line {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #9db2cf;
+}
+
+.sl-mix-src { display: inline-flex; gap: 2px; margin-right: 8px; flex: 0 0 auto; }
+.sl-mix-src-btn {
+  width: 22px;
+  padding: 2px 0;
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: #8fa2bd;
+  background: #16202e;
+  border: 1px solid #2c3d55;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.sl-mix-src-btn:hover { background: #1e2d40; color: #cfe0f5; }
+/* ⚠️ The ACTIVE state is derived in `syncFollowers`, never stored — see the note there. A blend at 50 %
+ * lights NEITHER deck button, which is the state this styling has to be able to express. */
+.sl-mix-src-btn.active { color: #0e1620; background: #6fa8dc; border-color: #6fa8dc; font-weight: 600; }
+.sl-mix-src-btn[disabled] { opacity: 0.4; cursor: default; }

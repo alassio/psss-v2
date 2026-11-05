@@ -1,7 +1,7 @@
 {
   "name": "psss-engine",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -30,8 +30,9 @@
     "check:splat": "node checks/splatcheck.mjs",
     "check:deform": "node checks/deformcheck.mjs",
     "check:demos": "node checks/democheck.mjs",
+    "check:search": "node checks/searchcheck.mjs",
     "check:ui": "node checks/uicheck.mjs",
-    "verify": "tsc --noEmit && npm run check:gl && npm run check:dead && npm run check:aesthetic && npm run check:field && npm run check:shape && npm run check:track && npm run check:name && npm run check:tip && npm run check:composer && npm run check:reel && npm run check:coverage && npm run check:palette && npm run check:facet && npm run check:figure && npm run check:mixer && npm run check:slider && npm run check:splat && npm run check:deform",
+    "verify": "tsc --noEmit && npm run check:gl && npm run check:dead && npm run check:aesthetic && npm run check:field && npm run check:shape && npm run check:track && npm run check:name && npm run check:tip && npm run check:composer && npm run check:reel && npm run check:coverage && npm run check:palette && npm run check:facet && npm run check:figure && npm run check:mixer && npm run check:slider && npm run check:splat && npm run check:deform && npm run check:search",
     "check:specs": "tsc --noEmit -p tests/tsconfig.json",
     "verify:browser": "playwright test",
     "release:web": "npm run build && npm run docs:pdf && npm run package:dist -- --web"

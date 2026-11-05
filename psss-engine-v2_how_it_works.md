@@ -1063,10 +1063,14 @@ builds rather than by rebuilding every frame:
 
 - **Recursion** interpolates the list at `floor(n)` and `floor(n)+1`. Both depend only on a particle's
   fraction along the curve, so both are fully precomputable, and the result reads as the curve
-  **subdividing** rather than scaling.
+  **subdividing** rather than scaling. Every level of a rule's own recursion range is reachable; the
+  levels are not the same amount of detail across rules, because the expansion factor per level runs
+  from about 2 (the dragon, Lévy C) to about 9 (Peano), which is why each rule declares its own range.
 - **An angle** interpolates two builds at the ends of a bracket, and rebuilds only when the angle leaves
   it. ⚠️ **The bracket width is declared per rule and is derived from a measured error budget**, because
   the figure's sensitivity to its angle differs by more than an order of magnitude across the rule set.
+  ⚠️ **The error also grows with recursion at a fixed width** — a deeper curve composes more rotations —
+  so a width holds only up to the depth it was solved at.
   On the space-filling rules the bracket is below the point of usefulness — a deep Hilbert curve is not a
   near-linear function of its angle at any workable width — so those rules **bypass it and rebuild each
   frame**, which the Composer states in a note.
@@ -1785,10 +1789,18 @@ These five live in the Film Look's **Particles** group but act per particle at d
 | Control | Effect |
 |---|---|
 | **Depth Sz** | near particles drawn larger. The primary cue that makes a 3D figure read as having depth |
-| **Depth Br** | near particles drawn brighter |
-| **DoF** | blurs particles away from a focal depth — a photographic cue |
-| **Color Sh** | tints distant particles away from near ones: aerial perspective, with no size or brightness cost |
+| **Depth Br** | near particles drawn brighter, far ones dimmer — atmospheric extinction. It points the same way as **Depth Sz**, so the two reinforce: a near stroke is both thicker and brighter |
+| **DoF** | blurs particles away from a focal depth fixed at the middle of the figure — a photographic cue. ⚠️ It blurs the near and the far side **alike**, so it cues distance from the focal plane and says nothing about which side is in front |
+| **Color Sh** | warms near particles and cools distant ones: aerial perspective, with no size or brightness cost |
 | **Lighting** / **Rim Pow** | `None` ignores direction entirely; `Directional`, `Rim` and `Both` add a highlight and a silhouette rim from the surface normal, `Rim Pow` setting how tightly the rim hugs the edge |
+
+⚠️⚠️ **Particles do not hide one another.** No particle pass tests depth, and the only depth sort in the
+engine is the crystal pass, so in every mode except *Liquid* the strokes of a figure **composite** where
+they cross. On a dense 3-D figure these cues are therefore the **entire** front-to-back signal, and they
+can only be judged against each other: `Depth Sz` and `Depth Br` agree, `Color Sh` agrees, and `DoF`
+does not take a side. The nearest thing to occlusion is the per-particle **Opacity Spread** driven by
+**Depth** with a **negative** amount — the channel's law favours the far end for a positive amount — and
+it reaches the point and splat passes only — the ribbon and neon renderers do not read the channels (see their row in *A.4 Preconditions*).
 
 ### 5.8 Blending
 
@@ -4621,6 +4633,8 @@ fix.
 | **Descend**, at depth | headroom below the cost ceiling | The figure stops revealing new detail and the spacing between particles begins to drift. The readout reports the clamp. | Lower **Recursion** to buy depth, or accept the ceiling: it is about two octaves of genuinely new structure. |
 | **Smoothness** | a value above 0 | At exactly 0 the stroke is drawn precisely as the rule produces it, with no spline evaluated at all. That is the intended identity, not a failure. | Raise it. The visible range is the lower half; the top is measurably flat. |
 | **The trail**, **ribbons**, **neon lines** | at least one modulated curve parameter, or a non-zero Rotation | A completely static curve gives the trail nothing to accumulate and the trajectory renderers nothing to join, so all three go quiet while appearing to be on. | Give one row a non-zero **Depth** and **Rate**. Every shipped curve preset does. |
+| **Ribbon Mode: Streaks** | particles with real velocity | **The figure disappears** and is replaced by a sparse field of isolated dots. A ribbon mode draws instead of the points, and this one draws along each particle's motion — on a slowly-turning curve there is almost no motion to draw along. Measured mean brightness 0.19 of 255. | Use **Hybrid**, which does not read velocity, or raise **Rotation** until the figure is genuinely moving. |
+| **Curl Noise**, on this figure type | nothing — it works, and that is the problem | **The figure drifts out of its own frame and scatters.** Curl pushes each particle along a flowing field and nothing pulls it back, so a shape whose whole identity is its exact geometry comes apart. Measured: the lit centre of the picture wanders halfway to the canvas edge and never settles, against a tenth of that with curl off on the same preset. | Use **Fluid Advection** instead — it has a return force, so the figure drifts and recovers. No Turbulence setting makes Curl Noise safe here. |
 
 > ⚠️ **A control this table says is inert may now be INVISIBLE instead, and the two symptoms need
 > different handling.** Visual FX, Materials and the Composer hide what is switched off: a section whose
@@ -4654,7 +4668,7 @@ fix.
 
 | Control | Requires | What it looks like when unmet | Fix |
 |---|---|---|---|
-| **Sharpness, on one wave slot** | that slot to carry a real share of the figure's amplitude | the cell is **disabled and dimmed** on a level with no wave at all, and says so on hover; on a level that is live but quiet it moves and the figure barely changes | **a slot's sharpness shows in proportion to that slot's share of the amplitude budget** ([§1.1](#the-wave-basis--sharpness)): mean shares Body 70.9 % / Structure 23.5 % / Detail 5.6 %, and **202 of the library's 339 presets have no live Detail term at all**, so on most of the library the third cell is structurally inert. Read the Composer's **Score** to see which slots carry this figure, and **do not reach for "sharpen Body"** — it is false wherever Structure outweighs Body |
+| **Sharpness, on one wave slot** | that slot to carry a real share of the figure's amplitude | the cell is **disabled and dimmed** on a level with no wave at all, and says so on hover; on a level that is live but quiet it moves and the figure barely changes | **a slot's sharpness shows in proportion to that slot's share of the amplitude budget** ([§1.1](#the-wave-basis--sharpness)): mean shares Body 70.9 % / Structure 23.5 % / Detail 5.6 %, and **most of the library's presets have no live Detail term at all**, so on most of the library the third cell is structurally inert. Read the Composer's **Score** to see which slots carry this figure, and **do not reach for "sharpen Body"** — it is false wherever Structure outweighs Body |
 | **Sharpness, on any preset with a long trail** | a low-accumulation preset | almost nothing at any setting on all three cells | the difference is 0.4 % of the waveform's energy and lives entirely in the corner, which accumulation averages away. Judge on `Cylinder`, `Quader` or `Pipes` |
 | **Temper Rate** | **Temper** (the depth) to be non-zero | nothing — the modulator is skipped entirely at depth 0, so the rate has nothing to drive | set Temper first. The same holds for **Stretch Rate**, **Sway Rate** and **Flare Rate** against their own depths, per axis |
 | **Any breathing rate's printed period** | — but it is **nominal** | the cycle takes a different time than the readout says | **Speed multiplies the actual rate and the preset's own sweep speed sets the scale**, so the printed seconds move when either does. Where the sweep speed is 0 the readout says the figure is paused, which is the honest answer rather than *off* |
@@ -4737,7 +4751,7 @@ fix.
 | **A category's own fader, after a lock** | the category **not** frozen | greyed again, and the readout reads **`held`** instead of a percentage | click the category chip to unfreeze; the chip is the toggle and there is no separate unlock |
 | **The `shape`, `color` or `motion` fader, for anything Visual FX writes** | the setting to actually be in that category — grading, the film look, the render mode, the symmetry fold and every field system are **`visual`** | the fader moves and almost nothing changes — **though less so since 2026-10-06**: those three owned **0** of the 46 `overlay` settings and now own 2, 5 and 1 (the grade, the palette and its mapping, `figureScale`, `particleSize`, `speedFactor`), so `color` now does move a grade and `visual` is still where the rest lives | use the **`visual`** fader. **Two cells of §21.1's ownership table pointed the wrong way until 2026-10-05, and so did the tab's own note** — this row is the symptom that reports it |
 | **A Randomise press at `Subtle`, if you wanted a new palette or film look** | `Medium` or `Wild` | the numbers move and the look does not — **by design.** Subtle withholds the two categorical strategies, so it can never swap the grade, palette, material, particle mode, warp style or attractor | press `Medium`: about one press in four re-skins exactly one of those. ⚠️ **The one exception is a warp layer's field pattern, which Subtle may still re-pick** — stated in the tooltip because an unstated exception reads as a lie. §22 |
-| **A Randomise `color` mutation, on a preset that authors a palette** | the palette cleared in Visual FX, to see the colour curves themselves | the four colour curves move and the frame does not — precedence is **palette > material ramp > preset colour** | expected, and the tab says so in a line under the lock chips rather than in a tooltip: a user who presses twice and sees nothing has no reason to hover anything. **145 of the library's 339 presets author a palette of their own.** §22.1 |
+| **A Randomise `color` mutation, on a preset that authors a palette** | the palette cleared in Visual FX, to see the colour curves themselves | the four colour curves move and the frame does not — precedence is **palette > material ramp > preset colour** | expected, and the tab says so in a line under the lock chips rather than in a tooltip: a user who presses twice and sees nothing has no reason to hover anything. **Nearly half of the library's presets author a palette of their own.** §22.1 |
 | **A Randomise style jump, on a preset with a live material** | no material, or the `material` lock open | the particle mode does not change, at any intensity | **accepted, not compensated.** A material overrides the mode at `resolveModeAgainstMaterial()` — the one owner of that decision — and `applyPresetChange` re-runs it on every apply, so the jump is a no-op on the **84** presets whose material pins the mode. The `visual` lock therefore cannot fully hold the mode while `material` is free. §22.1 |
 | **Sliders `Warmth`** | **neither a palette nor a material ramp** — for the COLOUR-CURVE law | the row stays **enabled** and its line says *rotating the palette "X"* instead | **SINCE `26.4` THIS IS NOT A DISABLED-STATE ROW — it has TWO laws and does something under both**, so disabling it would be a lie and the line is informational. Census: **rotate 238 · curves 21 · neither 15.** It is genuinely dead only on those 15, where a material ramp overrides the palette AND the curves. **Before `26.4` the row wrote curves alone and was invisible on 253** — *ask what a feature READS, not what the call writes.* §20 |
 | **Sliders `Turbulence`** | **curl noise ENABLED** (`overlay.curlNoise.enabled`) | disabled — *curl noise is off on this preset* | **Present is not enabled: the block is on 181 presets and switched on on 7.** The row was specified on the 181, which was a block census mistaken for a reach measurement; it ships as specified with its real reach stated. A slider may not flip an `enabled`. §20 |
