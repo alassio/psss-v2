@@ -1,5 +1,10 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.3.0.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.3.0](https://github.com/alassio/psss-v2/releases/tag/v1.3.0)** — **New since the first public release: a second figure type, self-similar curves.** Alongside the wave figures, PSSS now draws fractal curves built from thirteen production rules (Hilbert, dragon, Koch, Gosper, Moore and more), with fourteen demo presets to start from.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.3.0)
+<!-- LATEST-RELEASE:END -->
+
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
 
 ### ▶ [Run it in your browser](https://alassio.github.io/psss-v2/)
@@ -17,7 +22,7 @@ page. A frame like the one above is a click away in it.
 >
 > ### ⬇ [Download the screensaver](https://github.com/alassio/psss-v2/releases/latest)
 >
-> The release carries `psss.scr` plus both reference manuals as PDFs. Or build it yourself with
+> Each release carries `psss.scr`, both reference manuals as PDFs and a distribution zip. Or build it yourself with
 > `npm run build:all` — the wrapper is `psss-engine/screensaver/`, and *Install it as a Windows
 > screensaver* below walks the install.
 
@@ -39,9 +44,9 @@ page. A frame like the one above is a click away in it.
 > `ENGINEERING-NOTES.md` has the longer account, including why none of those artefacts are in this
 > repository.
 
-3D particles travelling along modulated sine waves — 3D Lissajous figures — projected to 2D, trailed,
-warped and colour-graded. It runs in a browser, and on Windows it can also be installed as a real
-screensaver.
+3D particles travelling along one of two kinds of figure — modulated sine waves (3D Lissajous figures)
+or self-similar fractal curves such as Hilbert, dragon and Koch — projected to 2D, trailed, warped and
+colour-graded. It runs in a browser, and on Windows it can also be installed as a real screensaver.
 
 **PSSS was created by Andreas Kardin (*mephzara*)** — the idea, the name, the mathematics and most of the
 preset library are his. It began as a Windows screensaver written in Delphi, was later rewritten by him in
@@ -86,6 +91,7 @@ specifications were actually extracted from. It is kept separate rather than pub
 | `psss-engine-v2_how_to_use_it.md` | The user manual. |
 | `psss-engine-v2_how_it_works.md` | The technical reference. |
 | `manual-images/` | Screenshots used by the user manual. See §6. |
+| `release-notes/` | One file per GitHub release (`vX.Y.Z.md`), used as that release's description. A release cannot be published without its file. |
 | `LICENSE` | GNU GPL v3, covering **the whole repository**. `psss-original/` keeps its own copy. |
 | `NOTICE` | Who wrote the original, what this version changed, and under what licence. |
 

@@ -51,6 +51,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # ⚠️⚠️ A RELEASE IS A DECISION, AND ITS NOTES FILE IS THE RECORD OF IT (owner, 2026-11-05). The version
+      # moves with the work and most versions are never released; a version chosen for release gets
+      # `release-notes/vX.Y.Z.md`. This step runs FIRST, before any build minute is spent, and refuses:
+      #   - a tag that does not match package.json's version (the tag would name a build it did not make);
+      #   - a missing or empty notes file (the release would publish with no description).
+      # On a workflow_dispatch rehearsal the version comes from package.json, so the rehearsal proves the
+      # notes file exists too.
+      - name: Require the release notes and a matching version
+        shell: bash
+        working-directory: .
+        run: |
+          set -e
+          V="v$(node -p "require('./psss-engine/package.json').version")"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [[ "$GITHUB_REF_NAME" != "$V" ]]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match psss-engine/package.json ($V)"; exit 1
+            fi
+          fi
+          N="release-notes/$V.md"
+          if [[ ! -s "$N" ]]; then
+            echo "::error::$N is missing or empty — every GitHub release needs its notes file"; exit 1
+          fi
+          echo "release $V, notes $N ($(wc -c < "$N") bytes)"
+
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -81,6 +105,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          body_path: release-notes/${{ github.ref_name }}.md
           files: |
             psss-engine-v2-distribution_*.zip
             psss-engine-v2_how_it_works.pdf
