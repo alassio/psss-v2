@@ -118,7 +118,7 @@ export type BooleanFacetKey =
   // 2. POPULATIONS
   | 'pop:sparks' | 'pop:crystals' | 'pop:buoyancy'
   // 3. PARTICLES & TRAILS
-  | 'particles:neonLines' | 'particles:symmetryFold'
+  | 'particles:neonLines' | 'particles:electricDischarge' | 'particles:symmetryFold' | 'particles:symmetry3d'
   // v8 Phase 30 — ONE key for all three model-space deformation operators (30.D18).
   | 'particles:deformed'
   // 4. MOTION & FIELDS
@@ -599,8 +599,11 @@ const PARTICLES_GROUP: FacetGroup = {
       })),
     },
     bool('particles:neonLines', 'Neon Lines',
-      'Presets that draw glowing lines between particles. Reads `linesEnabled`; none of these is findable by name.',
+      'Presets whose particles each draw their recent path as a glowing trail. Reads `linesEnabled`; none of these is findable by name.',
       (r) => r.ov.linesEnabled === true),
+    bool('particles:electricDischarge', 'Electric Discharge',
+      'Presets with crackling, forking filaments of light around the figure. Reads `dischargeEnabled`.',
+      (r) => r.ov.dischargeEnabled === true),
     {
       kind: 'enum', id: 'trailDecay', label: 'Trail Decay',
       tip: 'How long the trail persists, as four bands over the decay factor. The band boundaries come from the library\'s own measured distribution.',
@@ -614,6 +617,10 @@ const PARTICLES_GROUP: FacetGroup = {
     bool('particles:symmetryFold', 'Symmetry fold',
       'Presets that mirror the figure around a fold. A fold of 1 is no fold, so it does not count.',
       (r) => (r.ov.symmetryFold ?? 1) > 1),
+    // v8 Phase 42 — the group, never Off, is the activation (a facet predicate reads an ACTIVATION scalar, 22's rule).
+    bool('particles:symmetry3d', '3-D Symmetry',
+      'Presets that repeat the figure in 3-D around the centre — on a ring, a sphere or a solid.',
+      (r) => (r.ov.sym3dLayout ?? 'off') !== 'off'),
   ],
 };
 

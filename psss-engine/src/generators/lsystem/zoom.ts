@@ -63,7 +63,7 @@
  * and 8, both already at or under the old flat value. So the cap's entire effect was damage.
  *
  * ⚠️ **It was invisible because the figure does not get SHORTER, it gets COARSER.** Owner-reported as
- * *"this preset figure looks truncated"* on `Curve Scroll` (`levyC` at 11, rendering 8): nothing is
+ * *"this preset figure looks truncated"* on the `levyC` preset then named `Curve Scroll` (at 11, rendering 8; deleted 2026-11-08): nothing is
  * clipped — 0 particles culled, 0 off-canvas, 81 916 symbols against a 900 000 budget — the curve was
  * simply built with 257 segments instead of 2 049. **Measured: extent and arc length were byte-identical
  * from order 8 to 14, which is what a dead control looks like from the outside.**
@@ -107,8 +107,12 @@ export function effectiveRecursion(
   baseRecursion: number,
   descend: number,
   ceiling: number,
+  /** v8 `39.A7` — the rule's subdivision factor (`zoomBase`): 2 on Hilbert, 3 on Peano. */
+  base = 2,
 ): { order: number; clamped: boolean } {
-  const octaves = descend > 1 ? Math.log2(descend) : 0;
+  // ⚠️ `log2` for base 2, never `log/log`: the quotient can differ by an ulp and the Hilbert zoom would stop
+  // being bit-identical to what it was before the base became a parameter.
+  const octaves = descend > 1 ? (base === 2 ? Math.log2(descend) : Math.log(descend) / Math.log(base)) : 0;
   const want = baseRecursion + octaves;
   const order = Math.min(ceiling, want);
   return { order, clamped: order < want - 1e-9 };
@@ -126,6 +130,8 @@ export function zoomBandFromWalk(
   centre: readonly number[],
   descend: number,
   dim: number,
+  /** v8 `39.A7` — the subdivision factor; the band snaps to an aligned `base^k` sub-cube. */
+  base = 2,
 ): ZoomBand {
   if (count <= 0 || descend <= 1) {
     return { lo: 0, hi: Math.max(0, count - 1), contiguous: true, clamped: false };
@@ -152,8 +158,12 @@ export function zoomBandFromWalk(
   const cellsPerAxis = Math.max(2, Math.round(Math.pow(count, 1 / dim)));
   // The sub-cube side, rounded DOWN to a power of two so the alignment argument holds.
   const want = cellsPerAxis / descend;
-  const k = Math.max(0, Math.floor(Math.log2(Math.max(1, want))));
-  const subSide = 1 << k;
+  // ⚠️ `+ 1e-9`: `log(27)/log(3)` is 2.9999999999999996 in IEEE doubles, and a floor without the guard would
+  // take the next-smaller sub-square at every exact power of three.
+  const k = base === 2
+    ? Math.max(0, Math.floor(Math.log2(Math.max(1, want))))
+    : Math.max(0, Math.floor(Math.log(Math.max(1, want)) / Math.log(base) + 1e-9));
+  const subSide = base === 2 ? 1 << k : Math.round(Math.pow(base, k));
   const subCells = Math.max(1, Math.round(Math.pow(subSide, dim)));
 
   // Locate the sub-cube the centre falls in, by finding the list entry nearest the centre. One scan,

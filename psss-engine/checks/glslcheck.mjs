@@ -43,7 +43,26 @@ const FILES = [
   'generators/physarum.ts',
   'post-processors/fluid-advection.ts',
   'post-processors/reel-crossfade.ts',
+  // v8 Phase 40. Its update shader splices `GLSL_SIMPLEX3D_CURL2D` — see `expandModules` below.
+  'post-processors/electric-discharge.ts',
 ];
+
+/*
+ * ⚠️ **A SHADER MAY SPLICE A SHARED GLSL MODULE (`${GLSL_SIMPLEX3D_CURL2D}`), AND THE SCAN MUST SEE WHAT THE GPU
+ * SEES.** Read raw, the splice is a `${...}` hole and every function it declares (`snoise`, `curl2D`) would be
+ * reported as used-but-undeclared. So each known module is substituted with its OWN text, read from its owner
+ * (`core/glsl-noise.ts`), and any remaining `${...}` — numeric constants formatted into the source — with a
+ * neutral literal. An UNKNOWN module name is left as a hole, so its functions fail loudly rather than vanish.
+ */
+const MODULES = {
+  GLSL_SIMPLEX3D_CURL2D: (() => {
+    const m = readFileSync(SRC + 'core/glsl-noise.ts', 'utf8').match(/GLSL_SIMPLEX3D_CURL2D = `([\s\S]*?)`;/);
+    return m ? m[1] : '';
+  })(),
+};
+const expandModules = (txt) => txt
+  .replace(/\$\{(GLSL_[A-Z0-9_]+)\}/g, (all, name) => (name in MODULES ? MODULES[name] : all))
+  .replace(/\$\{[A-Z_]+\.toFixed\(\d\)\}/g, '1.0');
 
 let pass = 0, fail = 0;
 const chk = (n, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${x ? '   ' + x : ''}`); ok ? pass++ : fail++; };
@@ -72,7 +91,7 @@ const BUILTIN = new Set([
 
 let totalShaders = 0, problems = [];
 for (const f of FILES) {
-  const txt = readFileSync(SRC + f, 'utf8');
+  const txt = expandModules(readFileSync(SRC + f, 'utf8'));
   for (const sh of shaders(txt)) {
     totalShaders++;
     /*

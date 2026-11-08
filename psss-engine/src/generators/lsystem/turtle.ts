@@ -57,7 +57,12 @@ export function expandRule(rule: LSystemRule, depth: number): { text: string; tr
       out += sub === undefined ? c : sub;
     }
     s = out;
-    if (s.length > EXPAND_SYMBOL_BUDGET) return { text: s, truncated: true };
+    /*
+     * ⚠️ v8 Phase 39 — **truncated means an expansion was SKIPPED, so it can only be true with levels still to
+     * go.** Past the budget on the LAST level the string is complete; the old test flagged it anyway, so the
+     * zoom's deepest level reported a "truncated expansion" over a whole figure (`39.A6(b)`'s false flag).
+     */
+    if (s.length > EXPAND_SYMBOL_BUDGET && i < n - 1) return { text: s, truncated: true };
   }
   return { text: s, truncated: false };
 }
@@ -264,4 +269,44 @@ export function walkTurtle(
   }
 
   return { xyz: sink.xyz, count: sink.n, truncated, unclosedBrackets: stack.length };
+}
+
+/**
+ * v8 `39.A6(c)` — **which turtle angles a rule uses, decided by their MEASURED EFFECT and not by the symbol
+ * set alone.** `ruleAngleUsage` (rules.ts) scans the productions, and on `Bush 3D` that scan is WRONG: every
+ * `+`/`-` sits inside the `L` production's `{…}` polygon block, whose `f` moves emit no point, so the turn is
+ * thrown away and the `Yaw` row moved nothing (measured 0 displacement at two depths, `p39a6-c-inert.mjs`).
+ * **A row that moves nothing is ABSENT** (`36`'s rule), so the Composer reads this.
+ *
+ * ⚠️ An axis counts only if the symbol scan says it is used AND sweeping it across the rule's `angleRange`
+ * (the other two held at the landmark) moves a point of the shallowest walk. Noise floor: an unused axis reads
+ * exactly 0 and a 1e-9° nudge reads >= 1.5e-11, so `1e-9` separates them with margin. Memoised per rule —
+ * the answer is a property of the rule, and the walks are a few hundred points.
+ */
+const angleEffectMemo = new Map<string, { yaw: boolean; pitch: boolean; roll: boolean }>();
+export function ruleAngleEffect(
+  rule: LSystemRule,
+  usage: { yaw: boolean; pitch: boolean; roll: boolean },
+): { yaw: boolean; pitch: boolean; roll: boolean } {
+  const hit = angleEffectMemo.get(rule.key);
+  if (hit) return hit;
+  const depth = Math.max(1, rule.recursionRange[0]);
+  const a = rule.publishedAngle;
+  const [lo, hi] = rule.angleRange;
+  const moves = (axis: 0 | 1 | 2): boolean => {
+    const pose = (v: number): number[] => [axis === 0 ? v : a, axis === 1 ? v : a, axis === 2 ? v : a];
+    const p = pose(lo), q = pose(hi);
+    const A = walkTurtle(rule, depth, p[0]!, p[1]!, p[2]!);
+    const B = walkTurtle(rule, depth, q[0]!, q[1]!, q[2]!);
+    if (A.count !== B.count) return true;
+    for (let i = 0; i < A.count * 3; i++) if (Math.abs(A.xyz[i]! - B.xyz[i]!) > 1e-9) return true;
+    return false;
+  };
+  const out = {
+    yaw: usage.yaw && moves(0),
+    pitch: usage.pitch && moves(1),
+    roll: usage.roll && moves(2),
+  };
+  angleEffectMemo.set(rule.key, out);
+  return out;
 }

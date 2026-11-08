@@ -19,6 +19,7 @@ import {
 import type { FilmLookParams } from '../../renderers/film-looks.ts';
 import { FILM_LOOKS, CUSTOMIZE_FILM_LOOK } from '../../renderers/film-looks.ts';
 import { getPaletteLUT } from '../../presets/palettes.ts';
+import { SYM3D_DEFAULTS } from '../../core/symmetry-groups.ts';
 // v8 Step 21.4c — the ONE owner of "which palette, mapped how". See `tilePaletteFor`'s header for why this
 // reader may not keep its own `??` chain now that the palette has two sources.
 import {
@@ -1126,6 +1127,17 @@ export class GridTileRenderer {
     // reduced-fidelity version of the same one — which is exactly the divergence C7 accepts for
     // crystals and trails, but here it is free to avoid.
     generator.setSymmetry(preset.overlay?.symmetryFold ?? 1, preset.overlay?.symmetryMirror ?? true);
+    // v8 Phase 42 — 3-D Symmetry, forwarded beside the 2-D fold for the same reason: without it a tile would show a
+    // different SHAPE (one copy instead of the solid's arrangement), not a reduced-fidelity version of the same one.
+    generator.setSymmetry3d({
+      layout: preset.overlay?.sym3dLayout ?? SYM3D_DEFAULTS.layout,
+      positions: preset.overlay?.sym3dPositions ?? SYM3D_DEFAULTS.positions,
+      on: preset.overlay?.sym3dOn ?? SYM3D_DEFAULTS.on,
+      local: preset.overlay?.sym3dLocal ?? SYM3D_DEFAULTS.local,
+      radius: preset.overlay?.sym3dRadius ?? SYM3D_DEFAULTS.radius,
+      mirrors: preset.overlay?.sym3dMirrors ?? SYM3D_DEFAULTS.mirrors,
+      facing: preset.overlay?.sym3dFacing ?? SYM3D_DEFAULTS.facing,
+    });
 
     /*
      * ⚠️⚠️ **EVERY OTHER MODEL-SPACE OPERATOR, ADDED 2026-10-28 — AND THEIR ABSENCE WAS A DEFECT SPANNING

@@ -175,8 +175,19 @@ export function interpolatePreset(
         amplitude: x.amplitude + (y.amplitude - x.amplitude) * t,
         frequency: x.frequency + (y.frequency - x.frequency) * t,
       });
+      // v8 `39.A8` — an optional key survives the blend unless the deck lacking it is at its own endpoint.
+      const oneSidedKeep = (x: unknown, y: unknown, w: number): boolean =>
+        (x !== undefined && w < 1) || (y !== undefined && w > 0);
+      /*
+       * v8 `39.C5` — **the custom generator SNAPS WITH THE RULE and is never interpolated** (spec §2.4: structure is
+       * not a parameter). It travels with whichever deck's `rule` wins, so a result naming `customize` always
+       * carries ITS generator and one naming a library rule never carries a stale one (`custom` present iff
+       * `customize`, spec §3.5).
+       */
+      const ruleWinner = t < 0.5 ? liveA : liveB;
       result.generators.lsystem = {
-        rule: (t < 0.5 ? liveA : liveB).rule,
+        rule: ruleWinner.rule,
+        ...(ruleWinner.custom !== undefined ? { custom: deepCopy(ruleWinner.custom) } : {}),
         recursion: lerpMV(liveA.recursion, liveB.recursion),
         yaw: lerpMV(liveA.yaw, liveB.yaw),
         pitch: lerpMV(liveA.pitch, liveB.pitch),
@@ -184,6 +195,25 @@ export function interpolatePreset(
         descend: geoMV(liveA.descend, liveB.descend),
         smoothness: liveA.smoothness + (liveB.smoothness - liveA.smoothness) * t,
         centre: (t < 0.5 ? liveA : liveB).centre.slice(),
+        /*
+         * v8 `39.A8` — **`twist` and `stretch` LERP**, each side read at its IDENTITY when absent (`?? 0`,
+         * `?? 1`). ⚠️⚠️ The fold-as-a-crossfade depends on this: two dragon presets at twist 0 and 180 play the
+         * fold across the fader. ⚠️ **Added only if EITHER deck authors the key**, so a blend of two pre-Phase-39
+         * curves produces exactly the block it always did — a key neither side has must not appear (`36.D1`).
+         * ⚠️ A plain lerp, NOT the spec's "shorter arc": no shipped Twist range wraps (the widest is ±180 on
+         * Peano, whose ends are different figures), so the arc rule has nothing to do here.
+         * ⚠️⚠️ **ONE-SIDED: the deck that LACKS the key wins at its own endpoint** — `mixercheck` §C found the first
+         * version ADDING `twist`/`stretch` at t = 1 over a deck B that authors neither. Between the ends the absent
+         * side reads as the identity, so the blend is continuous and each endpoint is that deck exactly.
+         */
+        ...(oneSidedKeep(liveA.twist, liveB.twist, t) ? {
+          twist: lerpMV(liveA.twist ?? { base: 0, amplitude: 0, frequency: 0 },
+            liveB.twist ?? { base: 0, amplitude: 0, frequency: 0 }),
+        } : {}),
+        ...(oneSidedKeep(liveA.stretch, liveB.stretch, t) ? {
+          stretch: lerpMV(liveA.stretch ?? { base: 1, amplitude: 0, frequency: 0 },
+            liveB.stretch ?? { base: 1, amplitude: 0, frequency: 0 }),
+        } : {}),
       };
     } else {
       // ⚠️ Only one deck (or neither) carries a curve, so there is nothing to blend TOWARD. The block
@@ -431,6 +461,13 @@ function mixSharpnessLevels(
  * a scalar law does not either.
  */
 const SCALAR_IDENTITIES: Record<KeysWithLaw<'lerp' | 'geometric'>, number> = {
+  // v8 Phase 40 — Electric Discharge: each identity IS the engine's `?? default` (`DISCHARGE_DEFAULTS`).
+  dischargeIntensity: 1.375,
+  dischargeFilament: 1.5,
+  dischargeCrackle: 0.875,
+  dischargeBranching: 0,
+  // v8 Phase 42 — 3-D Symmetry's Radius: the identity IS `SYM3D_DEFAULTS.radius` (centred).
+  sym3dRadius: 0,
   speedFactor: 1.0,
   figureScale: 1.0,
   particleSize: 1.0,

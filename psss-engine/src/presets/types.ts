@@ -1181,6 +1181,15 @@ export interface OverlayState {
   ribbonWidth?:          number;
   linesEnabled?:         boolean;
   lineWidth?:            number;
+  /**
+   * v8 Phase 40 — **Electric Discharge**, five FLAT optional scalars (invariant 14: no nested block, so no
+   * migration). Absent reads as off / `DISCHARGE_DEFAULTS`; combines with Neon Lines (owner), unlike Ribbons.
+   */
+  dischargeEnabled?:     boolean;
+  dischargeIntensity?:   number;
+  dischargeFilament?:    number;
+  dischargeCrackle?:     number;
+  dischargeBranching?:   number;
   filmLook?:             string;
   customFilmLookParams?: FilmLookParams;
   /**
@@ -1360,6 +1369,24 @@ export interface OverlayState {
   symmetryFold?:         number;
   /** E30 — `true` = dihedral (each sector mirrored), `false` = cyclic. Absent means `true`. See `setSymmetry`. */
   symmetryMirror?:       boolean;
+  /**
+   * v8 Phase 42 — **3-D Symmetry**: the figure REPLICATED under a solid's group (never folded — `E131`). Five FLAT
+   * scalars, each read `?? default` (invariant 14's preference), `'off'` the identity, so every preset that predates
+   * them is bit-identical. Groups and their orders live in `core/symmetry-groups.ts`.
+   */
+  sym3dLayout?:          'off' | 'ring' | 'sphere' | 'tetrahedron' | 'octahedron' | 'cube' | 'icosahedron' | 'dodecahedron';
+  /** Ring 1–24 / Sphere 2–60: how many positions. Read only for the two counted layouts. */
+  sym3dPositions?:       number;
+  /** For a solid: its vertices, edge midpoints or face centres carry the copies. */
+  sym3dOn?:              'vertices' | 'edges' | 'faces';
+  /** Copies at each position, 1–12, turned evenly about the position's axis. */
+  sym3dLocal?:           number;
+  /** Distance of the positions from the centre, in half-extents of the design box (0 = centred). */
+  sym3dRadius?:          number;
+  /** Mirror every second copy at a position. */
+  sym3dMirrors?:         boolean;
+  /** Each copy turned to face OUTWARD from the centre, or kept PARALLEL to the original. */
+  sym3dFacing?:          'outward' | 'parallel';
   /**
    * v8 `30.1` (`E129a`) — **Barr twist, per axis, in TURNS PER HALF-EXTENT of the design box.**
    *

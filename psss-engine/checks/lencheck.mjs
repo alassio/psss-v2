@@ -143,125 +143,85 @@ chk('no crystal upload uses a state.* array directly', bad.length === 0, bad.joi
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════════════════════════════
- * NeonLineRenderer — the invariant-6 relationship that became ZERO-MARGIN on 2026-09-24
+ * NeonLineRenderer — the GPU-built trails (2026-11-05): the history TEXTURE must cover every slot the draw reads
  * ═══════════════════════════════════════════════════════════════════════════════════════════════════
  *
- * ⚠️ **Why this section exists, and why it is not in the file it is about.** Until 2026-09-24 the neon
- * pass allocated both geometry arrays at the FULL worst case every frame and uploaded them whole, so its
- * vertex buffer was over-sized by however many segments had been skipped. That margin was accidental —
- * nothing asserted it — but it meant the invariant-6 hazard this whole file exists for could not bite.
- * The D1 performance fix replaced it with a ranged upload sized to exactly the written prefix, which is
- * correct by a DERIVATION rather than by a margin: `vertexFloats` and `indexCount` are incremented by the
- * same loop iteration, so the largest index the draw can read is exactly one less than the number of
- * vertices uploaded. **A margin is visible to a reader; a derivation is not.** Neon had no section here
- * at all before, so the file scanned two of the three paths that do this and reported green.
- *
- * The measured clause below is the one that matters: it replays the counter arithmetic over randomised
- * SKIP patterns, because every way of getting this wrong is a counter that moves on a skip when the other
- * does not — which is the defect the renderer's own comment records as "every subsequent segment's indices
- * point 4 vertices too far ... the figure appears partly missing". A grep for the upload call cannot see
- * it; only replaying the two counters against each other can.
+ * ⚠️ **This section's subject was the CPU vertex prefix — the zero-margin invariant-6 relationship between
+ * `vertexFloats` and `indexCount` — until the quads moved into the vertex shader.** There is no vertex buffer
+ * any more, so that hazard is gone, and the section now holds the hazards the new design HAS, each silent:
+ *   - the draw reads `count × 7` instances through `texelFetch` from a texture of `TRAIL × planeRows × TEX_W`
+ *     texels; a slot beyond the texture reads ZERO, which is a degenerate quad at the origin with a live alpha
+ *     (a bright dot), not an error;
+ *   - `TEX_W` and the trail length are written in TypeScript AND in GLSL, with no compiler between the copies;
+ *   - the per-frame upload must be the plane written THIS frame, or every trail lags or tears by one sample.
+ * The equivalence with the CPU renderer it replaced (291 800 quads, 0 mismatches, corners within 1.2e-4 px,
+ * calibrated by a seeded off-by-one head) is the private probe `equivalence.mjs` (not published).
  */
-console.log('\n=== NeonLineRenderer: the vertex prefix must cover every index the draw reads ===\n');
+console.log('\n=== NeonLineRenderer: the history texture covers every slot the draw reads ===\n');
 /*
- * ⚠️ **Every clause below reads the COMMENT-STRIPPED source, and the first run of this section is why.**
- * The `baseVert` clause failed on the renderer's own explanatory comment, which names the variable in order
- * to say it was removed — a doc comment legitimately mentioning the thing it warns about, exactly the trap
- * `cullcheck` records for the `-10000` literal. For an ABSENCE clause that is a false failure; for the
- * PRESENCE clauses it would be worse, a false pass, since a call named only in a comment would satisfy them.
+ * ⚠️ **Every clause below reads the COMMENT-STRIPPED source** — a doc comment naming a thing it warns about is a
+ * false failure for an ABSENCE clause and a false pass for a PRESENCE one.
  */
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-const neon = stripComments(readFileSync(SRC + 'renderers/neon-line-renderer.ts', 'utf8'));
-const neonNum = (name) => {
-  const m = neon.match(new RegExp(`const ${name} = (\\d+)`));
-  return m ? Number(m[1]) : NaN;
-};
-// Parsed, never transcribed — a constant changed in the renderer must move this test, not break it.
-const VPS = neonNum('VERTS_PER_SEGMENT');
-const IPS = neonNum('INDICES_PER_SEGMENT');
-const FPV = neonNum('FLOATS_PER_VERTEX');
-chk('the three geometry constants are parseable from the renderer',
-  Number.isFinite(VPS) && Number.isFinite(IPS) && Number.isFinite(FPV),
-  `VERTS_PER_SEGMENT=${VPS} INDICES_PER_SEGMENT=${IPS} FLOATS_PER_VERTEX=${FPV}`);
+const neonRaw = readFileSync(SRC + 'renderers/neon-line-renderer.ts', 'utf8');
+const neon = stripComments(neonRaw);
+const tsNum = (name) => { const m = neon.match(new RegExp(`const ${name} = (\\d+)`)); return m ? Number(m[1]) : NaN; };
+const glNum = (name) => { const m = neonRaw.match(new RegExp(`const int ${name} = (\\d+);`)); return m ? Number(m[1]) : NaN; };
+const TRAIL = tsNum('TRAIL_LENGTH'), TEXW = tsNum('TEX_W');
+chk('TRAIL_LENGTH and TEX_W agree between the TypeScript and the GLSL copies',
+  Number.isFinite(TRAIL) && TRAIL === glNum('TRAIL') && Number.isFinite(TEXW) && TEXW === glNum('TEX_W'),
+  `TS TRAIL_LENGTH=${TRAIL} TEX_W=${TEXW} · GLSL TRAIL=${glNum('TRAIL')} TEX_W=${glNum('TEX_W')} — no compiler `
+  + 'compares these, and a mismatch reads samples from the wrong row');
+chk('TEX_W is even and within the WebGL2 MAX_TEXTURE_SIZE floor (2048)',
+  TEXW % 2 === 0 && TEXW <= 2048, 'odd would split a sample across rows; above 2048 a conforming GPU may refuse the texture');
 
-if (Number.isFinite(VPS) && Number.isFinite(IPS) && Number.isFinite(FPV)) {
-  // MEASURED: replay the counters over random skip patterns. `written` counts the segments that emitted
-  // geometry; a skip must advance NEITHER counter.
-  let worstSlack = Infinity, cases = 0, broken = 0;
-  for (let seed = 1; seed <= 400; seed++) {
-    let rnd = seed * 2654435761 % 2147483647;
-    const next = () => ((rnd = (rnd * 48271) % 2147483647) / 2147483647);
-    const segments = 1 + Math.floor(next() * 500);
-    let vertexFloats = 0, indexCount = 0;
-    for (let s = 0; s < segments; s++) {
-      if (next() < 0.35) continue;                 // the frozen / teleport skip
-      vertexFloats += VPS * FPV;                   // four vertices written
-      indexCount += IPS;                           // ...and their indices consumed
-    }
-    if (indexCount === 0) continue;
-    cases++;
-    // The index pattern's j-th segment addresses vertices [4j, 4j+3], so the largest index read is:
-    const maxIndexRead = (indexCount / IPS) * VPS - 1;
-    const verticesUploaded = vertexFloats / FPV;
-    const slack = verticesUploaded - 1 - maxIndexRead;
-    if (slack < 0) broken++;
-    worstSlack = Math.min(worstSlack, slack);
-  }
-  chk('the prefix covers the draw for every skip pattern (measured, 400 randomised cases)',
-    broken === 0 && cases > 300,
-    `${cases} cases, worst slack ${worstSlack} vertices — 0 is CORRECT here and is the zero margin: `
-    + 'a negative slack is the dropped draw, a positive one would mean an index is never reached');
-
+if (Number.isFinite(TRAIL) && Number.isFinite(TEXW)) {
   /*
-   * CALIBRATION. The clause above asserts a NON-NEGATIVE slack over arithmetic this file supplies itself, so
-   * on its own it proves only that the arithmetic is self-consistent — it would read green against a replay
-   * that could not go wrong. Seeding the historical defect (a skip that consumes indices without writing
-   * vertices) shows the slack actually goes negative, i.e. that the clause has something to catch.
+   * MEASURED: replay the capacity arithmetic (`ensureHistoryCapacity`) over a randomised history of counts and
+   * assert the texture always holds every slot the draw reads. The rows and the doubling are copied from the
+   * renderer's own expressions below, which the source clauses then hold in place.
    */
-  let seededWorst = Infinity;
-  for (let seed = 1; seed <= 50; seed++) {
-    let rnd = seed * 2654435761 % 2147483647;
+  let broken = 0, cases = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    let rnd = (seed * 2654435761) % 2147483647;
     const next = () => ((rnd = (rnd * 48271) % 2147483647) / 2147483647);
-    let vertexFloats = 0, indexCount = 0;
-    for (let s = 0; s < 200; s++) {
-      if (next() < 0.35) { indexCount += IPS; continue; }   // ← the seeded desync
-      vertexFloats += VPS * FPV;
-      indexCount += IPS;
+    let cap = 0, rows = 0;
+    for (let step = 0; step < 30; step++) {
+      const count = Math.floor(next() * 200000);
+      if (count > cap) { cap = Math.max(count, cap * 2, 1024); rows = Math.ceil((2 * cap) / TEXW); }
+      cases++;
+      if (2 * count > rows * TEXW) broken++;
     }
-    seededWorst = Math.min(seededWorst, vertexFloats / FPV - 1 - ((indexCount / IPS) * VPS - 1));
   }
-  chk('CALIB: a skip that advances only the index cursor drives the slack NEGATIVE',
-    seededWorst < 0,
-    `worst seeded slack ${seededWorst} vertices — the draw would read that many vertices past the upload, `
-    + 'which ANGLE answers by dropping the whole draw with a clean console');
-
-  // SOURCE-SHAPED, and these three catch what the arithmetic cannot: that the SHIPPED code still derives
-  // both counters from one loop rather than from two.
-  chk('`buildGeometry` returns the written prefix, not a fresh array',
-    /return \{ vertexFloats: vIdx, indexCount: iIdx \};/.test(neon),
-    'a return of `{ vertices, indices }` is the pre-D1 shape — 19 MB/frame of upload and a full-worst-case alloc');
-  chk('the index count advances by the CONSTANT, in the same iteration as the vertex writes',
-    /iIdx \+= INDICES_PER_SEGMENT;/.test(neon),
-    'if these two counters ever come from different loops the derivation above stops holding');
-  chk('no `baseVert` variable has come back',
-    !/baseVert/.test(neon),
-    '⚠️ `baseVert` was the per-frame index cursor, and advancing it on a skip desynchronised it from the '
-    + 'vertex cursor. The constant index pattern removed the variable and with it the way to get it wrong; '
-    + 'a re-added one is that hazard restored, and it reads as a partly-missing figure, not as an error');
-  chk('the vertex upload is the RANGED form, bounded by the returned prefix',
-    /bufferData\(gl\.ARRAY_BUFFER, this\.vertexScratch, gl\.DYNAMIC_DRAW, 0, vertexFloats\)/.test(neon),
-    'uploading `this.vertexScratch` whole would be correct but re-transfers the unwritten tail; uploading '
-    + 'a DIFFERENT length is the short buffer ANGLE drops');
-  chk('the index pattern is uploaded whole, and only when the capacity changed',
-    /this\.geometryDirty/.test(neon)
-    && /bufferData\(gl\.ELEMENT_ARRAY_BUFFER, this\.indexPattern, gl\.STATIC_DRAW\)/.test(neon),
-    'the element buffer must stay at FULL capacity — it is indexed by `indexCount`, which is a per-frame '
-    + 'count into a constant pattern, so shortening it to the prefix would be the one real way to break this');
-  chk('the geometry capacity dies with the arrays it describes (invariant 3, CPU form)',
-    /this\.geometryCapacity = 0;/.test(neon.slice(neon.indexOf('dispose()'))),
-    'a live capacity over a zero-length scratch makes `ensureGeometryCapacity` skip the rebuild, and a '
-    + 'Float32Array store out of range is a silent no-op rather than a throw');
+  chk('the texture holds every slot the draw reads, for every count sequence (measured, 12 000 cases)',
+    broken === 0 && cases === 12000, `${broken} broken of ${cases}`);
+  let seededBroken = 0;
+  for (let count = 1000; count < 200000; count += 997) { const rows = Math.floor((2 * count) / TEXW); if (2 * count > rows * TEXW) seededBroken++; }
+  chk('CALIB: rows computed with floor instead of ceil leaves slots outside the texture',
+    seededBroken > 0, `${seededBroken} counts would read past the texture — a bright dot at the origin, not an error`);
 }
+
+chk('the capacity arithmetic in the renderer is the replayed one (ceil, doubling, a floor of 1024)',
+  /const cap = Math\.max\(slots, this\.capacitySlots \* 2, 1024\);/.test(neon)
+  && /const rows = Math\.ceil\(\(2 \* cap\) \/ TEX_W\);/.test(neon),
+  'if the renderer drifts from the expressions replayed above, the measured clause is about a different design');
+chk('the draw is bounded by the SEEDED slots, never by the capacity',
+  /const count = Math\.min\(trajectoryCount\(state\), this\.historySlots\);/.test(neon)
+  && /drawArraysInstanced\(gl\.TRIANGLE_STRIP, 0, 4, count \* SEGMENTS_PER_PARTICLE\)/.test(neon),
+  'drawing up to the capacity would read never-seeded slots: zero samples, i.e. dots at the origin');
+chk('the per-frame upload is the plane written THIS frame (the one before the advanced head)',
+  /const plane = \(this\.historyHead \+ TRAIL_LENGTH - 1\) % TRAIL_LENGTH;/.test(neon),
+  'uploading the head itself would ship the OLDEST plane and leave the newest sample on the CPU');
+chk('a reallocation, a re-seed or a newly seeded slot forces a WHOLE-texture upload',
+  (neon.match(/this\.fullUpload = true;/g) ?? []).length >= 3,
+  'a seeded ring written on the CPU but never uploaded would draw the previous occupant\'s trail');
+chk('the texture and its capacity die together in dispose() (invariants 1 and 3)',
+  /this\.histTexture = null;/.test(neon.slice(neon.indexOf('dispose()')))
+  && /this\.capacitySlots = 0;/.test(neon.slice(neon.indexOf('dispose()'))),
+  'a live capacity over a fresh texture would skip the allocation and upload into nothing');
+chk('the sampler unit is assigned every render and activeTexture is restored to unit 0 (invariant 4)',
+  /gl\.uniform1i\(this\.uHist, HIST_UNIT\);/.test(neon) && /gl\.activeTexture\(gl\.TEXTURE0\);/.test(neon),
+  'a sampler left on unit 0, or a unit left active, is the multi-sampler black frame');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

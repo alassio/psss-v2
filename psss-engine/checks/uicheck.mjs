@@ -874,6 +874,349 @@ if (await loadByTile(MIX_LOOK)) {
   chk(`the tile for ${MIX_LOOK} exists`, false, 'INCONCLUSIVE, not a pass: section U asserted nothing');
 }
 
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== V. v8 39 — the curve body\'s Twist / Stretch, the exclusion, the rule-pick reset and the search ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * ⚠️⚠️ **THE HALF `figurecheck` §J CANNOT REACH.** §J measures the engine; whether a row is SHOWN where the rule
+ * has the axis and ABSENT elsewhere, whether a disabled row is actually disabled, and whether the search finds
+ * the new rows at the path they live at are DOM questions. Each clause loads a real library demo by its tile.
+ */
+const curveRows = async () => page.evaluate(() => {
+  const c = document.querySelector('.tab-content[data-tab="composer"]');
+  if (!c) return null;
+  const rows = Array.from(c.querySelectorAll('.sl-vfx-row'));
+  const byLabel = (t) => rows.find((r) => r.querySelector('.sl-vfx-label')?.textContent?.trim() === t) ?? null;
+  const state = (t) => {
+    const r = byLabel(t);
+    if (!r) return 'absent';
+    const inp = r.querySelector('input');
+    return inp && inp.disabled ? 'disabled' : 'live';
+  };
+  const val = (t) => byLabel(t)?.querySelector('input')?.value ?? null;
+  const note = Array.from(c.querySelectorAll('.sl-composer-precondition'))
+    .find((n) => /Twist and Yaw take turns/.test(n.textContent ?? ''));
+  return {
+    twist: state('Twist'), stretch: state('Stretch'), yaw: state('Yaw'), yawSize: state('Yaw size'),
+    yawVal: val('Yaw'), yawSizeVal: val('Yaw size'),
+    note: !!note && getComputedStyle(note).display !== 'none',
+    rule: c.querySelector('select[aria-label="Rule"]')?.value ?? null,
+  };
+});
+const openComposer = async () => {
+  await page.locator('.sl-tab-btn[data-tab="composer"]').click();
+  await page.waitForTimeout(1100);
+};
+
+if (await loadByTile('Curve Fold')) {
+  await openComposer();
+  const f = await curveRows();
+  chk('on the dragon (Curve Fold) the Twist row is SHOWN and live, and Stretch is ABSENT (no stretchable copy)',
+    f !== null && f.twist === 'live' && f.stretch === 'absent', JSON.stringify(f));
+
+  const tw = await searchFor('twist');
+  const comp = tw.find((r) => r.label === 'Twist' && segsOf(r.path)[0] === 'Composer');
+  chk('the settings search finds the curve Twist under the Composer, at the Curve section',
+    comp !== undefined && segsOf(comp.path).includes('Curve'),
+    tw.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 5).join(' | '));
+  /*
+   * ⚠️ Measured, not assumed: the model-space deformation's rows are `Twist X/Y/Z`, so the two controls do NOT
+   * share a label -- the first draft of this clause assumed a bare `Twist` in Visual FX and was red over correct
+   * code. Asserted as it is: a separate hit, a different label AND a different path.
+   */
+  chk('...and the Visual FX deformation twist is a SEPARATE hit, with its own label (`Twist X`) and path',
+    tw.some((r) => /^Twist [XYZ]$/.test(r.label) && segsOf(r.path)[0] === 'Visual FX')
+    && !tw.some((r) => r.label === 'Twist' && segsOf(r.path)[0] === 'Visual FX'),
+    'so the curve row is the only control labelled exactly `Twist`');
+  await page.locator(SEARCH_FIELD).fill('');
+} else {
+  chk('the tile for Curve Fold exists', false, 'INCONCLUSIVE, not a pass');
+}
+
+if (await loadByTile('Curve Breathing Thicket')) {
+  await openComposer();
+  const s = await curveRows();
+  chk('on the Plant (Curve Breathing Thicket) BOTH Stretch and Twist are shown',
+    s !== null && s.stretch === 'live' && s.twist === 'live', JSON.stringify(s));
+  const st = await searchFor('stretch');
+  chk('the settings search finds the curve Stretch under the Composer',
+    st.some((r) => r.label === 'Stretch' && segsOf(r.path)[0] === 'Composer'),
+    st.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 5).join(' | '));
+  await page.locator(SEARCH_FIELD).fill('');
+}
+
+if (await loadByTile('Curve Hilbert Opening')) {
+  await openComposer();
+  const h = await curveRows();
+  chk('on a CELL rule with Twist in use, Yaw is DISABLED and the reason is shown (owner 39.Q2 (c))',
+    h !== null && h.twist === 'live' && h.yaw === 'disabled' && h.yawSize === 'disabled' && h.note,
+    JSON.stringify(h));
+
+  /*
+   * ⚠️⚠️ **A RULE PICK RESETS EVERYTHING (owner 39.Q6, retiring Phase 36's re-seat).** Picking Koch must land on
+   * Koch's landmark with no wobble, and its Twist row must disappear (Koch has no twistable copy).
+   */
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('koch');
+  await page.waitForTimeout(1500);
+  const k = await curveRows();
+  chk('a rule pick RESETS the shape parameters: Koch lands at 60° with no wobble, and its Twist row is absent',
+    k !== null && k.rule === 'koch' && Number(k.yawVal) === 60 && Number(k.yawSizeVal) === 0 && k.twist === 'absent',
+    JSON.stringify(k));
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== W. v8 Phase 40 — Electric Discharge: placement, the gated body, the search ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * The owner placed the section DIRECTLY BELOW Neon Lines (Phase 40), and the body is gated on its switch (31.U).
+ * Both are DOM facts: the order is the tab's APPEND order and the gate is a `display`, neither visible to a text scan.
+ */
+await page.locator('.sl-tab-btn[data-tab="visual-fx"]').click();
+await page.waitForTimeout(800);
+const dis = await page.evaluate(() => {
+  const root = document.querySelector('.tab-content[data-tab="visual-fx"]');
+  for (const head of root.querySelectorAll('.sl-vfx-group-head')) {
+    if ((head.querySelector('span')?.textContent?.trim() ?? '') === 'Particles'
+      && head.getAttribute('aria-expanded') !== 'true') head.click();
+  }
+  const titles = Array.from(root.querySelectorAll('.sl-section-title')).map((t) => t.textContent?.trim() ?? '');
+  const i = titles.indexOf('Neon Lines');
+  const cb = root.querySelector('input[aria-label="Enable Electric Discharge"]');
+  const body = root.querySelector('input[aria-label="Discharge Intensity"]')?.closest('.sl-vfx-row');
+  const shownBefore = !!body && body.offsetParent !== null;
+  if (cb && !cb.checked) cb.click();
+  const shownAfter = !!body && body.offsetParent !== null;
+  if (cb && cb.checked) cb.click();
+  return { next: i >= 0 ? titles[i + 1] : null, hasCb: !!cb, shownBefore, shownAfter };
+});
+chk('Electric Discharge is the section DIRECTLY below Neon Lines (owner)',
+  dis.next === 'Electric Discharge', `section after Neon Lines: "${dis.next}"`);
+chk('...and its four rows are HIDDEN until Enable is ticked, then SHOWN (the 31.U gate)',
+  dis.hasCb && !dis.shownBefore && dis.shownAfter, JSON.stringify(dis));
+
+/*
+ * COUPLED TO NEON LINES (owner 11-05) — both directions, through the real boxes, and the BOXES must show what the
+ * engine did (the handlers re-read; a box that kept its old tick would contradict the engine silently). The ribbon
+ * `Mode` select is found by its own options because its accessible name, `Mode`, is shared with other sections.
+ */
+const coupled = await page.evaluate(() => {
+  const root = document.querySelector('.tab-content[data-tab="visual-fx"]');
+  const q = (l) => root.querySelector(`input[aria-label="${l}"]`);
+  const lines = q('Enable Neon Lines'), dis = q('Enable Electric Discharge');
+  const ribbon = Array.from(root.querySelectorAll('select')).find((s) => [...s.options].some((o) => o.value === 'streaks'));
+  const setRibbon = (v) => { ribbon.value = v; ribbon.dispatchEvent(new Event('change', { bubbles: true })); };
+  const disBody = () => root.querySelector('input[aria-label="Discharge Intensity"]')?.closest('.sl-vfx-row')?.offsetParent !== null;
+  const r = {};
+  setRibbon('hybrid');
+  if (dis.checked) dis.click();
+  r.start = { lines: lines.checked, dis: dis.checked, ribbon: ribbon.value };
+  dis.click();                                   // discharge ON => lines ON, ribbons OFF
+  r.afterDisOn = { lines: lines.checked, dis: dis.checked, ribbon: ribbon.value };
+  lines.click();                                 // lines OFF => discharge OFF, its body hidden
+  r.afterLinesOff = { lines: lines.checked, dis: dis.checked, body: disBody() };
+  dis.click(); setRibbon('hybrid');              // a ribbon pick ends the lines, so the discharge too
+  r.afterRibbon = { lines: lines.checked, dis: dis.checked };
+  setRibbon('off');
+  return r;
+});
+chk('Electric Discharge is COUPLED to Neon Lines in both directions, and every box shows what the engine did',
+  coupled.start.lines === false && coupled.start.dis === false
+  && coupled.afterDisOn.lines === true && coupled.afterDisOn.dis === true && coupled.afterDisOn.ribbon === 'off'
+  && coupled.afterLinesOff.lines === false && coupled.afterLinesOff.dis === false && coupled.afterLinesOff.body === false
+  && coupled.afterRibbon.lines === false && coupled.afterRibbon.dis === false,
+  JSON.stringify(coupled));
+
+const ds = await searchFor('discharge');
+const dsPaths = ds.filter((r) => segsOf(r.path).join(' › ') === 'Visual FX › Particles › Electric Discharge');
+chk('the settings search finds the Electric Discharge controls at their exact path',
+  dsPaths.length >= 4, ds.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 6).join(' | '));
+await page.locator(SEARCH_FIELD).fill('');
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== X. v8 39 Stage C — Customize: the option, the no-op pick, the editor, a named pick back ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * ⚠️ **THE HALF `figurecheck` §K CANNOT REACH**: whether the option is offered or DISABLED with its reason, whether
+ * the pick resets NOTHING the rows show, whether an edit reaches the readout, whether deleting a move takes its
+ * retrace with it, and whether a named pick puts the rows back. All through the real controls, on real demos.
+ */
+const customState = async () => page.evaluate(() => {
+  const c = document.querySelector('.tab-content[data-tab="composer"]');
+  const sel = c?.querySelector('select[aria-label="Rule"]');
+  const opt = sel ? Array.from(sel.options).find((o) => o.value === 'customize') : null;
+  const rows = Array.from(c?.querySelectorAll('.sl-vfx-row') ?? []);
+  const val = (t) => rows.find((r) => r.querySelector('.sl-vfx-label')?.textContent?.trim() === t)?.querySelector('input')?.value ?? null;
+  const notes = Array.from(c?.querySelectorAll('.sl-row-note') ?? []).map((n) => n.textContent ?? '');
+  return {
+    rule: sel?.value ?? null, optDisabled: opt ? opt.disabled : null, optTitle: opt?.title ?? '',
+    steps: c ? c.querySelectorAll('select[aria-label^="Step "][aria-label$=" kind"]').length : 0,
+    kinds: Array.from(c?.querySelectorAll('select[aria-label^="Step "][aria-label$=" kind"]') ?? []).map((s) => s.value).join(','),
+    recursion: val('Recursion'), yaw: val('Yaw'), yawSize: val('Yaw size'),
+    prov: notes.find((n) => /Named at|Custom generator|Same generator/.test(n)) ?? '',
+    status: notes.find((n) => /steps\s+·/.test(n)) ?? '',
+    liftCol: !!c?.querySelector('input[aria-label="Step 1 lift"]'),
+    startOn: c?.querySelector('input[aria-label="Starting shape"]')?.checked ?? null,
+    startRows: c ? c.querySelectorAll('input[aria-label^="Start "][aria-label$=" turn"]').length : 0,
+  };
+});
+
+if (await loadByTile('Curve Lattice')) {
+  await openComposer();
+  /*
+   * Hilbert 3D is customizable since the cube tile and the 3-D frame: its EIGHT moves, with the Lift column shown
+   * (it lifts), and the readout naming the rule it still is. Then Bush 3D — the one rule left disabled — picked
+   * through the same Rule select, with the growth-rule reason on the option.
+   */
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('customize');
+  await page.waitForTimeout(900);
+  const h = await customState();
+  chk('Hilbert 3D (Curve Lattice) is customizable: 8 moves, the Lift column shown, and it is still the named rule',
+    h.rule === 'customize' && h.steps === 8 && h.liftCol && /Same generator as Hilbert 3D/.test(h.prov) && /Valid/.test(h.status),
+    `${h.steps} steps, lift column ${h.liftCol}, "${h.prov}", "${h.status}"`);
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('bush3d');
+  await page.waitForTimeout(900);
+  const b = await customState();
+  chk('on Bush 3D Customize is OFFERED but DISABLED, and the reason says it is a growth rule (a future phase)',
+    b.rule === 'bush3d' && b.optDisabled === true && /GROWTH rule/.test(b.optTitle) && /future phase/.test(b.optTitle),
+    JSON.stringify({ rule: b.rule, disabled: b.optDisabled }));
+}
+
+if (await loadByTile('Curve Weave')) {
+  await openComposer();
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('customize');
+  await page.waitForTimeout(900);
+  const m = await customState();
+  chk('Moore (Curve Weave) is customizable: the Hilbert 2D generator laid along a 4-step STARTING SHAPE, still Moore',
+    m.rule === 'customize' && m.steps === 4 && m.startOn === true && m.startRows === 4 && /Same generator as Moore/.test(m.prov),
+    `${m.steps} steps, starting shape ${m.startOn} with ${m.startRows} rows, "${m.prov}"`);
+}
+
+if (await loadByTile('Curve Koch Cesaro')) {
+  await openComposer();
+  const before = await customState();
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('customize');
+  await page.waitForTimeout(900);
+  const after = await customState();
+  chk('picking Customize RESETS NOTHING — Recursion, Yaw and its wobble read exactly as before (spec §3.3)',
+    after.rule === 'customize' && after.recursion === before.recursion && after.yaw === before.yaw
+    && after.yawSize === before.yawSize, `before ${before.recursion}/${before.yaw}/${before.yawSize} after ${after.recursion}/${after.yaw}/${after.yawSize}`);
+  chk('...the editor shows the RULE\'s generator (Koch: 4 moves) and the readout names the rule it still is',
+    after.steps === 4 && after.kinds === 'move,move,move,move' && /Same generator as Koch/.test(after.prov) && /Valid/.test(after.status),
+    `${after.steps} steps [${after.kinds}] · "${after.prov}" · "${after.status}"`);
+
+  const turn = page.locator('.tab-content[data-tab="composer"] input[aria-label="Step 2 turn"]');
+  await turn.fill('1.5');
+  await turn.dispatchEvent('change');
+  await page.waitForTimeout(900);
+  const edited = await customState();
+  chk('an edit to a step makes it a CUSTOM generator — the readout says so and the status stays valid',
+    /Custom generator/.test(edited.prov) && /Valid/.test(edited.status) && edited.steps === 4, `"${edited.prov}" · "${edited.status}"`);
+
+  const back = page.locator('.tab-content[data-tab="composer"] input[aria-label="Step 2 turn"]');
+  await back.fill('1');
+  await back.dispatchEvent('change');
+  await page.waitForTimeout(900);
+  const undone = await customState();
+  chk('...and UNDOING the edit makes it the named rule again (39.D8: no remembered source, only equality)',
+    /Same generator as Koch/.test(undone.prov), `"${undone.prov}"`);
+
+  const cs = await searchFor('step 2 turn');
+  chk('the settings search finds the editor\'s cells at the Composer',
+    cs.some((r) => /Composer/.test(r.path)), cs.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 3).join(' | '));
+  await page.locator(SEARCH_FIELD).fill('');
+
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('dragon');
+  await page.waitForTimeout(900);
+  const named = await customState();
+  chk('picking a NAMED rule again hides the editor and resets the rows to that rule (39.Q6)',
+    named.rule === 'dragon' && named.steps === 0 && /Named at/.test(named.prov), `${named.rule}, ${named.steps} step rows, "${named.prov}"`);
+}
+
+if (await loadByTile('Curve Thicket')) {
+  await openComposer();
+  await page.locator('.tab-content[data-tab="composer"] select[aria-label="Rule"]').selectOption('customize');
+  await page.waitForTimeout(900);
+  const p0 = await customState();
+  // The Plant: trunk, branch, RETRACE, trunk, branch, RETRACE, trunk. Delete step 2 (a branch) -> its retrace goes too.
+  await page.locator('.tab-content[data-tab="composer"] button[aria-label="Step 2 delete"]').click();
+  await page.waitForTimeout(900);
+  const p1 = await customState();
+  chk('deleting a MOVE takes the retrace that walks back along it (spec §4.4) — no orphan is left',
+    p0.kinds === 'move,move,retrace,move,move,retrace,move' && p1.kinds === 'move,move,move,retrace,move' && /Valid/.test(p1.status),
+    `[${p0.kinds}] -> [${p1.kinds}] · "${p1.status}"`);
+}
+
+if (await loadByTile('Curve Rosette Chain')) {
+  await openComposer();
+  const r = await customState();
+  chk('the Customize demo LOADS with its generator in the editor and no rule named (it equals none)',
+    r.rule === 'customize' && r.steps === 3 && /Custom generator/.test(r.prov), `${r.rule}, ${r.steps} steps, "${r.prov}"`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== Y. v8 Phase 42 — 3-D Symmetry: placement, the gated body, the layout rows, the notice ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * The owner placed it in Visual FX → Deformation beside Symmetry, and set the two factors SEPARATELY (2026-11-06):
+ * where the copies sit (a Ring or Sphere of n, or a solid's vertices / edges / faces) and how many share each place.
+ * DOM facts only: the row ORDER, the gate (a `display`), which rows each layout shows, Mirrors only once there are
+ * two copies at a place, and the notice — `N positions × M = T copies` — which the ENGINE's operator count feeds.
+ */
+await page.locator('.sl-tab-btn[data-tab="visual-fx"]').click();
+await page.waitForTimeout(800);
+const s3 = await page.evaluate(() => {
+  const root = document.querySelector('.tab-content[data-tab="visual-fx"]');
+  for (const h of root.querySelectorAll('[aria-expanded="false"]')) h.click();
+  const labels = Array.from(root.querySelectorAll('.sl-vfx-row .sl-vfx-label')).map((l) => l.textContent?.trim() ?? '');
+  const iSym = labels.indexOf('Symmetry'), i3 = labels.indexOf('3-D Symmetry');
+  const sel = root.querySelector('select[aria-label="3-D Symmetry"]');
+  const onSel = root.querySelector('select[aria-label="Solid Points"]');
+  const rowOf = (label) => Array.from(root.querySelectorAll('.sl-vfx-row')).find((r) => r.querySelector('.sl-vfx-label')?.textContent?.trim() === label);
+  const shown = (label) => { const r = rowOf(label); return !!r && r.offsetParent !== null; };
+  const note = () => Array.from(root.querySelectorAll('.sl-vfx-note')).map((n) => n.textContent ?? '').find((t) => /copies/.test(t)) ?? '';
+  const pick = (s, v) => { s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
+  const slide = (label, v) => { const i = rowOf(label)?.querySelector('input[type="range"]'); if (i) { i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); } };
+  const ROWS = ['Ring Positions', 'Sphere Positions', 'On', 'Copies at Each', '3-D Radius', '3-D Mirrors', 'Facing'];
+  const vis = () => Object.fromEntries(ROWS.map((l) => [l, shown(l)]));
+  const r = { order: [iSym, i3] };
+  const start = sel ? sel.value : null;
+  if (sel && onSel) {
+    pick(sel, 'off'); r.off = vis();
+    pick(sel, 'cube'); pick(onSel, 'vertices'); slide('Copies at Each', 1); r.cube = { rows: vis(), note: note() };
+    pick(onSel, 'faces'); slide('Copies at Each', 4); r.cubeFaces4 = { rows: vis(), note: note() };
+    pick(sel, 'ring'); slide('Ring Positions', 5); slide('Copies at Each', 2); r.ring = { rows: vis(), note: note() };
+    pick(sel, 'sphere'); slide('Sphere Positions', 30); slide('Copies at Each', 1); r.sphere = { rows: vis(), note: note() };
+    slide('Sphere Positions', 6); pick(onSel, 'vertices');
+    pick(sel, start ?? 'off');
+  }
+  return r;
+});
+const rowsAre = (v, want) => !!v && Object.entries(want).every(([k, on]) => v[k] === on);
+chk('3-D Symmetry sits in the Deformation section directly after Symmetry (owner)',
+  s3.order[0] >= 0 && s3.order[1] > s3.order[0] && s3.order[1] - s3.order[0] <= 2, JSON.stringify(s3.order));
+chk('...its body is HIDDEN while Off; each layout shows only its own count row — Ring Positions, Sphere Positions, or On for a solid (31.U)',
+  rowsAre(s3.off, { 'Ring Positions': false, 'Sphere Positions': false, On: false, 'Copies at Each': false, '3-D Radius': false, Facing: false })
+  && rowsAre(s3.cube?.rows, { 'Ring Positions': false, 'Sphere Positions': false, On: true, 'Copies at Each': true, '3-D Radius': true, Facing: true })
+  && rowsAre(s3.ring?.rows, { 'Ring Positions': true, 'Sphere Positions': false, On: false })
+  && rowsAre(s3.sphere?.rows, { 'Ring Positions': false, 'Sphere Positions': true, On: false }),
+  JSON.stringify({ off: s3.off, cube: s3.cube?.rows, ring: s3.ring?.rows, sphere: s3.sphere?.rows }));
+chk('...3-D Mirrors is shown only with two or more copies at each position',
+  s3.cube?.rows?.['3-D Mirrors'] === false && s3.cubeFaces4?.rows?.['3-D Mirrors'] === true && s3.ring?.rows?.['3-D Mirrors'] === true
+  && s3.sphere?.rows?.['3-D Mirrors'] === false, '');
+chk('...and the notice multiplies the ENGINE\'s factors (cube vertices 8 × 1, faces 6 × 4 = 24 with the thinning warning, ring 5 × 2, sphere 30 × 1)',
+  /^8 positions × 1 = 8 copies/.test(s3.cube?.note ?? '') && /^6 positions × 4 = 24 copies/.test(s3.cubeFaces4?.note ?? '')
+  && /thins/.test(s3.cubeFaces4?.note ?? '') && /^5 positions × 2 = 10 copies/.test(s3.ring?.note ?? '') && !/thins/.test(s3.ring?.note ?? '')
+  && /^30 positions × 1 = 30 copies/.test(s3.sphere?.note ?? ''),
+  `${s3.cube?.note} | ${s3.cubeFaces4?.note} | ${s3.ring?.note} | ${s3.sphere?.note}`);
+const sy = await searchFor('3-d symmetry');
+chk('the settings search finds 3-D Symmetry at Visual FX', sy.some((r) => /Visual FX/.test(r.path)),
+  sy.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 3).join(' | '));
+await page.locator(SEARCH_FIELD).fill('');
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

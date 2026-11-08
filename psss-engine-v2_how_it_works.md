@@ -53,6 +53,7 @@ substantially the original mathematics. The full account is
     - [4D rotation](#4d-rotation)
     - [Depth ordering](#depth-ordering)
     - [Symmetry](#symmetry)
+    - [3-D Symmetry](#3-d-symmetry)
   - [1.4 Strange attractors](#14-strange-attractors)
     - [1.4.1 Continuous systems — integrated ODEs](#141-continuous-systems--integrated-odes)
     - [1.4.2 Discrete maps](#142-discrete-maps)
@@ -63,6 +64,8 @@ substantially the original mathematics. The full account is
     - [The model](#the-model)
     - [The bracket pop retraces](#the-bracket-pop-retraces)
     - [Resampling, and the two interpolations](#resampling-and-the-two-interpolations)
+    - [The generator builder — Twist and Stretch](#the-generator-builder--twist-and-stretch)
+    - [Customize — the generator as data](#customize--the-generator-as-data)
     - [Normalisation](#normalisation)
     - [Smoothness](#smoothness)
     - [Descend — the self-similar zoom](#descend--the-self-similar-zoom)
@@ -93,6 +96,7 @@ substantially the original mathematics. The full account is
   - [5.4 Volume](#54-volume)
   - [5.5 Liquid: the iso-surface](#55-liquid-the-iso-surface)
   - [5.6 Ribbons and neon lines](#56-ribbons-and-neon-lines)
+  - [5.6a Electric Discharge](#56a-electric-discharge)
   - [5.7 Depth and lighting cues](#57-depth-and-lighting-cues)
   - [5.8 Blending](#58-blending)
 - [6. Stage 6 — The Trail: Motion Blur as Feedback](#6-stage-6--the-trail-motion-blur-as-feedback)
@@ -639,7 +643,7 @@ result reads as a solid being deformed rather than as an image being distorted.
 ```
   waves + secular term → attractor blend → the five positional-nudge fields
         → 4D rotation → Twist → Taper + Bend → Inversion
-        → Box-fold → Symmetry fold                             ← this stage, in order
+        → Box-fold → Symmetry fold → 3-D Symmetry              ← this stage, in order
         → modelPos snapshot (crystals nucleate HERE)
         → 3D rotation → perspective projection
 ```
@@ -853,6 +857,43 @@ same `N` particles are divided between `k` arms, **each arm carries `N/k` of the
 Symmetry thins the figure unless the particle count is raised with it. **Mirror**, available once
 `k > 1`, alternates the handedness of successive sectors, turning a pinwheel into a true reflection
 pattern.
+
+#### 3-D Symmetry
+
+**3-D Symmetry** REPLICATES the figure around the centre, as the last model-space stage after the 2-D fold. Its
+copies are **positions × copies at each position**, and the two factors are set independently. A solid's symmetry
+group always factors this way (orbit × stabiliser: the cube's 24 rotations towards a vertex are 8 vertices × 3
+turns), so a group alone fixes both numbers; setting them separately reaches every count in between. Copy `c`
+has a unit position `d_c` and an orientation `M_c`; particle `i` is copy `c = i mod C`, moved `r · h` along its
+position (`h` = half the design box's shorter side, `r` = Radius) and scaled by `1 / (1 + r)`:
+
+```
+  p' = (M_c · p + r · h · d_c) / (1 + r)        c = i mod C,  C = positions × copies at each
+```
+
+- ⚠️ **Replicate, never fold.** A fold maps each point into one fundamental region, which cuts the curve at
+  every mirror plane — a solid has many, and a 3-D fold reads as the figure chopped into multiplied line
+  segments. Replication keeps every copy whole; the copy index is a fixed function of `i`, so no particle
+  ever jumps between copies (nothing trips the teleport guards downstream).
+- **The positions.** A **Ring** of n is exact (`2πj/n` on the equator). A **Sphere** of n is a Fibonacci spiral,
+  even but not symmetric, because most n have no symmetric arrangement on a sphere. A **solid's** vertices, edge
+  midpoints or face centres are the exact ORBIT of one axis under the solid's rotation group, built once by
+  closure from generators: T for the tetrahedron (4 / 6 / 4), O for the cube (8 / 12 / 6) and the octahedron
+  (6 / 12 / 8), I for the icosahedron (12 / 30 / 20) and the dodecahedron (20 / 30 / 12). Duals share a group and
+  swap axes, so the octahedron's vertices are the cube's face centres. The order is deterministic, so a
+  particle's copy never changes between frames or sessions.
+- **The orientation.** `M_c = F_p · L_k`: `L_k` turns copy `k` of a position by `2πk / (copies at each)` about z
+  and, with **Mirrors**, reflects every second one (y → −y). `F_p` is the facing: **Outward** is the minimal
+  rotation taking z to the position (a half-turn about x for −z), so the local turns happen about the radial
+  axis; **Parallel** is the identity.
+- **Radius** reaches 3 half-extents: a figure is itself about one half-extent in radius, so below about 1.5
+  neighbouring copies overlap and above it they separate. The `1 / (1 + r)` fit keeps the arrangement at the
+  figure's size.
+- **Density divides by C.** The row's notice multiplies the two factors out and states the particles each copy
+  gets, and from 24 copies it says the figure thins; the particle count is never raised automatically.
+- **Off is a branch** — the stage does not run — so a preset without the keys is bit-identical. In the Mixer
+  the arrangement, counts, mirrors and facing snap at the midpoint and the radius lerps; the Randomiser does
+  not roll them. The preview tiles apply it, so a tile shows the same arrangement as the main view.
 
 ### 1.4 Strange attractors
 
@@ -1069,11 +1110,123 @@ builds rather than by rebuilding every frame:
 - **An angle** interpolates two builds at the ends of a bracket, and rebuilds only when the angle leaves
   it. ⚠️ **The bracket width is declared per rule and is derived from a measured error budget**, because
   the figure's sensitivity to its angle differs by more than an order of magnitude across the rule set.
-  ⚠️ **The error also grows with recursion at a fixed width** — a deeper curve composes more rotations —
-  so a width holds only up to the depth it was solved at.
+  ⚠️ **The error is not monotone in recursion on every rule** — on most it grows with depth, on Hilbert 2D
+  it falls and on Gosper it peaks at depth 1 — so each width is the **minimum** over every depth in the
+  rule's range and over a solve centred on its own demo's sweep.
   On the space-filling rules the bracket is below the point of usefulness — a deep Hilbert curve is not a
   near-linear function of its angle at any workable width — so those rules **bypass it and rebuild each
   frame**, which the Composer states in a note.
+
+#### The generator builder — Twist and Stretch
+
+Every rule is also **k scaled copies of itself laid along a k-segment generator**, each copy with a
+reverse flag and an orientation about its own axis. For a rule that draws junctions (an *edge* rule) the
+generator is simply the rule's own depth-1 walk, so the turn angle needs no second encoding; the copies
+are composed level by level as similarity transforms. Two parameters exist only in this model:
+
+- **Twist** adds an angle to the orientation of the rule's *twistable* copies. On the dragon the second
+  copy is twistable, and a half-turn of it **is the Lévy C curve** (and the converse), so one continuous
+  parameter folds one named fractal into another through 3-D intermediates.
+- **Stretch** is one factor on the rule's *stretchable* steps — the Plant's two branches and their
+  retraces — so the branches grow and recede at every level at once while the trunk keeps its length.
+
+Each is **one shared value with a per-copy mask**, never a value per copy.
+
+⚠️ **The turtle stays the builder at the identity** (twist 0, stretch 1, neither breathing), so a preset
+that uses neither is bitwise what it was. Off the identity the generator builds the bracket corners, and
+its output is carried into the **turtle's own frame** — the exact depth-n chord is computed from each
+symbol's net displacement and turn, level by level, and the first step decides a mirror — so the hand-over
+is continuous to rounding. ⚠️ The generator reproduces the turtle point for point on every rule it covers.
+
+⚠️ **Exactly one shape axis is bracketed, and only while it is the only one breathing.** Angle, twist and
+stretch brackets are each solved with the other two held, so with two or more breathing the corners are
+built at the exact values every frame; the generator affords it, building faster than the turtle.
+
+⚠️ **Stretch resamples by arc length.** Index resampling equals arc-length resampling only while every
+segment has the same length; a stretched step breaks that and the break compounds with depth, so while
+Stretch is off its identity the list is resampled at equal steps of length. At the identity the index walk
+is kept, which is why no unstretched figure changes.
+
+**Cell rules.** Hilbert 2D and Peano emit cell **centres**, not junctions, so their generator is an
+explicit junction path and each leaf emits the centre of its **tile** (the square with the copy as an edge,
+or as its diagonal). The tiles exist only at the lattice angle, so ⚠️ **on these two rules Twist and Yaw
+are mutually exclusive** — while Twist acts the turn angle is held at the landmark. Hilbert 3D, Moore,
+Bush 3D and the turtle-only rules have no Twist row.
+
+#### Customize — the generator as data
+
+Under the `Customize` rule the generator is stored in the preset (`generators.lsystem.custom`, present only
+while the rule is `customize`): a list of steps — a **move** with a turn and a lift in units of Yaw and Pitch,
+a length, a reverse flag, an orientation and the Twist / Stretch masks, or a **retrace** — plus a draw mode
+(`path` or `cells`) and a frame. Walking the steps gives the generator polyline, which is normalised to a unit
+chord; the depth-n curve is the same copy composition as the named rules', through the same transforms.
+
+- **A turn is relative to the previous heading** (`heading_i = heading_{i−1} + turn_i · yaw`, then the same for
+  lift about the left axis), so step 1's turn only rotates the whole polyline — which the chord normalisation then
+  removes. So the shape is carried by the turns from step 2 on: the edge rules seed step 1 as 0, and Hilbert 2D's
+  cell generator keeps its stored lattice units (+1 first), which draws the same figure. `orient` is a rotation of the copy's FRAME about its own segment, never a heading change. Example: Terdragon
+  seeds as turns 0, +1, −1 at yaw 120°, every other flag off; its triangles are not in the generator — every
+  segment at every level lies on one of three directions 120° apart, so the depth-n path runs along a
+  triangular lattice.
+- ⚠️ **A retrace stores nothing.** It walks back along the most recent move not yet retraced, and its segment,
+  flags (reverse inverted) and the heading after it are that move's — so the out-leg and its return leg can
+  never disagree.
+- ⚠️⚠️ **Choosing `Customize` is a visual no-op, by routing.** The seed is the current rule's generator, read off
+  its depth-1 walk (turn units are heading changes divided by Yaw; a segment that undoes the last open move is a
+  retrace), and every parameter is kept. While the generator is **structurally equal** to a named rule's — deep,
+  exact equality of steps and draw mode — the one resolver hands back that rule and the figure is built by the
+  rule's own path, so the picture is bit-identical at any recursion. The first structural edit leaves the rule;
+  undoing it returns. Nothing records where a generator came from: equality alone decides.
+- **The frame is fitted at seeding.** The custom build of the seed is matched to the rule's own drawing by a
+  similarity (rotation and mirror) at the current recursion, and stored, so the first edit does not spin the
+  figure. A seed that leaves the plane (Hilbert 3D) stores a full 3-D basis instead — one of the 48 signed axis
+  permutations, exact because both drawings lie on the cube lattice. Where the current angle leaves the generator
+  with no chord, the frame is fitted at the published angle instead.
+- **Every rule seeds except Bush 3D.** A rule's structure comes from its generator flags where it has them, and
+  otherwise from a Customize-only table that does not touch the named rule's rows: ⚠️ the two questions — *does
+  the named rule get a Twist row* and *can it seed Customize* — are separate tables, because Hilbert 3D has an
+  exact generator but no usable Twist. Hilbert 3D is eight unit moves on the cube lattice with Turn and Lift (no
+  roll needed), each copy oriented, drawn through cube centres; Moore is Hilbert 2D's generator on a **starting
+  shape**. Bush 3D is a growth rule (new branches at the tips, stems that lengthen) rather than a self-similar
+  subdivision, so it has no generator; `Customize` is offered but disabled there, and a plant-growth editor is a
+  future phase.
+- **The starting shape** (the spec's initiator) is an optional second step list walked with the same law but not
+  normalised — it may close. Each of its segments carries one copy of the depth-n generator, so a starting shape
+  of m segments has m · kⁿ leaves (the recursion bound divides the budget by m). One plain straight step is the
+  absent starting shape — the same drawing, and the same rule under equality — so switching it on is a no-op.
+  Moore is four steps up the square's centre line, a U-turn and back down: its four Hilbert quadrants have their
+  chords on that line, and each square tile lies to one side of its step.
+- **Validation runs on every build.** Fewer than 2 or more than 16 steps, a retrace with nothing open, or a
+  non-positive length cannot be drawn at any angle, and a stored generator failing them resolves to the default
+  rule on load (the generator itself is kept). A path whose end returns to its start — chord under 2 % of the
+  path length — fails at that angle only, and the figure keeps its **last valid build** while it does. A step
+  as long as the whole chord is a **warning**, not a failure: the named rules do it inside their own ranges
+  (the dragon above 90°) and draw correctly, because at a finite depth a non-contracting generator is still
+  exact — it grows with depth and the extent fit absorbs that.
+- **The recursion bound is derived**, `floor(log 65 536 / log k)` for k steps, never authored. There is **no
+  shape bracket** on this path (a bracket width is solved per named rule against an error budget; a custom
+  generator has none to solve), so a breathing Yaw, Pitch, Twist or Stretch rebuilds at the exact value each
+  frame, and a still figure builds once and is memoised. The list is resampled by arc length whenever the
+  steps are unequal.
+- ⚠️ **`Cells` and `Descend` are earned, not declared.** A planar generator with k = s² steps, or a 3-D one with
+  k = s³, passes the space-filling check if, at the 90° lattice with Twist 0 and Stretch 1, its depth-2 tile
+  centres are all distinct and every consecutive pair is one cell apart — trying the edge square, then the
+  diagonal square, or for 3-D the edge cube. Passing grants `Cells` (turns and lifts held at 90°) and `Descend`,
+  with `s` as the zoom octave and the tile's dimension as the zoom's; Descend acts only at the space-filling
+  shape, Twist 0 and Stretch 1, and not with a starting shape — the index window is a spatial one only inside a
+  single tile's grid.
+- **Density readout.** The build is resampled to 4 096 points along its length and binned on a 32-cell grid;
+  the readout is the 99th percentile over the median of the occupied cells' counts. The bands are the
+  library's own envelope — the named rules read 1.0 to 5.3 — so *clumpy* (above 5.5) means worse than any
+  named rule.
+- The Mixer snaps the generator with the rule and never interpolates it; the Randomiser never produces
+  `Customize`, and Evolution moves the curve block whole.
+
+⚠️ **Hill tetrahedron is not in the rule set, by measurement.** Its standard refinement (Maubach bisection of
+the Kuhn simplex) is exactly self-similar — every third generation is eight copies at ½ — but no
+single-generator traversal of that dissection is continuous, whatever its entry and exit points, and the
+traversal that is continuous by construction (always bisect the entry–exit edge) degenerates into needles
+without limit. An exact curve on it would need several generators, which this model does not have.
 
 #### Normalisation
 
@@ -1096,12 +1249,14 @@ change the figure's scale — it cuts corners, which is the whole visual effect.
 
 #### Descend — the self-similar zoom
 
-Effective recursion is `recursion + log2(descend)`, and the index window narrows by the same factor. So
+Effective recursion is `recursion + log(descend)/log(s)`, where **s** is the rule's subdivision factor —
+2 for Hilbert, whose levels halve a cell, and 3 for Peano, whose levels third it — and the index window
+narrows by the same factor. So
 the particle budget stays entirely on screen and the figure **reveals new structure** instead of being
 magnified. `Figure Scale` cannot do this: it maps the same points over a larger area, so a lattice
 becomes a few squares and then a dot.
 
-⚠️ **The window is snapped to a power-of-two sub-cube boundary, and that alignment is not an
+⚠️ **The window is snapped to an aligned `s^k` sub-cube boundary, and that alignment is not an
 optimisation.** An aligned sub-cube is visited as **one contiguous run of indices**; an arbitrarily
 placed box of the same size is not, and a band taken from its extremes contains stretches of curve from
 elsewhere in the figure. The symptom is that the spacing between particles drifts as the zoom deepens
@@ -1112,8 +1267,14 @@ disabled — everywhere else, because on a rule without that property the band i
 picture, but not a zoom.
 
 ⚠️ **Its depth is bounded by cost rather than by arithmetic.** Each octave multiplies the symbol count,
-so the ceiling is two levels above the rule's own recursion range — roughly two octaves of genuinely new
-detail. The clamp is reported rather than silent.
+so the ceiling is one level above the rule's own recursion range: a second level costs a rebuild of
+tens to hundreds of milliseconds at every octave crossing, a visible hitch. The clamp is reported rather
+than silent.
+
+⚠️ **Descend wins over Twist and Stretch.** The contiguous window exists only at the space-filling shape,
+so while the curve descends the two shape axes are ignored. ⚠️ **The band holds a constant number of cells,
+set by the BASE recursion** — (cells per axis at that recursion)^dimension — so a zoom from a shallow base
+draws a coarse curve of a few long strokes; the base recursion is what sets the detail on screen.
 
 #### What this figure source inherits, and what it does not
 
@@ -1773,14 +1934,51 @@ They are **mutually exclusive** — enabling one disables the other.
 
 - **Ribbon** builds a triangle strip along the curve with a width in pixels, giving the path an inside
   and an outside; past a certain width it occludes itself where the curve crosses.
-- **Neon Lines** emits glowing line segments between consecutive particles. Past about 4 px the
-  segments merge into a solid band and the wireframe reading is lost, and the effect depends on the
-  particle count being low enough for individual segments to be legible.
+- **Neon Lines** draws each particle's **own recent path** — its last eight positions on screen — as
+  a glowing stroke, so a moving figure leaves short light-trails and a motionless one leaves none. Past
+  about 4 px the strokes merge into a solid band and the wireframe reading is lost, and the effect depends
+  on the particle count being low enough for individual strokes to be legible.
+  ⚠️ **The strokes are built on the graphics card.** The trail history lives in a float texture laid out
+  so that the newest sample of every particle is one contiguous block, and only that block is uploaded each
+  frame — about 8 floats per particle; the vertex shader reads the two ends of each segment and builds its
+  quad, applying the frozen-sample and teleport skips itself (the teleport threshold is still computed on
+  the CPU from the same history). Expanding the quads on the CPU instead costs 196 floats per particle per
+  frame, which halves the frame rate at 40 000 particles.
 
 > ⚠️ **A vertex buffer shorter than its draw call is dropped entirely by ANGLE** — the whole draw
 > silently produces nothing. Two passes that share a VAO must therefore both upload every per-instance
 > buffer at the correct length, and length tests must compare against `state.count` rather than test
 > for a null array.
+
+### 5.6a Electric Discharge
+
+A full-screen pass on the finished image, between the reel cross-fade and Bloom, with **two buffers of its
+own**. Each frame it forms the blend `decay · previous + (1 − decay) · image`, computes the gradient of
+that blend's coverage, and resamples **both** inputs displaced **toward** the gradient — Translation Map
+style 7 with *Invert* on, i.e. diffusion run backwards, which keeps collapsing light into thin unstable
+filaments. The result **replaces** the image.
+
+- ⚠️ **Replace, not add.** Adding a pinched copy over the untouched image reads as extra glow with no
+  crackle; the crackle is the halo itself being torn into filaments.
+- ⚠️ **The warp acts on the blend, not on the previous buffer alone.** Warping only the history lays the
+  fresh light down unwarped, and that smooth layer keeps the halo intact.
+- ⚠️ **The feed is energy-neutral** (`deposit = 1 − decay`): with no pull the buffer settles to the image
+  itself, so the effect changes structure, not brightness.
+- **Intensity** is the pull in the same units as a refraction layer's strength (a fraction of
+  `min(w,h)`), **Filament** the gradient reach in pixels. **Crackle** sets the buffer's decay (0.9 calm to
+  0.5 violent) and a deterministic per-frame jitter of where the gradient is sampled, which keeps a slow
+  figure from settling into a static pattern. **Branching** adds the direction of a drifting curl-noise
+  field, measured in an isotropic domain (`min(w,h)` on both axes), scaled to the pull.
+- ⚠️ **Off is a branch**: the pass does not run, and Branching 0 skips the noise inside the shader. The
+  buffers are cleared on a preset change and when the effect is switched on, so stale filaments never flash.
+- It never writes the trail, so a preset's own decay and Translation Map are untouched. The preview grid
+  does not run it, as it does not run neon lines.
+- ⚠️⚠️ **It is coupled to Neon Lines.** The crackle is the lines' glow being torn apart; on crisp points or
+  ribbons there is no soft field to climb and the pull only thins and dims the figure (a self-supplied halo
+  was tried and rejected: it washes the lined case out and still gives no crackle without lines). So the
+  engine enforces both directions in one place, `coupleDischargeToLines()` in `main.ts`, called after
+  every write of the lines flag: enabling the discharge enables the lines (ending ribbons), and lines off ⇒
+  discharge off, including when a preset or a Mixer blend arrives with the discharge on and no lines.
 
 ### 5.7 Depth and lighting cues
 
@@ -4628,9 +4826,13 @@ fix.
 | Control | Needs | When unmet it looks like | Fix |
 |---|---|---|---|
 | **Every curve row** | `Figure type` set to **Self-similar curve** | The rows are not merely inert — they are **absent**, because the two types have mutually exclusive bodies. If you are looking for them on a wave preset there is nothing to find. | Switch the type at the top of the Composer. Your wave settings are kept. |
-| **Pitch**, **Roll** | a rule whose pattern contains pitch or roll turns | **Absent, not disabled.** Most rules are flat and turn in one plane, so two of the three angle rows simply do not appear. Only two of the thirteen rules use them. | Pick a rule that turns in three dimensions; the provenance line under **Rule** is the quickest way to tell. |
+| **Pitch**, **Roll** | a rule whose pattern contains pitch or roll turns | **Absent, not disabled.** Most rules are flat and turn in one plane, so two of the three angle rows simply do not appear. Only two of the fifteen rules use them, and on **Bush 3D** Yaw is absent too: its turns sit in a part of the pattern that draws nothing, so the row would move nothing. | Pick a rule that turns in three dimensions; the provenance line under **Rule** is the quickest way to tell. |
 | **Descend** | a rule whose structure can be indexed backwards | **Absent on most rules.** Without that property a zoom would select scattered pieces of the curve rather than one region — a picture, but not a zoom — so the control is withheld instead of lying. | Pick a rule that supports it. |
-| **Descend**, at depth | headroom below the cost ceiling | The figure stops revealing new detail and the spacing between particles begins to drift. The readout reports the clamp. | Lower **Recursion** to buy depth, or accept the ceiling: it is about two octaves of genuinely new structure. |
+| **Descend**, at depth | headroom below the cost ceiling | The figure stops revealing new detail and the spacing between particles begins to drift. The readout reports the clamp. | Lower **Recursion** to buy depth, or accept the ceiling: one level of genuinely new structure. |
+| **Twist** | a rule with copies to twist (Dragon, Lévy C, Sierpinski-Knopp, Plant, Hilbert 2D, Peano) | **Absent** on every other rule. | Pick one of those rules. |
+| **Twist**, on Hilbert 2D or Peano | Yaw at its landmark with no wobble | The Twist rows are **greyed out**, and a note under them says why: the lattice these two twist exists only at that angle. | Set Yaw back to its landmark, or leave Twist at 0 and use Yaw. |
+| **Twist**, **Stretch** | Descend at 1× | They have **no effect** while the curve descends: the zoom needs the space-filling shape. | Set Descend to 1×. |
+| **Stretch** | a branching rule (Plant) | **Absent** on every other rule. | Pick Plant. |
 | **Smoothness** | a value above 0 | At exactly 0 the stroke is drawn precisely as the rule produces it, with no spline evaluated at all. That is the intended identity, not a failure. | Raise it. The visible range is the lower half; the top is measurably flat. |
 | **The trail**, **ribbons**, **neon lines** | at least one modulated curve parameter, or a non-zero Rotation | A completely static curve gives the trail nothing to accumulate and the trajectory renderers nothing to join, so all three go quiet while appearing to be on. | Give one row a non-zero **Depth** and **Rate**. Every shipped curve preset does. |
 | **Ribbon Mode: Streaks** | particles with real velocity | **The figure disappears** and is replaced by a sparse field of isolated dots. A ribbon mode draws instead of the points, and this one draws along each particle's motion — on a slowly-turning curve there is almost no motion to draw along. Measured mean brightness 0.19 of 255. | Use **Hybrid**, which does not read velocity, or raise **Rotation** until the figure is genuinely moving. |

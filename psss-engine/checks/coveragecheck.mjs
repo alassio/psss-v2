@@ -909,6 +909,14 @@ const BOOL_STATUS = {
    */
   'overlay.dye.showFigure': { status: 'EXEMPT', reason: 'the `true` leaf is the DEFAULT and resolves live on every preset that omits the key, so it is exercised library-wide while authored nowhere; the two bodies carrying the key are dye demos authoring `false`. Authoring `true` would write a no-op into a preset body, which is the shape under which a real retune hides.' },
   'overlay.growth.enabled': { status: 'EXEMPT', reason: 'growth is exempt by 21.D5 — Phase 9 mostly cut, Phases 10 and 12 HELD, and `overlay.growth` is import-only.' },
+  /*
+   * v8 `39.C` — the custom generator's two boolean leaves that its ONE library carrier (`Curve Rosette Chain`, a TWIST
+   * subject) never sets true. ⚠️ Both are EXERCISED, by a measuring instrument rather than a body: authoring a
+   * stretchable step or a mirrored frame into an unreviewed demo only to discharge a census would change the demo's
+   * figure for no visual reason — the shape under which a real retune hides (this file's own `showFigure` note).
+   */
+  'generators.lsystem.custom.steps[].stretchable': { status: 'EXEMPT', reason: 'Stretch on a custom generator is the named rules\' Stretch with the mask as data; the library carrier of Stretch is the Plant (`Curve Breathing Thicket`), the editor seeds the Plant\'s mask (`figurecheck` §K2), and the one Customize demo is a Twist subject.' },
+  'generators.lsystem.custom.frame.mirror': { status: 'EXEMPT', reason: 'a CAPTURED fact, not an authored choice: the frame is fitted when Customize is picked, and the Hilbert 2D and Peano seeds capture `mirror: true` (measured, `figurecheck` §K2 draws both through it); the demo was authored in the chord frame.' },
 };
 /*
  * ⚠️ **A `true` IS NOT AN ACTIVATION, AND THIS IS THE ONE PATH WHERE THE DIFFERENCE IS THE WHOLE FINDING.** The

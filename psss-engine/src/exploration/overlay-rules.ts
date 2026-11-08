@@ -469,6 +469,24 @@ export const UNCONDITIONAL_KEYS = [
   'travelDepthX', 'travelDepthY', 'travelDepthZ',
   'travelRateX', 'travelRateY', 'travelRateZ',
   'sharpnessDepth', 'sharpnessRate',
+  /*
+   * v8 Phase 40 — Electric Discharge's four AMOUNTS, re-derived because `mixercheck` §C reported them ADDED (14
+   * paths each, at t = 0 over a deck A with no discharge). ⚠️ **Inert at every reader, twice over:** (1) the SWITCH
+   * `dischargeEnabled` SNAPS and is not on this list, so at t = 0 the result carries deck A's absent switch, `main.ts`
+   * reads it as off and `electricDischarge.apply()` never runs — the amounts are not read at all; (2) the value
+   * written is the IDENTITY, which `SCALAR_IDENTITIES` pins equal to `DISCHARGE_DEFAULTS`, i.e. the `?? default`
+   * every apply site reads. And the export is value-gated on those defaults, so no exported preset gains the keys.
+   */
+  'dischargeIntensity', 'dischargeFilament', 'dischargeCrackle', 'dischargeBranching',
+  /*
+   * v8 Phase 42 — `sym3dRadius`, re-derived because `mixercheck` §C reported the lerped distance ADDED on 22 paths at
+   * t = 0 (a deck with no 3-D Symmetry lerped against one with it, written as 0). ⚠️ **Inert at every reader, twice
+   * over:** (1) the ARRANGEMENT `sym3dLayout` SNAPS and is not on this list, so at t = 0 the result carries deck A's
+   * absent layout, read as `off`, and the operator never runs — the radius is not read at all; (2) the value written is
+   * the identity, which `SCALAR_IDENTITIES` pins equal to `SYM3D_DEFAULTS.radius`, the `?? default` every reader uses.
+   * The export is gated on the layout, so no exported preset gains the key.
+   */
+  'sym3dRadius',
 ] as const;
 
 /**
@@ -554,6 +572,27 @@ export const OVERLAY_RULES = {
   },
   lineWidth: { group: 'visual', law: { kind: 'snap' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
     scale: { kind: 'mul' },
+  },
+  /*
+   * ── v8 Phase 40 — Electric Discharge. The switch SNAPS (invariant 16: a half-on effect is meaningless); the four
+   * amounts LERP, so a crossfade between two discharging presets blends the crackle rather than jumping. ⚠️ None
+   * rolls: like Neon Lines it is a look a preset is authored around, and a re-roll would add it to presets with no
+   * figure to discharge from.
+   */
+  dischargeEnabled: { group: 'visual', law: { kind: 'snap' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'categorical' },
+  },
+  dischargeIntensity: { group: 'visual', law: { kind: 'lerp' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'none', why: 'An effect strength read only while the switch is on; no scaler owns it.' },
+  },
+  dischargeFilament: { group: 'visual', law: { kind: 'lerp' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'none', why: 'A screen-space width in pixels, read only while the switch is on.' },
+  },
+  dischargeCrackle: { group: 'visual', law: { kind: 'lerp' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'none', why: 'A 0..1 character control, read only while the switch is on.' },
+  },
+  dischargeBranching: { group: 'visual', law: { kind: 'lerp' }, mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'none', why: 'A 0..1 character control, read only while the switch is on.' },
   },
 
   // ── The GRADE, as ONE bundle from ONE winning side (23.D2) and ONE draw (24.D13). `customFilmLookParams`
@@ -766,6 +805,48 @@ export const OVERLAY_RULES = {
   symmetryMirror: {
     group: 'visual', law: { kind: 'custom', owner: 'mixSymmetry' },
     mutate: { kind: 'frozen', why: 'Follows symmetryFold, which is frozen: a mirror of no fold is nothing.' },
+    scale: { kind: 'categorical' },
+  },
+
+  /*
+   * ── v8 Phase 42 — 3-D Symmetry, five flat keys. ⚠️ The GROUP, its sides, the mirror flag and the direction are
+   * CATEGORICAL and SNAP at t = 0.5 (invariant 16; `42.D7`) — there is no halfway point group. The Offset is a
+   * distance and LERPS. None rolls: a group is an arrangement OF the figure, not a new figure (`symmetryFold`'s
+   * argument verbatim).
+   */
+  sym3dLayout: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'An arrangement OF the figure, not a new figure — symmetryFold’s argument.' },
+    scale: { kind: 'categorical' },
+  },
+  sym3dPositions: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: a count of copies names a different arrangement, not a value along one.' },
+    scale: { kind: 'categorical' },
+  },
+  sym3dOn: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: vertices, edges or faces of the solid, not a value.' },
+    scale: { kind: 'categorical' },
+  },
+  sym3dLocal: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: a count of copies, and half a copy does not exist.' },
+    scale: { kind: 'categorical' },
+  },
+  sym3dRadius: {
+    group: 'visual', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout, which is frozen: a radius with no arrangement moves nothing.' },
+    scale: { kind: 'none', why: 'A distance read only while an arrangement is on; no scaler owns it.' },
+  },
+  sym3dMirrors: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: mirroring is a choice, not a strength.' },
+    scale: { kind: 'categorical' },
+  },
+  sym3dFacing: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: outward or parallel, not a value.' },
     scale: { kind: 'categorical' },
   },
 

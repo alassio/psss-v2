@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.3.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.3.0](https://github.com/alassio/psss-v2/releases/tag/v1.3.0)** — **New since the first public release: a second figure type, self-similar curves.** Alongside the wave figures, PSSS now draws fractal curves built from thirteen production rules (Hilbert, dragon, Koch, Gosper, Moore and more), with fourteen demo presets to start from.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.3.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.7.0.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.7.0](https://github.com/alassio/psss-v2/releases/tag/v1.7.0)** — **New since v1.3.0: 3-D Symmetry, an editor for your own self-similar curves, and Electric Discharge.** Repeat any figure in three dimensions on a ring, a sphere or a solid; design a curve generator step by step and watch it grow; and tear Neon Lines into crackling filaments. Twenty-three new demo presets show them off.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.7.0)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
@@ -114,9 +114,9 @@ specifications were actually extracted from. It is kept separate rather than pub
 |---|---|
 | `main.ts` | The frame loop and all the wiring between the parts. |
 | `core/` | Shader compilation, projection, rotation, noise, shared types. |
-| `generators/` | What makes the particles move and take colour: waves, attractors, materials, crystals, sparks. |
+| `generators/` | What makes the particles move and take colour: waves, attractors, self-similar curves (and their Customize generators), materials, crystals, sparks. |
 | `renderers/` | How a particle becomes pixels: the main particle pass, ribbons, neon lines, film looks. |
-| `post-processors/` | Whole-image stages: the warp chain, bloom, tone mapping, the fluid and dye fields. |
+| `post-processors/` | Whole-image stages: the warp chain, Electric Discharge, bloom, tone mapping, the fluid and dye fields. |
 | `presets/` | The preset library, its format, migration of older presets, and the reel store. |
 | `exploration/` | The Lab's logic: mixing, randomising, evolution, shared state. |
 | `ui/` | The preview grid and the Synthesis Lab panel with its tabs. |

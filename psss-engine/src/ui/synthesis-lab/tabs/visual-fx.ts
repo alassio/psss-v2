@@ -6,6 +6,11 @@ import type { RenderMode, WaveConfig } from '../../../core/interfaces.ts';
 import type { OverlayState, FilmLookParams, IfsTransform, PhysarumConfig, FluidAdvectionConfig, MaterialConfig, BuoyancyConfig, SparkConfig, VolumeRenderConfig, LiquidSurfaceConfig, LiquidTintSource, LiquidColourMixModel, CohesionConfig, LiquidFieldConfig, LiquidSeedPattern, DyeFieldConfig, ColourRampName, ProceduralFlowConfig, FluidFeedbackConfig, CrystalRenderConfig, UnifiedPreset, TransMapLayer, TransMapStyle, ForceGateSource, SinMagicParams } from '../../../presets/types.ts';
 import { CUSTOMIZE_FILM_LOOK, type PaletteMapping } from '../../../renderers/film-looks.ts';
 import {
+  SYM3D_LAYOUTS, SYM3D_LAYOUT_LABELS, SYM3D_ONS, SYM3D_ON_LABELS, SYM3D_FACINGS, SYM3D_FACING_LABELS,
+  SYM3D_POSITIONS_RANGE, SYM3D_LOCAL_RANGE, SYM3D_RADIUS_RANGE, SYM3D_THIN_COPIES, sym3dPositions,
+  type Sym3dConfig, type Sym3dLayout, type Sym3dOn, type Sym3dFacing,
+} from '../../../core/symmetry-groups.ts';
+import {
   PALETTE_MAPPING_LABELS,
   PALETTE_MAPPING_ORDER,
   // ⚠️ `PALETTE_UNSET` is deliberately NOT imported since 21.4g: this tab neither offers "inherit" as an
@@ -898,6 +903,10 @@ export interface VisualFxControls {
   setRibbonWidth(w: number): void;
   getLinesEnabled(): boolean;
   setLinesEnabled(on: boolean): void;
+  /** v8 Phase 40 — Electric Discharge: the switch and its four amounts, read and patched as one record. */
+  getDischarge(): { enabled: boolean; intensity: number; filament: number; crackle: number; branching: number };
+  setDischarge(patch: Partial<{ enabled: boolean; intensity: number; filament: number; crackle: number;
+    branching: number }>): void;
   getLineWidth(): number;
   setLineWidth(w: number): void;
   getFilmLook(): string;
@@ -1010,6 +1019,10 @@ export interface VisualFxControls {
   /** E30 Mirror: `true` = dihedral (sectors reflected), `false` = cyclic (sectors rotated). */
   getSymmetryMirror(): boolean;
   setSymmetryMirror(v: boolean): void;
+  /** v8 Phase 42 — 3-D Symmetry: the whole configuration, the number of copies it makes, and a patch setter. */
+  getSym3d(): Sym3dConfig;
+  getSym3dCopies(): number;
+  setSym3d(patch: Partial<Sym3dConfig>): void;
   /**
    * v8 `30.1` (`E129a`) — Barr twist per axis, in **turns per half-extent of the design box**.
    *
@@ -1766,6 +1779,13 @@ export class VisualFxTab implements TabModule {
   private dyeCyclesRow: HTMLElement | null = null;
   /** E30: the Mirror row, hidden at fold 1 where it has nothing to mirror. */
   private symmetryMirrorRow: HTMLElement | null = null;
+  /** v8 Phase 42 — the 3-D Symmetry body (hidden while Off), its layout-dependent rows, and the copies notice. */
+  private sym3dBody: HTMLElement | null = null;
+  private sym3dRingRow: HTMLElement | null = null;
+  private sym3dSphereRow: HTMLElement | null = null;
+  private sym3dOnRow: HTMLElement | null = null;
+  private sym3dMirrorsRow: HTMLElement | null = null;
+  private sym3dNote: HTMLElement | null = null;
   /**
    * v8 `34.D9` — the Z depth precondition under the `Offset` row. **The ONE inline string this phase adds**,
    * because a precondition is the single exception to *every `title` comes from `tooltips.ts`*.
@@ -1806,6 +1826,8 @@ export class VisualFxTab implements TabModule {
   private liquidFieldBody: HTMLElement = document.createElement('div');
   private dyeBody: HTMLElement = document.createElement('div');
   private neonBody: HTMLElement = document.createElement('div');
+  /** v8 Phase 40 — Electric Discharge's body, shown only while its switch is on (31.U's gate). */
+  private dischargeBody: HTMLElement = document.createElement('div');
   private curlBody: HTMLElement = document.createElement('div');
   private physarumBody: HTMLElement = document.createElement('div');
   private wAngleRow: HTMLElement | null = null;
@@ -1925,6 +1947,12 @@ export class VisualFxTab implements TabModule {
     this.dyeMapRow = null;
     this.dyeCyclesRow = null;
     this.symmetryMirrorRow = null;
+    this.sym3dBody = null;
+    this.sym3dRingRow = null;
+    this.sym3dSphereRow = null;
+    this.sym3dOnRow = null;
+    this.sym3dMirrorsRow = null;
+    this.sym3dNote = null;
     this.zDepthNote = null;
     this.gateBySelect = null;
     this.gateAmountRow = null;
@@ -2513,6 +2541,25 @@ export class VisualFxTab implements TabModule {
     show(this.dyeCyclesRow, dyeRampSource && (dyeCfg.mapping ?? 'depth') === 'index');
     // E30: Mirror selects between the dihedral and cyclic groups, and neither exists at fold 1.
     show(this.symmetryMirrorRow, this.controls.getSymmetryFold() > 1);
+    // v8 Phase 42 — the 3-D body exists while a layout is on; each layout shows only the rows it reads; the notice.
+    {
+      const s3 = this.controls.getSym3d();
+      const on = s3.layout !== 'off';
+      const solid = on && s3.layout !== 'ring' && s3.layout !== 'sphere';
+      show(this.sym3dBody, on);
+      show(this.sym3dRingRow, s3.layout === 'ring');
+      show(this.sym3dSphereRow, s3.layout === 'sphere');
+      show(this.sym3dOnRow, solid);
+      show(this.sym3dMirrorsRow, s3.local > 1);
+      if (this.sym3dNote && on) {
+        const places = sym3dPositions(s3).length;
+        const copies = this.controls.getSym3dCopies();
+        const each = Math.floor(this.controls.getParticleCount() / Math.max(1, copies));
+        this.sym3dNote.textContent = `${places} positions × ${Math.round(s3.local)} = ${copies} copies, about `
+          + `${each.toLocaleString('en-US')} particles each.`
+          + (copies >= SYM3D_THIN_COPIES ? ' From this many copies the figure thins; raise Particle Number to fill it.' : '');
+      }
+    }
     this.updateZDepthNote();
     // v8 30.2 — the three dependent fold rows. The ITERATION COUNT is the gate, in the engine and here.
     {
@@ -2572,7 +2619,8 @@ export class VisualFxTab implements TabModule {
         + on(this.controls.getInversion().amount > 0)
         + on(this.controls.getBoxFold().iterations > 0)
         + on(this.controls.getDeform4d().wScale > 0)
-        + on(this.controls.getSymmetryFold() > 1);
+        + on(this.controls.getSymmetryFold() > 1)
+        + on(this.controls.getSym3d().layout !== 'off');
       m.cDeform.setCount(deformN);
       m.gFigure.setCount(deformN + on(this.controls.getAttractorIndex() >= 0));
 
@@ -2580,7 +2628,8 @@ export class VisualFxTab implements TabModule {
       m.gParticles.setCount(on(this.controls.getRenderMode() !== 'star')
         + on(ch.size !== 0 || ch.alpha !== 0 || ch.light !== 0)
         + on(this.controls.getRibbonState() !== 'off')
-        + on(this.controls.getLinesEnabled()));
+        + on(this.controls.getLinesEnabled())
+        + on(this.controls.getDischarge().enabled));
 
       // ⚠️ The palette has TWO sources and `resolvePaletteSelection` owns the order; this reads the
       // SELECTION rather than either raw field, so the badge cannot disagree with what is drawn.
@@ -2600,6 +2649,7 @@ export class VisualFxTab implements TabModule {
     show(this.liquidFieldBody, this.controls.getLiquidFieldConfig().enabled);
     show(this.dyeBody, this.controls.getDyeConfig().enabled);
     show(this.neonBody, this.controls.getLinesEnabled());
+    show(this.dischargeBody, this.controls.getDischarge().enabled);
     show(this.curlBody, this.controls.getCurlEnabled());
     show(this.physarumBody, (this.controls.getPhysarumConfig()?.blend ?? 0) > 0);
     show(this.wAngleRow, this.controls.getDeform4d().wScale > 0);
@@ -2696,7 +2746,7 @@ export class VisualFxTab implements TabModule {
     const mk = () => document.createElement('div');
     const secFraming = mk(), secBasis = mk(), secDeform = mk(), secAttractor = mk();
     const secRenderMode = mk(), secVolume = mk(), secLiquidSurface = mk(), secPerParticle = mk();
-    const secSplat = mk(), secRibbon = mk(), secNeon = mk();
+    const secSplat = mk(), secRibbon = mk(), secNeon = mk(), secDischarge = mk();
     const secFilm = mk(), secPalette = mk(), secDye = mk();
     const secTransMap = mk();
     const secCohesion = mk(), secLiquidField = mk(), secFluid = mk(), secCurl = mk(), secPhysarum = mk();
@@ -3084,6 +3134,77 @@ export class VisualFxTab implements TabModule {
     }));
     tgt.appendChild(this.symmetryMirrorRow);
 
+    /*
+     * v8 Phase 42 — **3-D Symmetry**, directly below the 2-D one (owner): the figure REPLICATED around the centre, with
+     * the two factors set SEPARATELY (owner, 2026-11-06) — WHERE the copies sit (a ring or sphere of n, or a solid's
+     * vertices / edges / faces) and how many share each place (`Copies at Each`). ⚠️ The body is gated on the layout
+     * (`31.U`: gating HIDES, never defers construction); each layout shows only the rows it reads — `Ring Positions` and
+     * `Sphere Positions` are two rows because their ranges differ, and one slider to 60 would lie on a ring that stops
+     * at 24. `3-D Mirrors` mirrors every second copy at a position, so it is hidden while there is one (Symmetry's own
+     * Mirror rule). ⚠️ The copies notice is `42.D6`'s answer to density — it never raises the particle count itself.
+     */
+    tgt.appendChild(this.makeRow('3-D Symmetry', this.select({
+      key: 'sym3dLayout',
+      options: SYM3D_LAYOUTS.map((g) => [g, SYM3D_LAYOUT_LABELS[g]] as [string, string]),
+      get: () => this.controls.getSym3d().layout,
+      set: v => { this.controls.setSym3d({ layout: v as Sym3dLayout }); this.syncVisibility(); },
+    })));
+    const s3Body = document.createElement('div');
+    this.sym3dBody = s3Body;
+    // ⚠️ Two LITERAL descriptors, not a helper with a key variable: `tipcheck` finds a descriptor by its literal `key`.
+    const ringR = SYM3D_POSITIONS_RANGE.ring, sphereR = SYM3D_POSITIONS_RANGE.sphere;
+    this.sym3dRingRow = this.makeRow('Ring Positions', this.slider({
+      key: 'sym3dPositionsRing', min: ringR[0], max: ringR[1], step: 1,
+      get: () => Math.max(ringR[0], Math.min(ringR[1], this.controls.getSym3d().positions)),
+      set: v => { this.controls.setSym3d({ positions: Math.round(v) }); this.syncVisibility(); },
+      fmt: (v) => `${Math.round(v)}`,
+    }));
+    this.sym3dSphereRow = this.makeRow('Sphere Positions', this.slider({
+      key: 'sym3dPositionsSphere', min: sphereR[0], max: sphereR[1], step: 1,
+      get: () => Math.max(sphereR[0], Math.min(sphereR[1], this.controls.getSym3d().positions)),
+      set: v => { this.controls.setSym3d({ positions: Math.round(v) }); this.syncVisibility(); },
+      fmt: (v) => `${Math.round(v)}`,
+    }));
+    s3Body.appendChild(this.sym3dRingRow);
+    s3Body.appendChild(this.sym3dSphereRow);
+    this.sym3dOnRow = this.makeRow('On', this.select({
+      key: 'sym3dOn',
+      options: SYM3D_ONS.map((o) => [o, SYM3D_ON_LABELS[o]] as [string, string]),
+      get: () => this.controls.getSym3d().on,
+      set: v => { this.controls.setSym3d({ on: v as Sym3dOn }); this.syncVisibility(); },
+    }), 'Solid Points');
+    s3Body.appendChild(this.sym3dOnRow);
+    s3Body.appendChild(this.makeRow('Copies at Each', this.slider({
+      key: 'sym3dLocal', min: SYM3D_LOCAL_RANGE[0], max: SYM3D_LOCAL_RANGE[1], step: 1,
+      get: () => this.controls.getSym3d().local,
+      set: v => { this.controls.setSym3d({ local: Math.round(v) }); this.syncVisibility(); },
+      fmt: (v) => `${Math.round(v)}`,
+    })));
+    s3Body.appendChild(this.makeRow('3-D Radius', this.slider({
+      key: 'sym3dRadius', min: SYM3D_RADIUS_RANGE[0], max: SYM3D_RADIUS_RANGE[1], step: 1 / 64,
+      get: () => this.controls.getSym3d().radius,
+      set: v => this.controls.setSym3d({ radius: v }),
+      fmt: (v) => v.toFixed(2),
+    })));
+    this.sym3dMirrorsRow = this.makeRow('3-D Mirrors', this.check({
+      key: 'sym3dMirrors',
+      get: () => this.controls.getSym3d().mirrors,
+      set: v => this.controls.setSym3d({ mirrors: v }),
+    }));
+    s3Body.appendChild(this.sym3dMirrorsRow);
+    s3Body.appendChild(this.makeRow('Facing', this.select({
+      key: 'sym3dFacing',
+      options: SYM3D_FACINGS.map((f) => [f, SYM3D_FACING_LABELS[f]] as [string, string]),
+      get: () => this.controls.getSym3d().facing,
+      set: v => this.controls.setSym3d({ facing: v as Sym3dFacing }),
+    }), '3-D Facing'));
+    const s3Note = document.createElement('div');
+    s3Note.className = 'sl-vfx-note';
+    s3Note.style.cssText = 'margin:2px 0 0 4px;font-size:10px;color:#888;';
+    this.sym3dNote = s3Note;
+    s3Body.appendChild(s3Note);
+    tgt.appendChild(s3Body);
+
     tgt.appendChild(this.tripletRow('Twist', {
       key: 'twist', min: -TWIST_MAX_TURNS, max: TWIST_MAX_TURNS, step: TWIST_STEP,
       captions: ['X', 'Y', 'Z'],
@@ -3264,6 +3385,9 @@ export class VisualFxTab implements TabModule {
         if (mode !== 'off') {
           this.controls.setLinesEnabled(false);
           this.syncKey('linesEnabled');
+          // ...and lines off ends the discharge, which is coupled to them (owner 11-05).
+          this.syncKey('dischargeEnabled');
+          this.syncVisibility();
         }
       },
     })));
@@ -3299,6 +3423,8 @@ export class VisualFxTab implements TabModule {
           this.controls.setRibbonState('off');
           this.syncKey('ribbonMode');
         }
+        // The engine switches the discharge off with the lines (coupled, owner 11-05): re-read, never assume.
+        this.syncKey('dischargeEnabled');
         this.syncVisibility();
       },
     }), 'Enable Neon Lines'));
@@ -3309,6 +3435,49 @@ export class VisualFxTab implements TabModule {
       get: () => this.controls.getLineWidth(),
       set: v => this.controls.setLineWidth(v),
     }), 'Neon Width'));
+
+    /*
+     * --- Electric Discharge section (v8 Phase 40), directly below Neon Lines (owner). ⚠️⚠️ It is COUPLED to Neon
+     * Lines (owner 11-05): it tears the lines' glow into filaments and has nothing to work on without it, so
+     * enabling it enables the lines (ending ribbons) and disabling the lines disables it. The ENGINE owns the rule
+     * (`coupleDischargeToLines` in `main.ts`); this handler only re-reads the boxes the engine changed.
+     * ⚠️ Each step is a negative power of two and each range a whole number of steps (the Slider-tracks rule: a
+     * browser refuses an overshooting stop rather than clamping).
+     */
+    tgt = secDischarge;
+    tgt.appendChild(this.sectionTitle('Electric Discharge'));
+    tgt.appendChild(this.makeRow('Enable', this.check({
+      key: 'dischargeEnabled',
+      get: () => this.controls.getDischarge().enabled,
+      set: on => {
+        this.controls.setDischarge({ enabled: on });
+        this.syncKey('linesEnabled');
+        this.syncKey('ribbonMode');
+        this.syncVisibility();
+      },
+    }), 'Enable Electric Discharge'));
+    secDischarge.appendChild(this.dischargeBody);
+    tgt = this.dischargeBody;
+    tgt.appendChild(this.makeRow('Intensity', this.slider({
+      key: 'dischargeIntensity', min: 0, max: 2, step: 1 / 64, decimals: 2,
+      get: () => this.controls.getDischarge().intensity,
+      set: v => this.controls.setDischarge({ intensity: v }),
+    }), 'Discharge Intensity'));
+    tgt.appendChild(this.makeRow('Filament', this.slider({
+      key: 'dischargeFilament', min: 0.5, max: 8, step: 1 / 8, decimals: 2,
+      get: () => this.controls.getDischarge().filament,
+      set: v => this.controls.setDischarge({ filament: v }),
+    }), 'Discharge Filament'));
+    tgt.appendChild(this.makeRow('Crackle', this.slider({
+      key: 'dischargeCrackle', min: 0, max: 1, step: 1 / 64, decimals: 2,
+      get: () => this.controls.getDischarge().crackle,
+      set: v => this.controls.setDischarge({ crackle: v }),
+    }), 'Discharge Crackle'));
+    tgt.appendChild(this.makeRow('Branching', this.slider({
+      key: 'dischargeBranching', min: 0, max: 1, step: 1 / 64, decimals: 2,
+      get: () => this.controls.getDischarge().branching,
+      set: v => this.controls.setDischarge({ branching: v }),
+    }), 'Discharge Branching'));
 
     // --- Film Look section ---
     tgt = secFilm;
@@ -3786,7 +3955,7 @@ export class VisualFxTab implements TabModule {
      */
     gFigure.body.append(secFraming, secBasis, secDeform, secAttractor);
     gParticles.body.append(secRenderMode, secVolume, secLiquidSurface, secPerParticle,
-      secSplat, secRibbon, secNeon);
+      secSplat, secRibbon, secNeon, secDischarge);
     gColour.body.append(secFilm, secPalette);
     gImage.body.append(secTransMap);
     gFields.body.append(secCohesion, secLiquidField, secDye, secFluid, secCurl, secPhysarum);

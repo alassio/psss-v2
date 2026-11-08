@@ -41,6 +41,10 @@ import {
   LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, type RuleKey,
 } from '../../generators/lsystem/rules.ts';
 import { walkTurtle } from '../../generators/lsystem/turtle.ts';
+// v8 `39.A8` — imports only its siblings, so the Node-loadable chain survives (see the note above).
+import { buildGenerator, LSYSTEM_GENERATORS } from '../../generators/lsystem/generator.ts';
+// v8 `39.C` — the one resolver for `Customize`; imports only lsystem siblings, so the Node chain survives.
+import { resolveCustomRule, buildCustom, CUSTOM_RANGES } from '../../generators/lsystem/custom.ts';
 import { captureExtent } from '../../generators/lsystem/curve.ts';
 /*
  * v8 `34.1` — **the wave law is SHARED with the generator and this file no longer owns a copy of it.**
@@ -475,13 +479,44 @@ export function computeScore(waves: readonly WaveConfig[], plane: ScorePlane): S
  * reads as a different rule rather than as a coarse one, so the label saying so matters more, not less.
  */
 export function computeCurveScore(cfg: LSystemConfig, plane: ScorePlane): ScoreResult {
-  const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+  /*
+   * v8 `39.C` — through the ONE resolver (`resolveCustomRule`): a `Customize` generator equal to a named rule is
+   * drawn AS that rule (the no-op), and a genuinely custom one by `buildCustom` at its bases, in its own ranges.
+   */
+  const resolved = resolveCustomRule(cfg);
+  const rule = resolved.kind === 'named' ? resolved.rule : LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
   const [ax, ay] = PLANE_AXIS_INDEX[plane];
 
   // The BASES, never an instant — see the header.
   const recursion = Math.min(rule.recursionRange[1],
     Math.max(rule.recursionRange[0], cfg.recursion.base));
-  const walk = walkTurtle(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base);
+  /*
+   * v8 `39.A8` — **the Score draws Twist and Stretch too, at their BASES**, through the same generator the
+   * figure uses; a diagram that ignored them would show the untwisted dragon under a folded figure. ⚠️ Read with
+   * the engine's own identities (`?? 0`, `?? 1`) and only where the rule HAS the row, so every preset without
+   * them draws exactly as before. A cell rule's angles are held at the lattice, as in `resolveGenerated`.
+   */
+  const gen = LSYSTEM_GENERATORS[rule.key as RuleKey];
+  const clampTo = (v: number, r: readonly [number, number]): number => Math.min(r[1], Math.max(r[0], v));
+  let customWalk: { xyz: Float64Array; count: number; truncated: boolean } | null = null;
+  if (resolved.kind === 'custom') {
+    const steps = resolved.gen.steps;
+    const twAt = steps.some((s) => s.kind === 'move' && s.twistable) ? clampTo(cfg.twist?.base ?? 0, CUSTOM_RANGES.twist) : 0;
+    const stAt = steps.some((s) => s.kind === 'move' && s.stretchable) ? clampTo(cfg.stretch?.base ?? 1, CUSTOM_RANGES.stretch) : 1;
+    const depth = Math.max(1, Math.min(resolved.maxDepth, Math.floor(cfg.recursion.base)));
+    const b = buildCustom(resolved.gen, depth, clampTo(cfg.yaw.base, CUSTOM_RANGES.yaw),
+      clampTo(cfg.pitch.base, CUSTOM_RANGES.pitch), twAt, stAt, resolved.tile);
+    // ⚠️ An invalid generator draws an EMPTY diagram rather than another rule's: the status line says why.
+    customWalk = b !== null ? { xyz: b.xyz, count: b.count, truncated: false } : { xyz: new Float64Array(0), count: 0, truncated: false };
+  }
+  const tw = gen !== null && gen.twistable.length > 0 ? clampTo(cfg.twist?.base ?? 0, gen.twistRange) : 0;
+  const st = gen !== null && gen.stretchable.length > 0 ? clampTo(cfg.stretch?.base ?? 1, gen.stretchRange) : 1;
+  const built = customWalk === null && gen !== null && (tw !== 0 || st !== 1)
+    ? buildGenerator(rule, gen, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base, tw, st)
+    : null;
+  const walk = customWalk !== null ? customWalk : built !== null
+    ? { xyz: built.xyz, count: built.count, truncated: false }
+    : walkTurtle(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base);
 
   // Normalised by its own extent, which is the same canonical fit the engine's figure source uses, so
   // the diagram and the figure agree in shape even though they differ in absolute scale.

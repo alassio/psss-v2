@@ -13,6 +13,8 @@ import { ATTRACTOR_PRESETS } from './generators/attractors.ts';
 import { HDRParticleRenderer } from './renderers/hdr-particle.ts';
 import { RibbonRenderer, type RibbonMode } from './renderers/ribbon-renderer.ts';
 import { NeonLineRenderer } from './renderers/neon-line-renderer.ts';
+import { ElectricDischarge, DISCHARGE_DEFAULTS } from './post-processors/electric-discharge.ts';
+import { SYM3D_DEFAULTS, type Sym3dConfig } from './core/symmetry-groups.ts';
 import { TranslationMapProcessor, type TransMapConfig } from './post-processors/trans-map.ts';
 import { TransMapForceField } from './post-processors/trans-map-force.ts';
 import { DepthFieldPass } from './post-processors/depth-field.ts';
@@ -883,6 +885,34 @@ async function init() {
   });
   neonLineRenderer.resize(canvas.width, canvas.height);
   let linesEnabled = false;
+  /*
+   * v8 Phase 40 — **Electric Discharge**: its own pass and buffers (`electric-discharge.ts`), applied to
+   * `presentSource` between the reel cross-fade and Bloom. ⚠️ ONE reader of the preset (`readDischarge`) for both
+   * apply paths, so `applyPresetChange` and `resetOverlays` cannot drift apart on a default (the `lineWidth`
+   * 1.5-vs-2.0 lesson below).
+   */
+  const electricDischarge = new ElectricDischarge();
+  electricDischarge.init(gl);
+  type DischargeState = { enabled: boolean; intensity: number; filament: number; crackle: number; branching: number };
+  const readDischarge = (ov: OverlayState | undefined): DischargeState => ({
+    enabled: ov?.dischargeEnabled ?? false,
+    intensity: ov?.dischargeIntensity ?? DISCHARGE_DEFAULTS.intensity,
+    filament: ov?.dischargeFilament ?? DISCHARGE_DEFAULTS.filament,
+    crackle: ov?.dischargeCrackle ?? DISCHARGE_DEFAULTS.crackle,
+    branching: ov?.dischargeBranching ?? DISCHARGE_DEFAULTS.branching,
+  });
+  let discharge: DischargeState = readDischarge(undefined);
+  /*
+   * ⚠️⚠️ **ELECTRIC DISCHARGE IS COUPLED TO NEON LINES (owner 2026-11-05).** The effect tears the GLOW already on
+   * screen into filaments, and only the neon lines supply one: on a crisp point or ribbon figure it can only thin and
+   * dim the lines (measured `p58-lines-dependence.mjs`; a self-made halo was tried and reverted). So enabling the
+   * discharge enables the lines (`setDischarge`), and lines OFF ⇒ discharge OFF — enforced HERE, the ONE owner,
+   * called after EVERY write of `linesEnabled` (both apply paths, both setters, the ribbon setter and the ribbon
+   * key). A writer that skips it leaves a discharge over no lines, which is the state the owner rejected.
+   */
+  const coupleDischargeToLines = (): void => {
+    if (!linesEnabled && discharge.enabled) discharge = { ...discharge, enabled: false };
+  };
   /**
    * Fallback for a preset that declares no `overlay.lineWidth` (D5).
    *
@@ -1080,6 +1110,32 @@ async function init() {
   let symmetryFold = preset?.overlay?.symmetryFold ?? 1;
   let symmetryMirror = preset?.overlay?.symmetryMirror ?? true;
   generator.setSymmetry(symmetryFold, symmetryMirror);
+  /*
+   * v8 Phase 42 — **3-D Symmetry**: ONE reader and ONE adoption function for every path (the startup preset here,
+   * `applyPresetChange`, the Reset path; the live setter writes through `setSym3d`). ⚠️ A model-space operator has
+   * FOUR adoption paths and missing one is silent — `adoptTwist`'s header — so none of them transcribes the defaults.
+   */
+  const readSym3d = (ov: OverlayState | undefined): Sym3dConfig => ({
+    layout: ov?.sym3dLayout ?? SYM3D_DEFAULTS.layout,
+    positions: ov?.sym3dPositions ?? SYM3D_DEFAULTS.positions,
+    on: ov?.sym3dOn ?? SYM3D_DEFAULTS.on,
+    local: ov?.sym3dLocal ?? SYM3D_DEFAULTS.local,
+    radius: ov?.sym3dRadius ?? SYM3D_DEFAULTS.radius,
+    mirrors: ov?.sym3dMirrors ?? SYM3D_DEFAULTS.mirrors,
+    facing: ov?.sym3dFacing ?? SYM3D_DEFAULTS.facing,
+  });
+  let sym3d: Sym3dConfig = readSym3d(preset?.overlay);
+  function adoptSym3d(ov: OverlayState | undefined): void {
+    sym3d = readSym3d(ov);
+    generator.setSymmetry3d(sym3d);
+  }
+  generator.setSymmetry3d(sym3d);
+  /** The export block: value-GATED on the layout, so a preset that never used 3-D Symmetry exports the same bytes. */
+  const sym3dExport = (): Partial<OverlayState> => (sym3d.layout !== 'off' ? {
+    sym3dLayout: sym3d.layout, sym3dLocal: sym3d.local, sym3dRadius: sym3d.radius, sym3dMirrors: sym3d.mirrors,
+    sym3dFacing: sym3d.facing,
+    ...(sym3d.layout === 'ring' || sym3d.layout === 'sphere' ? { sym3dPositions: sym3d.positions } : { sym3dOn: sym3d.on }),
+  } : {});
   /*
    * v8 `30.1` (`E129a`) — the twist triple, adopted and handed over at **exactly the four sites
    * `setSymmetry` is handed over at**, and that parity is the design rather than a coincidence.
@@ -3821,6 +3877,14 @@ async function init() {
     if (reelFreezeWeight > 0 && reelCrossfade?.hasCapture()) {
       presentSource = reelCrossfade.mix(presentSource, reelFreezeWeight, canvas.width, canvas.height);
     }
+    /*
+     * v8 Phase 40 — Electric Discharge, PRE-BLOOM so its filaments glow and grade with the rest. ⚠️ A BRANCH: off,
+     * `presentSource` is not touched, so every preset without the effect is bitwise what it was. It reads
+     * `presentSource` (not `fboState.texA`) for the cross-fade's reason above, and never writes the trail.
+     */
+    if (discharge.enabled) {
+      presentSource = electricDischarge.apply(presentSource, canvas.width, canvas.height, discharge, elapsedTime);
+    }
 
     // Step 4: Post-processing (bloom + tone map) or direct blit
     if (bloom.isEnabled() || toneMap.isEnabled()) {
@@ -4899,6 +4963,7 @@ async function init() {
        */
       ...(particleSizeScale !== 1.0 ? { particleSize: particleSizeScale } : {}),
       ...(symmetryFold > 1 ? { symmetryFold, symmetryMirror } : {}),
+      ...sym3dExport(),   // v8 Phase 42 — the same gate at both export sites
       /*
        * v8 `30.1` — the twist triple, identity-gated with **exactly** the gate the plain branch below uses.
        * The warning above this block applies to it verbatim: this function is spread OVER the frozen
@@ -5204,6 +5269,7 @@ async function init() {
     symmetryFold = preset.overlay?.symmetryFold ?? 1;
     symmetryMirror = preset.overlay?.symmetryMirror ?? true;
     generator.setSymmetry(symmetryFold, symmetryMirror);
+    adoptSym3d(preset.overlay);   // v8 Phase 42 — the same path, the same obligation
     adoptTwist(preset.overlay);   // v8 30.1 — one of the four adoption paths; see adoptTwist's header
     adoptTaperBend(preset.overlay);   // v8 32.1/32.2 — the same path, the same obligation
     adoptFigureBasis(preset.overlay);   // v8 33.2/33.3 - Sharpness and Travel, same path
@@ -5297,6 +5363,10 @@ async function init() {
     linesEnabled = (ribbonState === 'off') ? (ov.linesEnabled ?? false) : false;
     neonLineWidth = ov.lineWidth ?? DEFAULT_LINE_WIDTH;
     neonLineRenderer.setLineWidth(neonLineWidth);
+    // v8 Phase 40 — a new preset starts its discharge from an empty buffer, never from the last one's filaments.
+    discharge = readDischarge(ov);
+    coupleDischargeToLines();
+    electricDischarge.reset();
 
     // Attractor: preset.fractal (handled above) takes priority; overlay attractor is additive
     if (!preset.fractal) {
@@ -5519,12 +5589,23 @@ async function init() {
       if (mode !== 'off') {
         ribbonRenderer.setMode(mode as RibbonMode);
         linesEnabled = false;
+        coupleDischargeToLines();
       }
     },
     getRibbonWidth: () => ribbonWidth,
     setRibbonWidth: (w) => { ribbonWidth = w; ribbonRenderer.setRibbonWidth(w); },
     getLinesEnabled: () => linesEnabled,
-    setLinesEnabled: (on) => { linesEnabled = on; if (on) { ribbonState = 'off'; } },
+    setLinesEnabled: (on) => { linesEnabled = on; if (on) { ribbonState = 'off'; } coupleDischargeToLines(); },
+    getDischarge: () => ({ ...discharge }),
+    setDischarge: (patch) => {
+      const wasOn = discharge.enabled;
+      discharge = { ...discharge, ...patch };
+      // Coupled (see `coupleDischargeToLines`): switching the discharge ON switches the neon lines on, which in
+      // turn ends ribbons — the same exclusion `setLinesEnabled` applies.
+      if (discharge.enabled && !linesEnabled) { linesEnabled = true; ribbonState = 'off'; }
+      // Switched ON: start from an empty buffer, so stale filaments from the last time it was on do not flash.
+      if (!wasOn && discharge.enabled) electricDischarge.reset();
+    },
     getLineWidth: () => neonLineWidth,
     setLineWidth: (w) => { neonLineWidth = w; neonLineRenderer.setLineWidth(w); },
     getFilmLook: () => currentFilmLook,
@@ -5703,6 +5784,12 @@ async function init() {
       next[axis] = v;
       generator.setRotationSpeed(next);
       if (preset) preset.generators.rotation = generator.getRotationSpeed();
+    },
+    getSym3d: () => ({ ...sym3d }),
+    getSym3dCopies: () => generator.getSymmetry3dCopies(),
+    setSym3d: (patch) => {
+      sym3d = { ...sym3d, ...patch };
+      generator.setSymmetry3d(sym3d);
     },
     getSymmetryFold: () => symmetryFold,
     setSymmetryFold: (v) => {
@@ -6321,6 +6408,19 @@ async function init() {
         ribbonWidth,
         linesEnabled,
         lineWidth: neonLineWidth,
+        /*
+         * v8 Phase 40 — VALUE-GATED like the palette pair: written only while the effect is on or an amount was
+         * moved off its default, so a preset that never used it exports exactly the bytes it always did.
+         */
+        ...(discharge.enabled || discharge.intensity !== DISCHARGE_DEFAULTS.intensity
+          || discharge.filament !== DISCHARGE_DEFAULTS.filament || discharge.crackle !== DISCHARGE_DEFAULTS.crackle
+          || discharge.branching !== DISCHARGE_DEFAULTS.branching ? {
+            dischargeEnabled: discharge.enabled,
+            dischargeIntensity: discharge.intensity,
+            dischargeFilament: discharge.filament,
+            dischargeCrackle: discharge.crackle,
+            dischargeBranching: discharge.branching,
+          } : {}),
         filmLook: currentFilmLook,
         /*
          * v8 Step 21.4c — the palette override, **VALUE-GATED on `!== undefined`.**
@@ -6413,6 +6513,7 @@ async function init() {
         // writing it would put an inert key into every export — and `symmetryMirror` has no meaning at
         // all without a fold, which is why both are gated on the same condition rather than separately.
         ...(symmetryFold > 1 ? { symmetryFold, symmetryMirror } : {}),
+        ...sym3dExport(),   // v8 Phase 42 — the same gate at both export sites
         // v8 30.1 — emitted only when the operator is actually doing something, so an export from a session
         // that never touched it is byte-identical to a pre-30.1 one and no new key enters any of the 284
         // presets. ⚠️ **ONE GATE FOR THE TRIPLE** — see the bypass branch, which carries the same test and
@@ -6950,6 +7051,9 @@ async function init() {
       ribbonRenderer.setRibbonWidth(ribbonWidth);
       neonLineWidth = ov?.lineWidth ?? DEFAULT_LINE_WIDTH;
       neonLineRenderer.setLineWidth(neonLineWidth);
+      discharge = readDischarge(ov);
+      coupleDischargeToLines();
+      electricDischarge.reset();
       // Film look
       const filmName = ov?.filmLook ?? 'Legacy';
       if (filmName === CUSTOMIZE_FILM_LOOK && ov?.customFilmLookParams) {
@@ -7051,6 +7155,7 @@ async function init() {
       symmetryFold = ov?.symmetryFold ?? 1;
       symmetryMirror = ov?.symmetryMirror ?? true;
       generator.setSymmetry(symmetryFold, symmetryMirror);
+      adoptSym3d(ov);   // v8 Phase 42 — a Reset must REVERT it too
       adoptTaperBend(ov);   // v8 32.1/32.2 — a Reset must REVERT these too
       adoptFigureBasis(ov);   // v8 33.2/33.3 - and the basis and the sweep with them
       adoptEscapeFlow(ov);   // v8 33.4 - a Reset must revert the foliation too
@@ -8303,7 +8408,7 @@ async function init() {
       } else {
         ribbonState = 'off';
       }
-      if (ribbonState !== 'off') linesEnabled = false;
+      if (ribbonState !== 'off') { linesEnabled = false; coupleDischargeToLines(); }
       notifyExternalChange();
       console.log(`Ribbon mode: ${ribbonState}`);
     }

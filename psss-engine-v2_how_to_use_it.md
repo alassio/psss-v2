@@ -165,13 +165,18 @@ branching tree — while still being a single line you could draw without liftin
 
 The famous members of this family have names: the **Hilbert** curve, which visits every cell of a cube
 exactly once; the **dragon** and **terdragon**; the **Koch** curve; the **Gosper** island; the
-**Sierpiński** arrowhead. PSSS ships thirteen of them.
+**Sierpiński** arrowhead; the **Minkowski** sausage. PSSS ships fifteen of them.
 
 What makes them useful here rather than merely pretty is one property that is easy to miss: **the angle
 the rule turns at is not part of the rule.** Run the Koch production at its published 90° and you get
 the Koch curve. Run the *same* production at 117° and you get a Sierpiński triangle — a different named
 fractal, reached by moving one dial. So a single rule plus one continuous angle is a whole family, and
 sweeping the angle animates the figure *between named shapes* rather than merely wobbling one.
+
+The same idea gives a second axis. Every one of these curves is **copies of itself laid end to end**, so
+the copies can also be **twisted** about their own axis, which lifts a flat curve into three dimensions.
+On the dragon, a half-turn of one copy produces the **Lévy C** curve, so one slider folds one named
+fractal into another through shapes that exist in neither.
 
 Two more properties matter in practice:
 
@@ -609,7 +614,7 @@ doing anything on this preset.*
 | Group | What it is for | Sections inside it |
 |---|---|---|
 | **Figure** | the shape itself, before anything draws it | Framing & Timing · Curve Basis · Deformation · Attractor |
-| **Particles** | how each particle is drawn | Render Mode · Volume Render · Liquid Surface · Per-Particle · Splat Shear · Ribbon Rendering · Neon Lines |
+| **Particles** | how each particle is drawn | Render Mode · Volume Render · Liquid Surface · Per-Particle · Splat Shear · Ribbon Rendering · Neon Lines · Electric Discharge |
 | **Colour** | grading and palette — the photography | Film Look · Colour Palette |
 | **Image** | the warp applied to the finished frame | Translation Map |
 | **Fields** | forces and dyes that move the particles around | Cohesion · Liquid Field · Dye Field · Fluid Advection · Curl Noise · Physarum Network |
@@ -861,6 +866,14 @@ are functions **of** where a point is, unlike the flow and turbulence controls f
 |---|---|
 | **Symmetry** | Folds the figure into *n* identical sectors **in model space**, so the symmetry axis tumbles with the 3D rotation instead of being pinned to the screen. Whole numbers only — at 1 it is off |
 | **Mirror** | Appears underneath only once Symmetry is above 1. It alternates the handedness of successive sectors, which turns a pinwheel into a true mirror pattern |
+| **3-D Symmetry** | Repeats the **whole** figure in three dimensions around the centre, and says **where the copies sit**: on a **Ring** or a **Sphere** of as many positions as you choose, or on the points of a solid — **Tetrahedron**, **Octahedron**, **Cube**, **Icosahedron**, **Dodecahedron**. Each copy is the complete figure, never cut, and the arrangement turns with the figure. **Off** changes nothing. The rows below appear only while an arrangement is chosen, and each shows only what that arrangement uses |
+| **Ring Positions** | Only for **Ring**: how many positions around it, 1 to 24, evenly spaced — 2 doubles the figure, 3 triples it |
+| **Sphere Positions** | Only for **Sphere**: how many positions, 2 to 60, spread as evenly as a sphere allows (most counts have no perfectly symmetric arrangement, so this is even rather than crystal-like) |
+| **On** | Only for a solid: which of its points carry a copy — its **Vertices**, the middles of its **Edges** or the centres of its **Faces**. The cube has 8, 12 and 6; the icosahedron 12, 30 and 20 |
+| **Copies at Each** | How many copies share each position, turned evenly about it, 1 to 12: 2 makes a pair, 3 a three-way star. The total is the positions times this |
+| **3-D Radius** | How far the positions are from the centre. At 0 every copy sits on the centre and they overlap into one symmetric solid; from about 1.5 they separate into distinct copies. The whole arrangement is scaled back so it keeps the figure's size |
+| **3-D Mirrors** | Appears once **Copies at Each** is 2 or more: mirrors every second copy at a position, so a pair becomes a figure and its mirror image |
+| **Facing** | **Outward** turns each copy to face away from the centre, so a ring reads as a wreath and a sphere as a shell; **Parallel** keeps every copy the way the original faces |
 | **Twist** (X / Y / Z) | Wrings the figure about each axis, by an angle proportional to how far along that axis a point sits — so the near and far ends turn opposite ways. One full turn from the centre to the edge of the figure's own box per 1.00. **Needs a figure with depth**: on a flat one it correctly does nothing. |
 | **Taper** (X / Y / Z) | Scales the figure's cross-section along each axis, so it **flares open at one end and pinches shut at the other** — a tube becomes a cone, a trumpet or a spindle. The readout says *flare* or *pinch* because the sign is the gesture. Centre is off, and the slider snaps to it |
 | **Bend** (X / Y / Z) | **Curves the figure's axis**, like bending a pipe into an arc. The readout also prints `r`, the radius of curvature, because that is the quantity the limit is about — the range stops short of the point where the figure would turn inside out |
@@ -875,6 +888,26 @@ are functions **of** where a point is, unlike the flow and turbulence controls f
 
 > **Symmetry divides the particles between the arms** — each arm carries 1/n of the density. After
 > raising it, raise **Particle Number** to compensate, or the figure thins out.
+
+> **3-D Symmetry divides them between the copies.** The line under the rows multiplies it out — for
+> example *6 positions × 4 = 24 copies, about 2,083 particles each* — and from 24 copies it adds that the
+> figure thins. Particle Number tops out at 50 000, so keep the total modest for a dense figure: a ring of 3
+> or a cube's 6 faces already reads as a sculpture. **Worked examples**, each a figure that animates by
+> itself: `Breathing Crown` (a ring of 6 with 3 copies at each — plants growing and receding), `Morph
+> Wreath` (a ring of 3 mirrored pairs, close in), `Subdivide Sphere` (a sphere of 7 — a count no solid has), `Thicket Globe` (the icosahedron's 12
+> vertices at Radius 0, so the copies overlap into one solid), `Cesaro Cube` (a sphere of 6 with 3 copies at each,
+> close in at Radius 0.5), `Hilbert Tetra` (the tetrahedron's 4
+> faces with 3 mirrored copies at each) and `Tilt Octahedron` (the octahedron's 6 vertices, kept parallel). Of
+> these, only `Subdivide Sphere` and `Tilt Octahedron` hold their copies fully apart — the rest let them overlap,
+> which is the other picture 3-D Symmetry makes. Because none of them draws Neon Lines, the depth cues work on
+> them: `Hilbert Tetra` and `Tilt Octahedron` use them to bring the near copies forward.
+
+![The Deformation section with 3-D Symmetry set to Cube: On, Copies at Each, Radius, Facing and the copies line](manual-images/lab-visual-fx-sym3d.png)
+
+*The **Deformation** section with **3-D Symmetry** set to **Cube**: its rows appear below it — **On**, **Copies
+at Each**, **3-D Radius** and **Facing** (the two Positions rows are absent, as they belong to the Ring and the
+Sphere, and **3-D Mirrors** waits for a second copy at each position) — and the line under them multiplies the
+copies out: *8 positions × 1 = 8 copies*. The section's badge counts it as one active operator.*
 
 > **The bright creases are the point.** A fold sends many separate stretches of one curve to the same place,
 > and overlapping particles are what makes a region bright — so the chambers arrive outlined in light. If the
@@ -933,12 +966,12 @@ the preset's character in it. Blend also fades the Translation Map warp as it ri
 
 Seven sections deciding what a single particle looks like. **Render Mode comes first because it governs the other six**: two of them only exist under one mode, and the rest change meaning with it.
 
-![The Particles group open: Render Mode, Per-Particle, Splat Shear, Ribbon Rendering and Neon Lines](manual-images/lab-visual-fx-particles.png)
+![The Particles group open: Render Mode, Per-Particle, Splat Shear, Ribbon Rendering, Neon Lines and Electric Discharge](manual-images/lab-visual-fx-particles.png)
 
 *The **Particles** group, opened: **Render Mode** with Particle Size and Trail Decay, then
-**Per-Particle**, **Splat Shear**, **Ribbon Rendering** and **Neon Lines** — the whole group in one
-view, with the other four closed around it. **Neon Lines** shows only its **Enable** box until it is
-ticked; **Ribbon Rendering** is switched off by its own *Mode* dropdown instead, which is why its
+**Per-Particle**, **Splat Shear**, **Ribbon Rendering**, **Neon Lines** and **Electric Discharge** — the
+whole group in one view, with the other four closed around it. **Neon Lines** and **Electric Discharge**
+show only their **Enable** box until it is ticked; **Ribbon Rendering** is switched off by its own *Mode* dropdown instead, which is why its
 **Width** row is still here. **Volume Render** and **Liquid Surface** are absent because this preset's
 mode is *Splat* — they are shown further down, each with the mode that creates it.*
 
@@ -1112,11 +1145,33 @@ switches the other off.
 |---|---|
 | **Ribbon · Mode** | *Off*, *Hybrid*, *Streaks* or *Adaptive*. Draws the path as a continuous solid band, so the curve reads as a surface with an inside and an outside. *Off* is the point cloud every legacy preset was authored against |
 | **Ribbon · Width** | Thickness of the band in pixels. Narrow reads as a drawn line; wide reads as a folded sheet that occludes itself where the curve crosses |
-| **Neon · Enable** | Connects consecutive particles with glowing line segments, turning a point cloud into a wireframe |
+| **Neon · Enable** | Draws each particle's recent path as a short glowing trail, so the figure's motion shows as light-trails. A figure that does not move draws no trails |
 | **Neon · Width** | Line thickness in pixels. Past about 4 the segments merge into a solid ribbon and the wireframe reading is lost |
 
-> **Neon Lines wants a low particle count.** The effect depends on the individual segments being
-> legible; at 50 000 particles they overlap into a solid mass.
+> **Neon Lines reads best at a moderate particle count.** The effect depends on the individual trails
+> being legible; at 50 000 particles they overlap into a solid mass.
+
+##### Electric Discharge
+
+Crackling, flickering filaments of light around the figure, like an electric discharge. The light on
+screen is pulled toward its own brightest parts, which keeps collapsing it into thin, unstable filaments
+that form, snap and re-form every frame. It works on any figure, whatever its trail length.
+
+**It needs Neon Lines.** What it tears into filaments is the glow of the neon lines; on plain points or
+ribbons it has nothing to work with and only thins the figure. So the two are linked: turning **Electric
+Discharge** on also turns **Neon Lines** on (which, as always, switches Ribbons off), and turning **Neon
+Lines** off also turns **Electric Discharge** off.
+
+| Control | Effect |
+|---|---|
+| **Enable** | Switches the effect on, and Neon Lines with it. Off, nothing about the preset changes |
+| **Intensity** | How strongly the light is pulled into filaments: low is a faint shimmer, high a violent, tightly wound discharge |
+| **Filament** | How thick the filaments are, in pixels: low is hair-fine, high is thicker, softer arcs |
+| **Crackle** | How fast the filaments flicker and how long they live. High also keeps a slow-moving figure crackling |
+| **Branching** | Makes the filaments fork and wander along a slowly drifting field, from none to lightning-like arcs |
+
+> **Worked examples:** `Quader Discharge` (the same figure as `Quader Star Eight`, where the effect was
+> first found as a Translation Map setting) and `Curve Weave Lightning` (Branching).
 
 #### 6.2.4 Colour — the photography
 
@@ -2064,28 +2119,133 @@ When the figure type is **Self-similar curve**, the three wave slots are replace
 section. Every row here except **Rule** and **Smoothness** is a **triple** — the value, plus a **Depth**
 and a **Rate** that make it wobble over time, exactly as the wave rows work.
 
+![The Composer on a curve preset: the Shape diagram, Framing & Preview open, and the Curve section](manual-images/lab-composer-curve.png)
+
+*`Curve Morph` in the Composer: the **Shape** diagram of the curve in its three planes, **Framing &
+Preview** opened, then the **Curve** section — the **Rule** (Koch quadratic), the line naming its published
+angle and recursion range, and the Recursion and Yaw rows with their wobble pairs.*
+
 | Row | What it does |
 |---|---|
-| **Rule** | Which fractal. This is the figure's *identity* — Hilbert, dragon, Koch, Gosper, a plant. The line under it tells you the angle at which this rule is the named fractal, how deep it can recurse, and whether it closes into a loop. |
+| **Rule** | Which fractal. This is the figure's *identity* — Hilbert, dragon, Koch, Gosper, a plant, Minkowski. The line under it tells you the angle at which this rule is the named fractal, how deep it can recurse, and whether it closes into a loop. The last entry, **Customize**, lets you edit the rule's pattern itself (see *Customize — editing the generator* below). |
 | **Recursion** | How many times the rule is applied. Fractional values blend two levels, so the curve **subdivides smoothly** — new detail appears *between* existing strokes rather than the whole figure growing. |
 | **Yaw** | The turn angle, left and right. **The rule's published angle is a landmark, not a limit:** other angles give other named fractals, and sweeping this is the point of the whole type. |
 | **Pitch**, **Roll** | The other two turn axes. They appear only for a rule whose pattern actually uses them — most rules are flat and turn in one plane only, so on those two rows are simply absent. |
-| **Descend** | Travels *into* the curve, revealing finer structure as you go. It is **not** Figure Scale: the figure does not get bigger, it gets deeper. Only available on rules whose structure can be indexed backwards, so it is absent on most. |
+| **Twist** | Rotates chosen copies of the curve about their own axis, at every level at once, so a flat curve opens into three dimensions. On **Dragon**, 180° *is* the Lévy C curve (and on **Lévy C**, the dragon): one slider folds one named fractal into the other. On **Plant** it turns the branches about the trunk; on **Hilbert 2D** and **Peano** the square lattice opens out. Shown only on rules that have copies to twist. |
+| **Stretch** | Grows or shrinks the branches at every level at once, while the trunk keeps its length. 1× is the rule as published. Shown only on a rule with branches (**Plant**). |
+| **Descend** | Travels *into* the curve, revealing finer structure as you go. It is **not** Figure Scale: the figure does not get bigger, it gets deeper. Available on **Hilbert 2D**, **Hilbert 3D** and **Peano** — the rules whose structure can be indexed backwards — and absent on the rest. On Peano each step into the curve is a factor of three rather than two. |
 | **Smoothness** | Rounds the curve's corners toward a spline. At 0 the stroke is exactly as the rule draws it. Raising it also makes deeper recursions readable instead of solid. |
+
+![The Curve section on Hilbert 3D, with the Pitch, Roll and Descend rows](manual-images/lab-composer-curve-3d.png)
+
+*`Curve Tilt` on **Hilbert 3D**, a rule that turns in three dimensions: below Yaw come the **Pitch** and **Roll**
+rows (here both wobbling), then **Descend** — rows that a flat rule does not show — and the amber note that a
+wobbling angle rebuilds this rule's curve every frame.*
 
 **Two things that are easy to be surprised by:**
 
-- **Picking a rule re-seats the angles** on that rule's own landmark. Each rule has a different useful
-  range, so carrying a 120° angle onto a rule whose range stops at 60° would silently clamp it and give
-  you a figure that is neither. The wobble Depth and Rate are kept, because those are your gesture
-  rather than the rule's identity.
+- **Picking a rule resets its shape.** Recursion, Yaw, Pitch, Roll, Twist and Stretch all go back to
+  the new rule's own starting point, with no wobble. Each rule has a different useful range, so carrying
+  a 120° angle onto a rule whose range stops at 60° would silently clamp it and give you a figure that is
+  neither. Smoothness and Descend are kept.
+- **On Hilbert 2D and Peano, Twist and Yaw take turns.** Twist works on these two only at the lattice
+  angle, so while Twist is in use the Yaw rows are greyed out, and while Yaw is away from its landmark the
+  Twist rows are. A note under the rows says which to set back.
+- **Descend and Twist do not combine.** While the curve is descending, Twist and Stretch have no effect;
+  set Descend back to 1× to use them.
 - **On a few rules a wobbling angle is noticeably more expensive**, and the tab says so in a note when
   it applies. The space-filling rules — Hilbert, Moore, Peano — have to rebuild the whole stroke every
   frame when an angle moves, because their shape is not a smooth function of the angle at any useful
   step. Recursion and Smoothness are unaffected on every rule.
 
-> **Worked examples, one per thing to look at.** Fourteen presets ship on this figure type, and each was
-> built to show one row doing its job:
+##### Customize — editing the generator
+
+Every rule is drawn the same way: a short **generator** — a few straight steps — is repeated, each step
+replaced by a smaller copy of the whole generator, and so on down to the chosen recursion. **Customize**
+lets you edit that generator directly.
+
+- **Choosing Customize changes nothing on screen.** It starts from the rule you were on, with every
+  setting kept, and the line under the Rule says *Same generator as …* for as long as your generator is
+  still exactly that rule's. The first edit to a step makes it your own curve; undo the edit and it is the
+  named rule again.
+- **Choosing a named rule again replaces your edits**, with no confirmation, exactly as picking a named
+  Film Look replaces a customized one.
+- **Customize works on every rule except Bush 3D.** Bush 3D is a *growth* rule — each level adds branches
+  at the tips and lengthens the stems — rather than one shape repeated inside itself, so it has no generator
+  to edit; a plant-growth editor is planned as a future phase. On Bush 3D the entry is greyed out and says so.
+
+Under the rows, a **Generator** table lists the steps, one per row:
+
+![The Customize editor on Curve Rosette Chain: the curve rows, the Generator table with three moves, and the status line](manual-images/lab-composer-customize.png)
+
+*`Curve Rosette Chain`, one of the two presets made under **Customize** (the other is `Chaos to Order`): the line under the Rule says *Custom
+generator · 3 pieces*, the **Twist** rows exist because every step is marked for Twist, and the **Generator**
+table shows its three moves (turns +1, −1, −1, the second reversed). Under the table: **+ Move**, **+ Retrace**,
+**Show lift**, **Starting shape**, the status line and the density readout.*
+
+
+| Column | What it does |
+|---|---|
+| **Kind** | **Move** walks a new segment. **Retrace** walks back along the most recent move not yet retraced — how a branch is drawn as one stroke. A retrace copies everything from its move, so its own cells are greyed out. |
+| **Turn** | How far the step turns before it walks, in units of **Yaw**: 1 is one Yaw angle, −2 is two the other way. Because every turn is a multiple of Yaw, the Yaw slider still bends the whole generator together. |
+| **Lift** | How far the step tilts out of the plane, in units of **Pitch**. The column is hidden until you tick **Show lift** (or a step already has one). |
+| **Length** | The step's length relative to the others. Unequal lengths are fine. |
+| **Reverse** | Walk this piece's copy backwards. |
+| **Orient** | Rotate this piece about its own direction: 180° mirrors it, 90° and 270° turn it out of the plane. |
+| **Twist**, **Stretch** | Let the **Twist** / **Stretch** rows act on this piece. Those rows appear as soon as one piece is marked. |
+| **↑ ↓ ✕** | Move the step earlier or later, or remove it. Removing a move also removes the retrace that walks back along it. |
+
+**Reading a generator — Terdragon as the example.** Choose Customize on **Terdragon** and the table shows
+three moves with Turn **0, +1, −1**, all lengths 1, everything else off; Yaw is **120°**. Read it as a walk:
+
+1. step 1 — turn 0, walk one unit;
+2. step 2 — turn +1, i.e. 120° left, walk one unit;
+3. step 3 — turn −1, i.e. 120° right, walk one unit — back to the first direction.
+
+That small zig-zag is the whole rule. Three things make the table easier to read:
+
+- **Every turn is relative to the previous step's direction**, not to the screen.
+- **Step 1's turn never matters.** It only rotates the whole generator, and the figure is always fitted to
+  its own start and end — so the shape lives in the turns of step 2 onward.
+- **Orient is not a turning angle.** It rotates a piece's *copy* about its own direction (180° mirrors it).
+  On Terdragon it is 0° everywhere because no copy is flipped.
+
+**Where the triangles come from:** nowhere in the rule. Recursion replaces each of the three segments with
+a smaller copy of the whole zig-zag, then does the same inside every copy — 3, 9, 27 … segments. Every
+segment points along one of three directions 120° apart, so at depth the path runs along a triangular grid
+and closes into the triangles you see. The same holds for every rule: the figure is what the generator
+becomes when it is repeated, not something drawn by the rule itself. Change **Yaw** and every turn scales
+together, so the triangles distort while the table stays the same; change one **Turn** and you have a new
+generator.
+
+**+ Move** adds a straight step at the end, **+ Retrace** a step back along the most recent open move.
+**Draw** chooses **Path** (through the joints) or **Cells** (through the centre of each piece's square —
+or cube, for a 3-D generator such as Hilbert 3D's); **Cells** is offered only when your generator fills
+space — every piece one cell from the next and none visited twice — and it is what makes **Descend**
+available. In Cells mode the turns and lifts are held at 90°.
+
+**Starting shape.** Normally the copies are laid along one straight line. Tick **Starting shape** and a
+second, smaller table appears: the steps of a shape the copies are laid along instead, which may close into
+a loop. Ticking it adds one straight step, which changes nothing; add and edit steps from there. **Moore**
+shows what it is for: its generator is exactly Hilbert 2D's, laid along a starting shape of four steps up
+the square's centre line, a U-turn, and back down — each copy fills the square on one side of its step, so
+the way up fills one half and the way back the other. **Descend** is not available while a starting shape
+is set.
+
+![Customize on Moore: the Hilbert 2D generator in Cells mode and a four-step starting shape](manual-images/lab-composer-customize-moore.png)
+
+*Customize chosen on `Curve Weave` (Moore): the line under the Rule still says *Same generator as Moore*,
+**Draw** is **Cells**, the **Generator** table holds Hilbert 2D's four moves, and **Starting shape** is ticked
+with its own table — turns 0, 0, 2, 0: up the centre line, a U-turn, and back down.*
+
+The line under the table says whether the generator can be drawn. **If it cannot** — for example a
+Retrace with nothing to retrace, or a generator whose end comes back to its start — the figure keeps its
+last good shape until you fix it, and the line says why. **Density** says how evenly the curve covers
+space, which is how evenly it is lit: *even*, *uneven*, or *clumpy* where pieces pile on top of each other
+and glow brighter there. Every named rule reads *even* or *uneven*.
+
+> **Worked examples, one per thing to look at.** Many presets ship on this figure type; these each show
+> one row doing its job:
 >
 > | To see | Load |
 > |---|---|
@@ -2093,8 +2253,19 @@ and a **Rate** that make it wobble over time, exactly as the wave rows work.
 > | **Recursion** subdividing | `Curve Subdivide` — new detail appearing between existing strokes, not the figure growing |
 > | **Descend** travelling into the curve | `Curve Descent` and `Curve Volume` in three dimensions, `Curve Plane Dive` flat, where the zoom is easiest to read |
 > | **Pitch** and **Roll**, the two rows most rules do not have | `Curve Tilt` |
+> | **Twist** folding one named fractal into another | `Curve Fold` — the dragon folding into the Lévy C curve and back |
+> | the fold as a **Mixer** crossfade | `Curve Fold A` and `Curve Scroll` — the dragon and, at a half-turn of Twist, the Lévy C curve: load them as Deck A and Deck B and drag the crossfader |
+> | **Twist** opening a lattice | `Curve Hilbert Opening` and `Curve Peano Fold` |
+> | **Twist** on a branching plant | `Curve Spiral Thicket` — the branches turning about the trunk |
+> | **Stretch** | `Curve Breathing Thicket` — the branches growing and receding at every level at once |
+> | **Yaw** between two named fractals on one rule | `Curve Koch Cesaro` — the Koch curve at 60° opening into the Cesàro curve at 85° |
+> | **Descend** on a rule that divides by three | `Curve Peano Descent` |
 > | a rule that **closes into a loop** | `Curve Weave` — the one shipped curve you can trace all the way round |
-> | what the **different rules** look like | `Curve Lattice` (a cube-filling lattice), `Curve Gasket` (a triangle), `Curve Island` (a coastline), `Curve Thicket` (a branching plant), `Curve Triad` (a triangular grid, the only rule that turns at 120°), `Curve Dragonfold` (a folded ribbon) and `Curve Scroll` (a curve that overlaps itself) |
+> | a **Customize** generator, edited in the table | `Curve Rosette Chain` — three steps no named rule has, a chain of hexagonal rosettes opening into 3-D as its Twist breathes |
+> | a **Customize** starting from a 3-D rule | `Chaos to Order` — the Hilbert 3-D lattice under Customize, drawn as cells, its Twist breathing so the lattice folds out of disorder into order and back |
+> | **Bush 3D** growing, as a surface | `Growing Corals` — the growth rule with its Recursion breathing, so branches sprout and recede, drawn as Liquid under a 3-D Symmetry of overlapping copies |
+> | a curve under a **liquid surface** | `Liquid Maze` — the Hilbert 3-D lattice of `Curve Subdivide`, its recursion breathing, drawn as liquid |
+> | what the **different rules** look like | `Curve Lattice` (a cube-filling lattice), `Curve Gasket` (a triangle), `Curve Island` (a coastline), `Curve Thicket` (a branching plant), `Curve Triad` (a triangular grid, the only rule that turns at 120°), `Curve Dragonfold` (a folded ribbon) and `Curve Minkowski` (a square-wave coastline) |
 
 #### A wave slot, control by control
 

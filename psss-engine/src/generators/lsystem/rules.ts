@@ -42,7 +42,9 @@ export type RuleKey =
   | 'peano'
   | 'levyC'
   | 'knopp'
-  | 'bush3d';
+  | 'bush3d'
+  | 'koch'
+  | 'minkowski';
 
 /**
  * One production system plus the metadata the UI and the checkers need.
@@ -96,6 +98,13 @@ export interface LSystemRule {
    * that lies is worse than an absent one.**
    */
   readonly zoomInverse: boolean;
+  /**
+   * v8 `39.A7` — **the zoom's subdivision factor `s`**: how many cells per axis one recursion level adds.
+   * Hilbert halves a cell (2), Peano thirds it (3), so one octave of `Descend` is `log(zoom)/log(s)` levels and
+   * the band snaps to an aligned `s^k` sub-square (spec §2.6.2). ⚠️ **Optional and read `?? 2`** — the zoom
+   * was Hilbert-only and wrote that factor into its arithmetic; only a rule that also zooms needs to say it.
+   */
+  readonly zoomBase?: number;
   readonly provenance: string;
 }
 
@@ -105,12 +114,12 @@ export interface LSystemRule {
  * not — see `LSYSTEM_RULE_BY_KEY` below, which closes the gap in the other direction.
  *
  * ⚠️⚠️ **FOURTEEN RULES WERE ADMITTED BY THE OWNER (`36.Q3`, 2026-11-02: *"ship all of them without a
- * conditional gate, we will check it in UI later and do a review"*) AND THIRTEEN ARE HERE.** The
- * fourteenth, **`Hill tetrahedron`, IS NOT AN L-SYSTEM AND IS NOT FAKED**: it is a rep-tile traversal
- * with no production string in the prototype and none published in the spec, so admitting it needs a
- * SECOND list builder. `36.D11`'s own note says so (*"may require a SECOND list builder, which
- * `36.D11`'s method cannot price"*). **It is recorded as owed rather than approximated, because a
- * wrong production would ship as a named fractal that is not that fractal.**
+ * conditional gate, we will check it in UI later and do a review"*) AND THIRTEEN OF THEM ARE HERE** —
+ * plus Koch and Minkowski (Phase 39), so fifteen rules in all. The fourteenth admitted, **`Hill
+ * tetrahedron`, IS NOT AN L-SYSTEM AND IS NOT FAKED**: it is a rep-tile traversal, and Phase 39 MEASURED
+ * that no single-generator traversal of its rep-8 dissection is continuous (`p60-hill*.mjs`) — an exact
+ * curve needs several alternating rules. ⛔ **OUT-SCOPED to Phase 41 by the owner (2026-11-06, `39.D16`),
+ * never approximated, because a wrong construction would ship as a named fractal that is not that fractal.**
  *
  * ⚠️⚠️ **AND TWO OF THE ADMITTED THIRTEEN ARE FLAGGED FOR THE REVIEW, NOT MERELY UNTESTED:**
  * `knopp` is very likely the `levyC` production reflected (both are base-2 two-child turn sequences at
@@ -267,7 +276,9 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
     recursionRange: [1, 4],
     bracketed: false,
     closed: false,
-    zoomInverse: false,
+    // v8 `39.A7` — Peano visits every aligned 3^k sub-square as one contiguous run, so it zooms by thirds.
+    zoomInverse: true,
+    zoomBase: 3,
     provenance: 'widened by 36.Q3. Admitted on EXPANSION FACTOR -- base 9 against Hilbert\'s 4 -- and '
       + 'it self-touches at corners where Hilbert does not. FASS with a known inverse, so it is the '
       + 'cheapest SECOND zoom host when 36.9 lands',
@@ -329,6 +340,40 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
       + 'and DRAWS on f where f means move-without-drawing. Both are fixed here; the figure is '
       + 'therefore NOT the one the prototype rendered, and that is deliberate',
   },
+  {
+    key: 'koch',
+    name: 'Koch',
+    axiom: 'F',
+    productions: { F: 'F+F--F+F' },
+    drawSymbols: '',
+    publishedAngle: 60,
+    angleRange: [20, 88],
+    recursionRange: [1, 7],
+    bracketed: false,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 39.A5, the textbook Koch curve (Prusinkiewicz & Lindenmayer, The Algorithmic Beauty of '
+      + 'Plants, fig. 1.9). ONE rule with TWO landmarks, because the angle is not part of the rule (36): 60deg '
+      + 'is the Koch curve and 85deg is the CESARO curve -- the same production, measured by the spec (s1.2) as '
+      + 'density 1.68 -> 2.61 across the sweep. The range stops at 88 because at 90 the two middle segments '
+      + 'fold back onto each other and the curve degenerates',
+  },
+  {
+    key: 'minkowski',
+    name: 'Minkowski sausage',
+    axiom: 'F',
+    productions: { F: 'F+F-F-FF+F+F-F' },
+    drawSymbols: '',
+    publishedAngle: 90,
+    angleRange: [45, 135],
+    recursionRange: [1, 5],
+    bracketed: false,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 39.A5, the Minkowski sausage (Prusinkiewicz & Lindenmayer, fig. 1.10) -- the square-wave '
+      + 'coastline, eight segments per step, a silhouette no other shipped rule draws. Its 39.A10 demo carries '
+      + 'the drop condition "reads like a third square maze beside Hilbert 2D / Moore"',
+  },
 ];
 
 /**
@@ -386,12 +431,17 @@ export const LSYSTEM_DEFAULT_RULE: RuleKey = 'hilbert3d';
  * cap**: those three rules are exactly the ones whose deep end the cap had been hiding, and shipping the
  * cap removal without this would have traded a coarse figure for a visibly jittering one.
  *
- * ⚠️⚠️ **THE OTHER BRACKET-USING RULES ARE STILL SOLVED SHALLOW AND STILL OVER BUDGET AT THE DEPTHS
- * THEIR OWN DEMOS RUN AT — PRE-EXISTING, MEASURED, AND DELIBERATELY NOT TOUCHED HERE**: `terdragon` 6.3°
- * (`Curve Triad` at 6), `kochQuad` 12° (`Curve Morph` at 4), `arrowhead` 4.5° (`Curve Gasket` at 7),
- * `gosper` 4.2° (`Curve Island` at 4), and `hilbert2d` 1.4° (over at depth 2 only). `plant` and `bush3d`
- * hold across their whole range. **Re-solving those five is a separate change with five shipped demos in
- * its blast radius; do not fold it into an unrelated sitting.**
+ * ⚠️⚠️ **v8 `39.A6(a)`, 2026-11-05: THE FIVE RULES THAT WERE STILL SOLVED SHALLOW ARE RE-SOLVED** — `terdragon`
+ * 6.30 -> **3.35**, `kochQuad` 12.00 -> **3.51**, `arrowhead` 4.50 -> **1.92**, `gosper` 4.20 -> **1.72**, `hilbert2d`
+ * 1.40 -> **1.25** (`p39a6-a2-alldepth.mjs`). ⚠️⚠️ **AND THE RULE THEY WERE SOLVED BY IS NOT "AT THE RANGE MAXIMUM":
+ * THAT PREMISE WAS FALSIFIED.** The error is NOT monotone in depth on every rule — on `hilbert2d` it FALLS with
+ * depth (2.7e-2 at depth 2, 1.0e-2 at 6, at 3.65°) and `gosper` is worst at depth 1 — so each width is the
+ * MINIMUM over every depth in range AND over a solve centred on the rule's own demo sweep (which is what binds
+ * `kochQuad`, `arrowhead` and `terdragon`, whose demos sweep away from the landmark). Demo error at the shipped
+ * pose fell 3-11x (e.g. `Curve Morph` 6.75e-2 -> 6.2e-3). ⚠️ Five shipped demos' wobble became visibly smoother
+ * at the cost of more crossings (14 / 13 / 24 / 27 / 36 per 90° sweep); every new width stays above
+ * `LSYSTEM_MIN_USEFUL_BRACKET_DEG`, so all five remain bracketed. The engine-grid sweep sits at 1.00-1.04e-2
+ * at rMax, i.e. the round-down margin is thin. `dragon`/`levyC`/`knopp` (11-04, solved at rMax) are unchanged.
  *
  * ⚠️ **`bush3d`'s `yaw` figure solved to the 32° ceiling and is CAPPED at 12 here, because the ceiling
  * is an artefact rather than a tolerance: its yaw symbols sit inside the `{…}` polygon-fill block, whose
@@ -401,18 +451,21 @@ export const LSYSTEM_DEFAULT_RULE: RuleKey = 'hilbert3d';
  */
 export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number }> = {
   hilbert3d: { yaw: 0.22, multi: 0.04 },
-  hilbert2d: { yaw: 1.40, multi: 1.40 },
+  hilbert2d: { yaw: 1.25, multi: 1.25 },
   dragon: { yaw: 1.17, multi: 1.17 },
-  terdragon: { yaw: 6.30, multi: 6.30 },
-  kochQuad: { yaw: 12.00, multi: 12.00 },
-  arrowhead: { yaw: 4.50, multi: 4.50 },
-  gosper: { yaw: 4.20, multi: 4.20 },
+  terdragon: { yaw: 3.35, multi: 3.35 },
+  kochQuad: { yaw: 3.51, multi: 3.51 },
+  arrowhead: { yaw: 1.92, multi: 1.92 },
+  gosper: { yaw: 1.72, multi: 1.72 },
   plant: { yaw: 12.00, multi: 12.00 },
   moore: { yaw: 0.85, multi: 0.85 },
   peano: { yaw: 0.69, multi: 0.69 },
   levyC: { yaw: 1.43, multi: 1.43 },
   knopp: { yaw: 1.43, multi: 1.43 },
   bush3d: { yaw: 12.00, multi: 0.72 },
+  // v8 `39.A5` — solved 2026-11-05 by the `39.A6` rule (min over every depth and the landmark-centred sweep).
+  koch: { yaw: 2.59, multi: 2.59 },        // binds at depth 7 near Cesaro (83 deg) -- p39a5-bracket-new.mjs
+  minkowski: { yaw: 2.35, multi: 2.35 },   // binds at depth 5, centre 116 deg
 };
 
 /**
@@ -500,6 +553,8 @@ export function defaultLSystemConfig(): {
   descend: { base: number; amplitude: number; frequency: number };
   smoothness: number;
   centre: number[];
+  twist: { base: number; amplitude: number; frequency: number };
+  stretch: { base: number; amplitude: number; frequency: number };
 } {
   const r = LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
   const still = (base: number) => ({ base, amplitude: 0, frequency: 0 });
@@ -512,5 +567,8 @@ export function defaultLSystemConfig(): {
     descend: still(DESCEND_MIN),
     smoothness: 0,
     centre: [0, 0, 0],
+    // v8 `39.A3`/`39.A4` — both at their IDENTITY, so a fresh curve takes the turtle path bit-exactly.
+    twist: still(0),
+    stretch: still(1),
   };
 }

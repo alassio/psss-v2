@@ -372,6 +372,15 @@ const UNCONDITIONAL_LEAVES = {
   'overlay.travelDepthX': 0, 'overlay.travelDepthY': 0, 'overlay.travelDepthZ': 0,
   'overlay.travelRateX': 0, 'overlay.travelRateY': 0, 'overlay.travelRateZ': 0,
   'overlay.sharpnessDepth': 0, 'overlay.sharpnessRate': 0,
+  /*
+   * v8 Phase 40 — Electric Discharge's four amounts, admitted AT `DISCHARGE_DEFAULTS` (not at 0). ⚠️ The GATED
+   * shape (the twist's): the snapped switch `dischargeEnabled` is not on the list, so an endpoint over a deck with
+   * no discharge carries it absent, and `electricDischarge.apply()` does not run — the amounts are not read.
+   */
+  'overlay.dischargeIntensity': 1.375, 'overlay.dischargeFilament': 1.5,
+  'overlay.dischargeCrackle': 0.875, 'overlay.dischargeBranching': 0,
+  // v8 Phase 42 — the 3-D Symmetry offset: inert at its identity while the snapped group is off (overlay-rules.ts).
+  'overlay.sym3dRadius': 0,
 };
 chk('every UNCONDITIONAL_LEAVES path belongs to a key on UNCONDITIONAL_KEYS',
   Object.keys(UNCONDITIONAL_LEAVES).every((p) => UNCONDITIONAL_KEYS.includes(p.split('.')[1])),

@@ -471,6 +471,72 @@ export interface LSystemConfig {
   smoothness: number;
   /** The zoom's centre in figure space. Static (`36.D3`). */
   centre: number[];
+  /**
+   * v8 `39.A3` — **`Twist`**: degrees added to the orientation of the rule's TWISTABLE copies
+   * (`LSYSTEM_GENERATORS`), the axis that folds the dragon into the Lévy C curve. ⚠️⚠️ **OPTIONAL and read
+   * `?? 0`, never migrated** (invariant 14's preference: a preset that predates it is bit-identical,
+   * because at the identity the turtle stays the builder). Present only where the rule has a Twist row.
+   */
+  twist?: ModulatedValue;
+  /**
+   * v8 `39.A4` — **`Stretch`**: one shared factor on the rule's STRETCHABLE steps (the Plant's branches and
+   * their retraces), at every level at once (`39.D4`). ⚠️ Read `?? 1`, never migrated; the identity is
+   * **1**, not 0 — `Grow`'s trap in the other direction.
+   */
+  stretch?: ModulatedValue;
+  /**
+   * v8 `39.C1` — **the generator a `Customize` rule draws**, present IFF `rule === 'customize'` and never read
+   * otherwise (spec §3.4: one resolver, `resolveCustomRule`). ⚠️⚠️ **Structure, never animated and never
+   * interpolated** (spec §2.4): the Mixer snaps it WITH the rule and Evolution never mutates it. A format
+   * ADDITION — absent on every preset that predates it, so no migration and no `metadata.version` bump.
+   */
+  custom?: CustomCurveGenerator;
+}
+
+/**
+ * v8 `39.C1` — one step of a custom curve generator (spec §2.2). A `move` walks one segment; a `retrace` walks
+ * back along the most recent move not yet retraced, and EVERY property of it is DERIVED from that partner
+ * (spec §2.2.1) — so it stores nothing, and an edit to the out-leg can never leave the return leg drawing a
+ * different subtree.
+ */
+export type CustomCurveStep =
+  | {
+    kind: 'move';
+    /** In UNITS of the Yaw angle, applied before walking — one Yaw slider scales every turn together. */
+    turn: number;
+    /** In UNITS of the Pitch angle; 0 on every planar generator. */
+    lift: number;
+    /** Relative; > 0. */
+    length: number;
+    /** This copy is walked backwards. */
+    reverse: boolean;
+    /** This copy's rotation about its own axis, degrees. 180 = mirrored. */
+    orient: 0 | 90 | 180 | 270;
+    /** Whether `Twist` acts on this copy. */
+    twistable: boolean;
+    /** Whether `Stretch` scales this step's length. */
+    stretchable: boolean;
+  }
+  | { kind: 'retrace' };
+
+/** v8 `39.C1` — a custom generator: its steps, what each leaf emits, and the frame captured at seeding. */
+export interface CustomCurveGenerator {
+  steps: CustomCurveStep[];
+  /** `path` emits the joints; `cells` the centre of each piece's tile, offered only when the generator fills space. */
+  draw: 'path' | 'cells';
+  /**
+   * ⚠️ **The figure's orientation, captured from the rule it was seeded from**, so choosing `Customize` and then
+   * editing does not spin the figure: degrees about the view axis and a mirror — or, for a 3-D seed (Hilbert 3D),
+   * a full orthonormal `basis` (row-major 3×3), which wins when present.
+   */
+  frame: { rotate: number; mirror: boolean; basis?: number[] };
+  /**
+   * v8 Phase 39 — **the STARTING SHAPE (the spec's initiator)**: the segments the copies are laid along at the top
+   * level, instead of the single segment a plain generator repeats along. It may CLOSE into a loop — that is what
+   * makes Moore (four Hilbert copies round a square) expressible. Absent = the single segment, so every generator
+   * without one draws exactly as before.
+   */
+  initiator?: CustomCurveStep[];
 }
 
 export interface AttractorParams {

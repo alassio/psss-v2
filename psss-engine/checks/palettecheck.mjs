@@ -480,8 +480,53 @@ const AUTHORED_INDEX_PALETTES = {
   // ⚠️ Declared `Cycle: Solar` first and the body moved to `Fire` during the look pass — this clause
   // caught the stale declaration, which is the direction nobody expects it to work in.
   'Curve Dragonfold': 'Fire',
-  'Curve Scroll': 'Pastel',
+  // (the `levyC` `Curve Scroll` declared `Pastel` here; the owner deleted it 2026-11-08 and the name now belongs to the
+  // former `Curve Fold B`, declared below.)
   'Curve Plane Dive': 'Classic: ice',
+  /*
+   * ─── 2026-11-05 — v8 `39.A10`, the Stage A demos (Twist, Stretch, the new Koch / Minkowski rules, the Peano
+   * zoom) ──────────────────────────────────────────────────────────────────────────────────────────────
+   *
+   * ⚠️ All ten take their LOOK from an owner-finetuned curve demo and author a DIFFERENT palette, so a family that
+   * shares a parent stays distinct on the one axis the eye reads first. All map `index`, for the block above's
+   * reason. `Curve Fold A` / `Curve Scroll` (`Curve Fold B` until 2026-11-08) share `Aurora` on purpose: they are a Mixer pair that must differ
+   * ONLY in `twist`, so the crossfade plays the fold and nothing else.
+   */
+  'Curve Fold': 'Cycle: Solar',
+  'Curve Fold A': 'Aurora',
+  'Curve Scroll': 'Aurora',
+  'Curve Koch Cesaro': 'Prismatic',
+  'Curve Minkowski': 'Cycle: Indigo',
+  'Curve Breathing Thicket': 'Warm',
+  'Curve Spiral Thicket': 'Cycle: Azure',
+  'Curve Peano Descent': 'Aurora',
+  'Curve Hilbert Opening': 'Neon',
+  'Curve Peano Fold': 'Pastel',
+  /*
+   * ─── 2026-11-05 — v8 Phase 40, the Electric Discharge demos. Each keeps its PARENT's authored palette unchanged
+   * (`Quader Star Eight`, `Curve Weave`, `Curve Fold`), because the demo is about the effect, not a new look —
+   * so these three rows restate their parents' declarations (a fourth demo, `Pipes Discharge`, was deleted 11-05).
+   */
+  'Quader Discharge': 'Cycle: Neutral',
+  'Curve Weave Lightning': 'Cycle: Indigo',
+  // ⚠️ 2026-11-08: `Curve Fold Discharge` was REPLACED by the owner's finetuned export, which maps `temperature`
+  // (`Material: liquid`, `LiquidLight`) — so it LEAVES this `index` list.
+  // 2026-11-05 — v8 `39.C7`, the Customize demo. ⚠️ 2026-11-08: REPLACED by the owner's finetuned export, which keeps
+  // `index` but authors its OWN palette, `Material: liquid` (under a `Customize` look, no material).
+  'Curve Rosette Chain': 'Material: liquid',
+  // 2026-11-08 — the owner's own `Growing Corals` (`Curve Island` on Bush 3D, liquid): its OWN palette under `index`.
+  'Growing Corals': 'Material: organic',
+  // 2026-11-06 — v8 Phase 42 (revised to positions × copies at each), the 3-D Symmetry demos: each restates its
+  // PARENT's authored palette unchanged (`Curve Morph`, `Curve Spiral Thicket`, `Curve Breathing Thicket`, `Curve Koch
+  // Cesaro`, `Curve Hilbert Opening`, `Curve Tilt`) — the demo is about the arrangement. ⚠️ 2026-11-07: three were
+  // REPLACED by the owner's finetuned exports — `Subdivide Sphere` now maps `index` (its parent maps `depth`), so it
+  // gains a row with its own `Warm`; `Thicket Globe` now maps `phase` with `Sunset`, so it LEAVES this `index` list.
+  // ⚠️ 2026-11-08: the other four were replaced too — `Morph Wreath` now authors its OWN `Midnight`; `Breathing Crown`
+  // (`phase`, `Classic: thermal`) and `Tilt Octahedron` (`age`, `Ocean`) leave the `index` list; `Hilbert Tetra` keeps `Neon`.
+  'Subdivide Sphere': 'Warm',
+  'Morph Wreath': 'Midnight',
+  'Cesaro Cube': 'Prismatic',
+  'Hilbert Tetra': 'Neon',
   /*
    * ─── v8 `35.7`, 2026-10-30 — the ORIENTATION-ANGLE demos ──────────────────────────────────────
    *

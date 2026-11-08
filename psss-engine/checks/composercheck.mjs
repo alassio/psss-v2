@@ -2559,7 +2559,32 @@ seed('a thumbnail seed wave that gained a modulator, putting an uncaptioned four
    */
   const modelSrc = readFileSync(join(ROOT, 'src/ui/synthesis-lab/composer-model.ts'), 'utf8');
   const modelCopy = copyOf(modelSrc).filter(l => !/^'\.\.?\//.test(l));
-  const surfaces = [...copyOf(composerTips), ...copyOf(tabSrc), ...modelCopy].join('\n');
+  /*
+   * ⚠️⚠️ **v8 `39.Q3` (owner, 2026-11-05): `twist` IS NOW A STORED FIELD OF ITS OWN — `generators.lsystem.twist`,
+   * labelled `Twist`.** 16.12 retired the word because it was a SECOND name for the wave rows' `phase` field, and
+   * the rule is *one word per stored field*; that rule now REQUIRES the curve body to say `Twist`. So the
+   * exemption is exactly the curve body's own copy and nothing else: the `composer.twist` / `composer.stretch`
+   * tooltips and the literals inside `buildLSystemSection` and `syncCurveExclusion` — and, since Stage C, the
+   * generator editor (`buildGeneratorEditor`, whose `Twist` column IS the `twistable` mask) and its `composer.gen*` /
+   * `composer.customize*` tooltips. ⚠️ **It fails CLOSED**: a
+   * rename that empties a region leaves its literals in the scan, so the word reappears and this clause goes red.
+   * A `twist` anywhere in the WAVE rows' copy is still the regression 16.12 was written for.
+   */
+  const region = (src, start) => {
+    const i = src.indexOf(start);
+    if (i < 0) return '';
+    const j = src.indexOf('\n  private ', i + start.length);
+    return src.slice(i, j < 0 ? src.length : j);
+  };
+  const curveRegions = [region(tabSrc, '  private buildLSystemSection('), region(tabSrc, '  private syncCurveExclusion('),
+    region(tabSrc, '  private buildGeneratorEditor(')];
+  let tabScan = tabSrc;
+  for (const r of curveRegions) if (r) tabScan = tabScan.replace(r, '');
+  // The bare stored-field KEY (`CurveKey`'s member, `curveMV`'s comparison) is an identifier, not copy — the
+  // same reason the tooltip keys are excluded above. Only the EXACT literal is removed; `'Twist …'` copy stays.
+  tabScan = tabScan.replace(/'twist'/g, '');
+  const tipsScan = composerTips.replace(/'composer\.(twist|stretch|gen[A-Za-z]+|customize[A-Za-z]*)':[\s\S]*?(?=\n  '|\n  \/\/|\n\};|$)/g, '');
+  const surfaces = [...copyOf(tipsScan), ...copyOf(tabScan), ...modelCopy].join('\n');
   const retired = ['breathes', 'AM depth', 'FM depth', 'twist'];
   const hit = (corpus, w) => new RegExp(w.replace(/ /g, '\\s+'), 'i').test(corpus);
   const found = retired.filter(w => hit(surfaces, w));

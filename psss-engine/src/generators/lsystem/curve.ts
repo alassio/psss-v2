@@ -208,6 +208,61 @@ export function resampleSmoothInto(
 }
 
 /**
+ * v8 `39.A2` — **resample at equal steps of ARC LENGTH**, with the same spline relaxation as
+ * `resampleSmoothInto` when `smoothness > 0`.
+ *
+ * ⚠️⚠️ **USED ONLY WHILE `Stretch` IS OFF ITS IDENTITY, AND THAT IS A DECISION, NOT AN OPTIMISATION.**
+ * Index resampling equals arc-length resampling exactly when every segment has the same length, which is
+ * true of every shipped rule (`36.Q4` consequence 1, asserted by `figurecheck`); a stretched step breaks it
+ * and the break COMPOUNDS with depth (spec §7.1.1: the Plant at stretch 0.5 reads density 50 by index and 5
+ * by arc length). Keeping the index path at the identity keeps the 14 shipped demos bit-identical rather
+ * than identical-to-rounding — `39.A2`'s measurement is that the two agree, not that one replaces the other.
+ *
+ * ⚠️ `cum` is caller-owned scratch of at least `srcCount` entries (invariant 8: this runs per frame).
+ */
+export function resampleArcInto(
+  out: Float64Array,
+  outCount: number,
+  src: Float64Array,
+  srcCount: number,
+  smoothness: number,
+  cum: Float64Array,
+): void {
+  if (outCount <= 0) return;
+  if (srcCount < 2) { resampleInto(out, outCount, src, srcCount); return; }
+  cum[0] = 0;
+  for (let j = 1; j < srcCount; j++) {
+    const a = (j - 1) * 3, b = j * 3;
+    cum[j] = cum[j - 1]! + Math.hypot(src[b]! - src[a]!, src[b + 1]! - src[a + 1]!, src[b + 2]! - src[a + 2]!);
+  }
+  const total = cum[srcCount - 1]!;
+  if (!(total > 0)) { resampleInto(out, outCount, src, srcCount); return; }
+  const last = srcCount - 1;
+  let k = 0;
+  for (let i = 0; i < outCount; i++) {
+    // Same parameterisation as `resampleInto` — it stops short of the final entry — measured in length.
+    const u = (i / outCount) * total;
+    while (k < last - 1 && cum[k + 1]! <= u) k++;
+    const seg = cum[k + 1]! - cum[k]!;
+    const f = seg > 0 ? (u - cum[k]!) / seg : 0;
+    const a = k * 3, b = (k + 1) * 3, o = i * 3;
+    if (smoothness > 0) {
+      const c0 = (k - 1 >= 0 ? k - 1 : 0) * 3;
+      const w0 = 0.5 * (1 - f) * (1 - f), w1 = 0.5 + f * (1 - f), w2 = 0.5 * f * f;
+      for (let q = 0; q < 3; q++) {
+        const lin = src[a + q]! + (src[b + q]! - src[a + q]!) * f;
+        const spl = w0 * src[c0 + q]! + w1 * src[a + q]! + w2 * src[b + q]!;
+        out[o + q] = lin + (spl - lin) * smoothness;
+      }
+    } else {
+      out[o] = src[a]! + (src[b]! - src[a]!) * f;
+      out[o + 1] = src[a + 1]! + (src[b + 1]! - src[a + 1]!) * f;
+      out[o + 2] = src[a + 2]! + (src[b + 2]! - src[a + 2]!) * f;
+    }
+  }
+}
+
+/**
  * Component-wise lerp of two already-resampled buffers of the same length, into `out`.
  *
  * ⚠️ **`t === 0` and `t === 1` take a COPY branch rather than arithmetic.** `a + 0*(b-a)` is exact for

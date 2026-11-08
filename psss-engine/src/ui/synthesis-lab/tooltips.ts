@@ -61,6 +61,24 @@ export const CONTROL_TIPS: Record<string, string> = {
   symmetryMirror: 'Reflects each sector into its neighbour so the seam matches. Recommended: the un-mirrored '
     + 'form jumps at the sector edge, which visibly breaks trails in Ribbon and Neon modes. Meaningless at '
     + 'fold 1, where the row is hidden.',
+  // ---- v8 Phase 42 — 3-D Symmetry ----
+  sym3dLayout: 'Repeats the whole figure in 3-D around the centre. Choose where the copies sit: on a Ring or a Sphere '
+    + 'of as many positions as you like, or on the points of a solid — Tetrahedron, Octahedron, Cube, Icosahedron, '
+    + 'Dodecahedron. Each copy is the complete figure, never cut, and the arrangement turns with the figure.',
+  sym3dPositionsRing: 'How many positions around the ring, evenly spaced: 2 doubles the figure, 3 triples it, and so on.',
+  sym3dPositionsSphere: 'How many positions on the sphere, spread as evenly as possible. Most counts have no perfectly '
+    + 'symmetric arrangement on a sphere, so this is even rather than crystal-like.',
+  sym3dOn: 'Which points of the solid carry a copy: its vertices, the middles of its edges, or the centres of its '
+    + 'faces. The cube has 8, 12 and 6; the icosahedron 12, 30 and 20.',
+  sym3dLocal: 'How many copies share each position, turned evenly about it: 2 makes a pair, 3 a three-way star. The '
+    + 'total is positions × copies here.',
+  sym3dRadius: 'How far the positions are from the centre. At 0 every copy sits on the centre and they overlap into one '
+    + 'symmetric solid; from about 1.5 they separate into distinct copies. The whole arrangement is scaled back so it '
+    + 'keeps the figure\'s size.',
+  sym3dMirrors: 'Mirrors every second copy at a position, so pairs become mirror images of each other. Shown once there '
+    + 'are at least 2 copies at each position.',
+  sym3dFacing: 'Outward turns each copy to face away from the centre, so a ring reads as a wreath and a sphere as a '
+    + 'shell. Parallel keeps every copy the way the original faces.',
 
   // ---- Deformation (v8 Phase 30) ----
   /*
@@ -267,10 +285,25 @@ export const CONTROL_TIPS: Record<string, string> = {
     + 'occludes itself where the curve crosses.',
 
   // ---- Neon Lines ----
-  linesEnabled: 'Connects consecutive particles with glowing line segments, turning a point cloud into a '
-    + 'wireframe. Best on a low particle count, where the individual segments are still legible.',
+  linesEnabled: 'Draws each particle\'s recent path as a short glowing trail, so the figure\'s motion shows as '
+    + 'light-trails. A figure that does not move draws none. Best on a moderate particle count, where the '
+    + 'individual trails are still legible. Turning Neon Lines off also turns off Electric Discharge, which '
+    + 'needs their glow.',
   lineWidth: 'Line thickness in pixels. Past about 4 the segments merge into a solid ribbon and the '
     + 'wireframe reading is lost.',
+
+  // ---- Electric Discharge (v8 Phase 40) ----
+  dischargeEnabled: 'Crackling filaments of light around the figure, like an electric discharge. The light is '
+    + 'pulled toward the brightest parts of the image, which keeps collapsing it into thin, unstable filaments. '
+    + 'It tears the glow of the Neon Lines apart, so it needs them: turning it on also turns Neon Lines on '
+    + '(which ends Ribbons), and turning Neon Lines off turns it off.',
+  dischargeIntensity: 'How strongly the light is pulled into filaments. Low is a faint shimmer; high is a '
+    + 'violent, tightly wound discharge.',
+  dischargeFilament: 'How thick the filaments are, in pixels: low is hair-fine, high is thick, softer arcs.',
+  dischargeCrackle: 'How fast the filaments flicker and how long they live. Low is calm and slow; high is a '
+    + 'violent, fast crackle that also keeps a slow figure flickering.',
+  dischargeBranching: 'Makes the filaments fork and wander along a slowly drifting field instead of hugging the '
+    + 'figure\'s edges — from 0 (none) to lightning-like branches.',
 
   // ---- Film Look ----
   filmLook: 'A named bundle of grading settings — bloom, tone curve, exposure, saturation, vignette and the '
@@ -709,8 +742,10 @@ export const HEADER_TIPS: Record<string, string> = {
   'Splat Shear': 'Chooses which way a material splat is stretched across its direction of travel. Follow path keeps every mark the same apparent width; Flat nib fixes the cross-axis to the screen so marks widen across the motion and narrow along it, like a calligraphy pen. Needs a material to be visible at all.',
   'Ribbon Rendering': 'Draws the particle path as a continuous solid band rather than as separate points, so '
     + 'the curve reads as a surface.',
-  'Neon Lines': 'Connects consecutive particles with glowing segments, turning the point cloud into a '
-    + 'wireframe. Most legible at a low particle count.',
+  'Neon Lines': 'Each particle draws its recent path as a short glowing trail, so the figure\'s motion shows '
+    + 'as light-trails. Most legible at a moderate particle count.',
+  'Electric Discharge': 'Crackling, forking filaments of light around the figure, like an electric discharge. '
+    + 'Needs Neon Lines: turning it on turns them on (ending Ribbons), and turning them off turns it off.',
   'Film Look': 'The whole grading chain — bloom, tone curve, exposure, colour, vignette — as named bundles. '
     + 'Pick Customize to edit the individual values.',
   // ⚠️ Since 21.4g this is the ONE palette header — the Customize sub-panel's `Palette` sub-header and its
@@ -1533,8 +1568,66 @@ export const TAB_TIPS: Record<string, string> = {
     + 'rather than the whole figure scaling. The range is the rule\'s own.',
   'composer.yaw': 'The turtle\'s left/right turn, in degrees. \u26a0 The rule\'s published angle is a '
     + 'LANDMARK, not a limit \u2014 it is where this production is the NAMED fractal, and other angles give '
-    + 'other named fractals. Sweeping it is the point. \u26a0 This is not the figure\'s orientation; that is '
-    + 'Rotation, in Visual FX.',
+    + 'other named fractals. Sweeping it is the point. Under Customize it is the UNIT every Turn in the '
+    + 'generator table counts in, so it bends all of them together. \u26a0 This is not the figure\'s '
+    + 'orientation; that is Rotation, in Visual FX.',
+  'composer.twist': 'Rotates chosen copies of the curve about their own axis, in degrees, at every level at '
+    + 'once — so the flat curve opens into 3-D. On Dragon, 180° IS the Lévy C curve (and on Lévy C, '
+    + 'the dragon): one slider folds one named fractal into the other. On Plant it turns the branches about '
+    + 'the trunk. On Hilbert 2D and Peano the square lattice opens out — there Twist works at the lattice '
+    + 'angle only, so Yaw is held at 90° while Twist is in use. Only shown where the rule has copies to twist.',
+  'composer.stretch': 'Grows or shrinks the branches, at every level at once, while the trunk keeps its '
+    + 'length. 1× is the rule as published. Only shown for a rule with branches (Plant).',
+  // ---- v8 Phase 39 Stage C — the Customize rule and the generator editor ----
+  'composer.customize': 'Customize: edit the generator — the few straight steps the rule repeats inside every '
+    + 'step, level after level, which is all a rule is. It starts from the rule you were on and changes nothing '
+    + 'until you edit a step. ⚠ Choosing a named rule again replaces your edits, with no confirmation.',
+  'composer.customizeUnavailable': 'Bush 3D cannot be customized: it is a GROWTH rule — each level adds branches at '
+    + 'the tips and lengthens the stems — not a shape repeated inside itself, so it has no generator to edit. A '
+    + 'plant-growth editor is planned as a future phase. Pick another rule first.',
+  'composer.customizeNote': 'The steps the rule repeats. Read them as a walk: each row turns, then walks one '
+    + 'segment; recursion then replaces every segment with a smaller copy of the whole walk. While the table is '
+    + 'still exactly a named rule\'s, the figure IS that rule; the first edit makes it your own curve, and '
+    + 'undoing the edit makes it the named rule again.',
+  'composer.genDraw': 'Path draws through the joints between pieces; Cells draws through the centre of each '
+    + 'piece\'s square. Cells is offered only when the generator fills space — every piece one cell from the '
+    + 'next and none twice — and it is what grants Descend.',
+  'composer.genKind': 'Move walks a new segment. Retrace walks back along the most recent move not yet retraced '
+    + '— how a branch is drawn as one stroke, out and back. A retrace copies everything from its move, so its '
+    + 'own cells are greyed out.',
+  'composer.genTurn': 'How far this step turns before it walks, in units of Yaw and relative to the previous '
+    + 'step: 0 is straight on, +1 one Yaw angle left, −2 two to the right. Step 1\'s turn only rotates the '
+    + 'whole figure, so the shape lives in the turns from step 2 on. Terdragon is 0, +1, −1 at Yaw 120°: a '
+    + 'zig-zag whose repeats fill a triangular grid. Because every turn is a multiple of Yaw, the Yaw slider bends '
+    + 'the whole generator together.',
+  'composer.genLift': 'How far this step tilts up or down out of the plane before it walks, in units of Pitch '
+    + 'and relative to the previous step. 0 keeps the generator flat.',
+  'composer.genLength': 'This step\'s length, relative to the others. Unequal lengths are fine: the curve is '
+    + 'spaced along its length either way.',
+  'composer.genReverse': 'Walk this piece backwards: the smaller copy laid along it runs end to start, so its own '
+    + 'pattern comes out in the opposite order. The segment itself does not move.',
+  'composer.genOrient': 'Not a turn — the walk is unchanged. It rotates the smaller copy laid along this piece '
+    + 'about the piece\'s own direction: 180° mirrors the copy to the other side, 90° and 270° stand it '
+    + 'out of the plane. 0° on every step of most rules.',
+  'composer.genTwistable': 'Let Twist act on this piece. Twist then rotates every marked piece about its own '
+    + 'direction by the same angle.',
+  'composer.genStretchable': 'Let Stretch act on this step: Stretch then lengthens or shortens every marked '
+    + 'step by the same factor, at every level at once.',
+  'composer.genMoveUp': 'Move this step one place earlier.',
+  'composer.genMoveDown': 'Move this step one place later.',
+  'composer.genDelete': 'Remove this step. A retrace that depended on it is removed with it.',
+  'composer.genAddMove': 'Add a straight step at the end.',
+  'composer.genAddRetrace': 'Add a step back along the most recent move not yet retraced. Needs an open move.',
+  'composer.genStart': 'Lay the copies along a STARTING SHAPE instead of one straight segment. It may close into a '
+    + 'loop: Moore is Hilbert 2D\'s generator laid along four steps up the square\'s centre line and back '
+    + 'down. Ticking it adds one straight step, which changes nothing until you edit it.',
+  'composer.genStartAdd': 'Add a straight step to the starting shape.',
+  'composer.genStartDelete': 'Remove this step from the starting shape (it keeps at least one).',
+  'composer.genShowLift': 'Show the Lift column, to tilt steps out of the plane and make the generator 3-D.',
+  'composer.genStatus': 'Whether the generator can be drawn. A failure keeps the figure on its last valid shape '
+    + 'until it is fixed.',
+  'composer.genDensity': 'How evenly the curve covers space, which is how evenly it is lit: about 1 is even, '
+    + 'and a high value means pieces pile on top of each other and glow brighter there.',
   'composer.pitch': 'The turtle\'s up/down turn, in degrees. Only shown for a rule whose production '
     + 'actually contains pitch symbols \u2014 most are flat and use yaw alone.',
   'composer.roll': 'The turtle\'s spin about its own heading, in degrees. Only shown for a rule whose '

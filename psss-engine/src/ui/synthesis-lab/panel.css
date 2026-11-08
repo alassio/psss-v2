@@ -1883,3 +1883,48 @@
  * lights NEITHER deck button, which is the state this styling has to be able to express. */
 .sl-mix-src-btn.active { color: #0e1620; background: #6fa8dc; border-color: #6fa8dc; font-weight: 600; }
 .sl-mix-src-btn[disabled] { opacity: 0.4; cursor: default; }
+
+/* v8 `39.Q2` (c) — a row disabled by the Composer's Twist/Yaw exclusion on a cell rule. The REASON is the
+   amber precondition note directly below the rows; a dimmed row with no visible reason is invariant 25. */
+.sl-row-disabled {
+  opacity: 0.45;
+}
+
+/* v8 `39.C3` — the Customize generator editor: one grid row per step. The Lift column exists only while shown
+   (`--lift`), so the column count follows it; inputs are compact so nine columns fit the panel width. */
+.sl-gen-table {
+  display: grid;
+  grid-template-columns: 1.4em 5.6em 3.6em 3.6em 4.2em 4.4em 2.8em 3.6em auto;
+  gap: 3px 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+  font-size: 12px;
+}
+.sl-gen-table--lift {
+  grid-template-columns: 1.4em 5.6em 3.6em 3.6em 3.6em 4.2em 4.4em 2.8em 3.6em auto;
+}
+.sl-gen-head { color: #8aa2bd; font-size: 11px; }
+.sl-gen-idx { color: #8aa2bd; text-align: right; }
+.sl-gen-num {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0e1620;
+  color: #cfe0f5;
+  border: 1px solid #2a3b50;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-size: 12px;
+}
+.sl-gen-num:disabled { opacity: 0.4; }
+.sl-gen-kind, .sl-gen-orient { padding: 1px 2px; font-size: 12px; }
+.sl-gen-acts { display: flex; gap: 2px; }
+.sl-gen-btn { padding: 0 6px; min-width: 0; font-size: 12px; }
+.sl-gen-add { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; }
+.sl-gen-lift { color: #8aa2bd; font-size: 12px; margin-left: 6px; }
+/* The starting-shape table: the generator table without its Kind column (moves only). */
+.sl-gen-table--start {
+  grid-template-columns: 1.4em 3.6em 3.6em 4.2em 4.4em 2.8em 3.6em auto;
+}
+.sl-gen-table--start-lift {
+  grid-template-columns: 1.4em 3.6em 3.6em 3.6em 4.2em 4.4em 2.8em 3.6em auto;
+}

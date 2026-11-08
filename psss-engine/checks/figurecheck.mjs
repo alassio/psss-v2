@@ -651,8 +651,12 @@ console.log('\n=== H. v8 36.8/36.9 — the smoothness BRANCH, and the zoom ===\n
     }
     return s / (n - 1);
   };
-  for (const key of ['hilbert3d', 'hilbert2d']) {
+  // ⚠️ v8 `39.A7`: DERIVED from `zoomInverse`, never a hand list — a hand list of the two Hilbert rules would
+  // have let Peano's zoom ship unmeasured, which is `32.15`'s missing-clause failure in this section's form.
+  // `descend` steps in powers of the rule's OWN base (2 on Hilbert, 3 on Peano), so each step is one level.
+  for (const key of LSYSTEM_RULES.filter((x) => x.zoomInverse).map((x) => x.key)) {
     const rule = LSYSTEM_RULE_BY_KEY[key];
+    const zb = rule.zoomBase ?? 2;
     const out = new Float64Array(N * 3);
     const cache = createFigureCache();
     const base = { rule, recursion: rule.recursionRange[0] + 1,
@@ -662,13 +666,13 @@ console.log('\n=== H. v8 36.8/36.9 — the smoothness BRANCH, and the zoom ===\n
     const ref = meanChord(out, N);
     const ratios = [];
     let anyIncontiguous = false;
-    for (const d of [2, 4, 8]) {
+    for (const d of [zb, zb * zb, zb * zb * zb]) {
       const c2 = createFigureCache();
       resolveFigure(c2, { ...base, descend: d }, out, N);
       ratios.push(meanChord(out, N) / ref);
       if (c2.band && !c2.band.contiguous) anyIncontiguous = true;
     }
-    chk(`${rule.name}: the mean chord holds within ±15 % across descend 2/4/8`,
+    chk(`${rule.name}: the mean chord holds within ±15 % across descend ${zb}/${zb * zb}/${zb * zb * zb}`,
       ratios.every((x) => Math.abs(x - 1) <= 0.15),
       `ratios ${ratios.map((x) => x.toFixed(3)).join(', ')}`);
     chk(`...and every band is COMPACT (the contiguity the prototype never checked)`,
@@ -734,6 +738,421 @@ console.log('\n=== I. v8 36.12 — the Score agrees with the figure source ===\n
   const sig = /export function computeCurveScore\(([^)]*)\)/.exec(src);
   chk('`computeCurveScore` takes NO `time` — the Score draws the BASES (at pos 0 the modulator sine is 0)',
     !!sig && !/time/.test(sig[1]), sig ? sig[1].replace(/\s+/g, ' ').trim() : 'signature not found');
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== J. v8 39 — the generator builder, Twist and Stretch ===\n');
+
+{
+  /*
+   * ⚠️⚠️ **`generators.lsystem` GETS NO AUTOMATIC LAW (Phase 36's finding), so this section is the only
+   * instrument that holds the two new keys to every hand-written site AND to the behaviour that makes them
+   * correct.** Each clause is MEASURED against the shipped modules except J1, which is source-shaped by
+   * design and names the files it reads.
+   */
+  const G = await import('../src/generators/lsystem/generator.ts');
+  const F = await import('../src/generators/lsystem/figure.ts');
+  const { captureExtent } = await import('../src/generators/lsystem/curve.ts');
+  const { interpolatePreset } = await import('../src/exploration/interpolate.ts');
+  const { computeCurveScore } = await import('../src/ui/synthesis-lab/score-canvas.ts');
+
+  // J1 — every hand-written site names BOTH keys (`39.D13`). ⚠️ Source-shaped: a rename breaks it, and that
+  // is the point — a site that stops naming the key has stopped carrying it.
+  const SITES = {
+    'src/exploration/interpolate.ts': ['twist', 'stretch'],
+    'src/ui/synthesis-lab/score-canvas.ts': ['cfg.twist', 'cfg.stretch'],
+    'src/generators/lissajous.ts': ['cfg.twist', 'cfg.stretch'],
+    'src/ui/synthesis-lab/tabs/composer.ts': ["'twist'", "'stretch'"],
+    'src/generators/lsystem/rules.ts': ['twist:', 'stretch:'],
+    'src/core/interfaces.ts': ['twist?: ModulatedValue', 'stretch?: ModulatedValue'],
+  };
+  const missingSite = [];
+  for (const [f, toks] of Object.entries(SITES)) {
+    const s = readFileSync(join(ROOT, f), 'utf8');
+    for (const t of toks) if (!s.includes(t)) missingSite.push(`${f}: ${t}`);
+  }
+  chk('J1: every hand-written lsystem site names twist AND stretch (39.D13)', missingSite.length === 0,
+    missingSite.length ? missingSite.join('; ') : `${Object.keys(SITES).length} sites`);
+  // ...and the copy-whole sites still copy the WHOLE block (a field-by-field copy would drop the new keys).
+  const whole = [['src/exploration/evolution-ops.ts', 'deepCopy(src.generators.lsystem)'],
+    ['src/main.ts', 'structuredClone(preset.generators.lsystem)']];
+  const notWhole = whole.filter(([f, t]) => !readFileSync(join(ROOT, f), 'utf8').includes(t)).map(([f]) => f);
+  chk('...and the copy-whole sites (Evolution, main.ts getLSystem) still copy the block WHOLE', notWhole.length === 0,
+    notWhole.join(', ') || `${whole.length} sites`);
+
+  // J2 — the IDENTITY: with twist 0 / stretch 1 / nothing breathing, resolveFigure takes the turtle path and is
+  // BITWISE the result with no Phase 39 fields at all (what every shipped preset is).
+  const N = 4000;
+  let idDiff = 0;
+  for (const r of LSYSTEM_RULES) {
+    const pose = { rule: r, recursion: r.recursionRange[0] + 1, yaw: r.publishedAngle, pitch: r.publishedAngle,
+      roll: r.publishedAngle, multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0] };
+    const a = new Float64Array(N * 3), b = new Float64Array(N * 3);
+    F.resolveFigure(F.createFigureCache(), pose, a, N);
+    F.resolveFigure(F.createFigureCache(), { ...pose, twist: 0, stretch: 1, anglesAnimated: false,
+      twistAnimated: false, stretchAnimated: false, generator: G.LSYSTEM_GENERATORS[r.key] }, b, N);
+    for (let i = 0; i < N * 3; i++) if (!Object.is(a[i], b[i])) idDiff++;
+  }
+  chk('J2: at the identity every rule is BITWISE the pre-Phase-39 figure (the turtle path is kept)', idDiff === 0,
+    `${idDiff} differing slots over ${LSYSTEM_RULES.length} rules`);
+
+  // J3 — PARITY: every generator reproduces its turtle, raw frame, at two depths and two angles.
+  let worstPar = 0, parAt = '';
+  for (const r of LSYSTEM_RULES) {
+    const f = G.LSYSTEM_GENERATORS[r.key];
+    if (f === null) continue;
+    const angles = f.cells ? [r.publishedAngle] : [r.publishedAngle, (r.angleRange[0] + r.publishedAngle) / 2];
+    for (const d of [r.recursionRange[0], Math.min(r.recursionRange[1], r.recursionRange[0] + 2)]) {
+      for (const y of angles) {
+        const t = walkTurtle(r, d, y, y, y);
+        const g = G.buildGenerator(r, f, d, y, y, y, 0, 1);
+        let m = g === null || g.count !== t.count ? Infinity : 0;
+        if (m === 0) for (let i = 0; i < t.count * 3; i++) m = Math.max(m, Math.abs(g.xyz[i] - t.xyz[i]));
+        const rel = m / (captureExtent(t.xyz, t.count).scale * 2);
+        if (rel > worstPar) { worstPar = rel; parAt = `${r.key}@d${d}/${y}`; }
+      }
+    }
+  }
+  chk('J3: every generator reproduces its turtle point for point (39.A0(a))', worstPar < 1e-9,
+    `worst ${worstPar.toExponential(2)}${parAt ? ' at ' + parAt : ''}`);
+  seed('J3 sees a WRONG flag (dragon without its reversed copy)', (() => {
+    const r = LSYSTEM_RULE_BY_KEY.dragon;
+    const g = G.buildGenerator(r, { ...G.LSYSTEM_GENERATORS.dragon, reverse: [] }, 6, 90, 90, 90, 0, 1);
+    const t = walkTurtle(r, 6, 90, 90, 90);
+    let m = 0;
+    for (let i = 0; i < t.count * 3; i++) m = Math.max(m, Math.abs(g.xyz[i] - t.xyz[i]));
+    return m > 1e-6 ? 1 : 0;
+  })(), 'a flag error that J3 cannot see would ship a different curve under a named rule');
+
+  // J4 — the LANDMARK: Twist 180 on the dragon IS the Levy C curve, and back (the headline, spec §1.3).
+  const chordNorm = (b) => {
+    const n = b.count, x1 = b.xyz[(n - 1) * 3], y1 = b.xyz[(n - 1) * 3 + 1], d2 = x1 * x1 + y1 * y1;
+    return (i) => [(b.xyz[i * 3] * x1 + b.xyz[i * 3 + 1] * y1) / d2, (b.xyz[i * 3 + 1] * x1 - b.xyz[i * 3] * y1) / d2,
+      b.xyz[i * 3 + 2] / Math.sqrt(d2)];
+  };
+  const landmark = (a, b) => {
+    const ra = LSYSTEM_RULE_BY_KEY[a], rb = LSYSTEM_RULE_BY_KEY[b];
+    const g = G.buildGenerator(ra, G.LSYSTEM_GENERATORS[a], 8, ra.publishedAngle, ra.publishedAngle, ra.publishedAngle, 180, 1);
+    const t = walkTurtle(rb, 8, rb.publishedAngle, rb.publishedAngle, rb.publishedAngle);
+    const A = chordNorm(g), B = chordNorm(t);
+    let m = 0, mm = 0;
+    for (let i = 0; i < t.count; i++) {
+      const p = A(i), q = B(i);
+      m = Math.max(m, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+      mm = Math.max(mm, Math.hypot(p[0] - q[0], p[1] + q[1], p[2] + q[2]));
+    }
+    return Math.min(m, mm);
+  };
+  const l1 = landmark('dragon', 'levyC'), l2 = landmark('levyC', 'dragon');
+  chk('J4: Twist 180 folds the dragon into Levy C AND Levy C into the dragon (up to similarity)',
+    l1 < 1e-9 && l2 < 1e-9, `${l1.toExponential(2)} / ${l2.toExponential(2)}`);
+
+  // J5 — the Mixer lerps twist (the fold as a crossfade) and adds no key neither deck authors.
+  // ⚠️ A REAL library body as the deck — the Mixer reads every block, so a hand-built stub throws on the first
+  // one it lacks. `Curve Dragonfold` is the library's dragon; only its curve block is varied here.
+  const { VARIANT_PRESETS: VP } = await import('../src/presets/variant-presets.ts');
+  const dragonBody = VP.find((v) => v.name === 'Curve Dragonfold').preset;
+  const deck = (tw) => {
+    const p = structuredClone(dragonBody);
+    p.generators.lsystem = { rule: 'dragon', recursion: { base: 8, amplitude: 0, frequency: 0 },
+      yaw: { base: 90, amplitude: 0, frequency: 0 }, pitch: { base: 90, amplitude: 0, frequency: 0 },
+      roll: { base: 90, amplitude: 0, frequency: 0 }, descend: { base: 1, amplitude: 0, frequency: 0 },
+      smoothness: 0, centre: [0, 0, 0] };
+    if (tw !== undefined) p.generators.lsystem.twist = { base: tw, amplitude: 0, frequency: 0 };
+    return p;
+  };
+  let mixTw = NaN, ghost = 'n/a';
+  try {
+    mixTw = interpolatePreset(deck(0), deck(180), 0.5, new Set()).generators.lsystem.twist?.base;
+    ghost = 'twist' in interpolatePreset(deck(undefined), deck(undefined), 0.5, new Set()).generators.lsystem
+      ? 'ADDED' : 'absent';
+  } catch (e) { ghost = `threw: ${e.message}`; }
+  chk('J5: the Mixer lerps Twist (0 -> 180 at t 0.5 = 90), and a key neither deck has stays absent',
+    mixTw === 90 && ghost === 'absent', `twist at 0.5 = ${mixTw}; untwisted blend: ${ghost}`);
+
+  // J6 — the Score draws the twist BASE (a diagram ignoring it would show the untwisted dragon).
+  const scoreAt = (tw) => {
+    const c = deck(tw).generators.lsystem;
+    return computeCurveScore(c, 'xz').path;
+  };
+  const s0 = scoreAt(0), s90 = scoreAt(90);
+  let sd = 0;
+  for (let i = 0; i < Math.min(s0.length, s90.length); i++) sd = Math.max(sd, Math.abs(s0[i] - s90[i]));
+  chk('J6: the Score draws Twist — the xz plane of a twisted dragon is not the flat one', sd > 1e-3,
+    `max path difference ${sd.toExponential(2)} between twist 0 and 90`);
+
+  // J7 — a CELL rule holds Yaw at the lattice while Twist acts (owner 39.Q2 (c)).
+  const h2 = LSYSTEM_RULE_BY_KEY.hilbert2d;
+  const cellPose = (yaw) => ({ rule: h2, recursion: 3, yaw, pitch: 90, roll: 90, multiAxis: false, smoothness: 0,
+    descend: 1, centre: [0, 0, 0], twist: 30, stretch: 1, anglesAnimated: false, twistAnimated: false,
+    stretchAnimated: false, generator: G.LSYSTEM_GENERATORS.hilbert2d });
+  const c1 = new Float64Array(N * 3), c2 = new Float64Array(N * 3);
+  F.resolveFigure(F.createFigureCache(), cellPose(90), c1, N);
+  F.resolveFigure(F.createFigureCache(), cellPose(70), c2, N);
+  let cellDiff = 0;
+  for (let i = 0; i < N * 3; i++) if (!Object.is(c1[i], c2[i])) cellDiff++;
+  chk('J7: on a cell rule Yaw is HELD at the lattice while Twist acts (Twist and Yaw are exclusive)', cellDiff === 0,
+    `${cellDiff} slots differ between yaw 90 and 70 at twist 30`);
+
+  // J8 — a stored twist on a rule WITHOUT a Twist row never reaches the figure (absent row = inert key).
+  const noRow = LSYSTEM_RULES.filter((r) => { const f = G.LSYSTEM_GENERATORS[r.key]; return f === null || f.twistable.length === 0; });
+  const lisSrc = readFileSync(join(ROOT, 'src/generators/lissajous.ts'), 'utf8');
+  chk('J8: twist resolves only where the rule has twistable copies (a rule with no row ignores the key)',
+    /gen\.twistable\.length > 0/.test(lisSrc) && noRow.length > 0,
+    `${noRow.length} rules have no Twist row: ${noRow.map((r) => r.key).join(', ')}`);
+
+  // J9 — Stretch needs arc length: the Plant at stretch 0.5 by index would read ~50, by arc ~5 (spec §7.1.1).
+  const plant = LSYSTEM_RULE_BY_KEY.plant;
+  const pp = { rule: plant, recursion: 4, yaw: plant.publishedAngle, pitch: plant.publishedAngle, roll: plant.publishedAngle,
+    multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 0.5, anglesAnimated: false,
+    twistAnimated: false, stretchAnimated: false, generator: G.LSYSTEM_GENERATORS.plant };
+  const M = 12000, pb = new Float64Array(M * 3);
+  F.resolveFigure(F.createFigureCache(), pp, pb, M);
+  const dens = (buf, n) => {
+    const d = [];
+    for (let i = 1; i < n; i++) { const a = (i - 1) * 3, b = i * 3; d.push(Math.hypot(buf[b] - buf[a], buf[b + 1] - buf[a + 1], buf[b + 2] - buf[a + 2])); }
+    d.sort((x, y) => x - y); const lo = d[Math.floor(d.length * 0.01)];
+    return lo > 1e-12 ? d[Math.floor(d.length * 0.99)] / lo : Infinity;
+  };
+  const dv = dens(pb, M);
+  chk('J9: a stretched Plant is resampled by ARC LENGTH (density stays in the unstretched envelope)', dv < 8,
+    `density ${dv.toFixed(2)} at stretch 0.5, depth 4 (by index it reads ~50)`);
+
+  // J10 — the CURVE's Twist/Stretch have NO filter chip and that is a NAMED exemption (owner 39.Q5).
+  // ⚠️ Scoped to the curve block: `twist`/`stretch` already name Phase 30's model-space Twist and Phase 34's
+  // Stretch, which DO have chips, so a bare word scan is red over correct code (it was, on its first run).
+  const facetSrc = readFileSync(join(ROOT, 'src/presets/preset-facets.ts'), 'utf8');
+  chk('J10: no chip reads the CURVE\'s twist/stretch, by the owner\'s named exemption (39.Q5) — revisited at 39.GA',
+    !/lsystem[?!]?\.(twist|stretch)/.test(facetSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')),
+    'a chip added later must replace this clause, not sit beside it');
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one resolver, validation, the demo ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const stripC = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  /*
+   * ⚠️⚠️ **`custom` IS A NON-`overlay` KEY, SO NOTHING AUTOMATIC HOLDS IT (Phase 36's finding again)** — this section
+   * is the instrument. Measured against the shipped modules except K5/K10, which are source-shaped by design.
+   */
+  const C = await import('../src/generators/lsystem/custom.ts');
+  const G = await import('../src/generators/lsystem/generator.ts');
+  const F = await import('../src/generators/lsystem/figure.ts');
+  const { captureExtent, normaliseInto } = await import('../src/generators/lsystem/curve.ts');
+  const { expandRule, EXPAND_SYMBOL_BUDGET } = await import('../src/generators/lsystem/turtle.ts');
+  const { interpolatePreset } = await import('../src/exploration/interpolate.ts');
+  const { VARIANT_PRESETS } = await import('../src/presets/variant-presets.ts');
+  const norm = (xyz, n) => { const o = new Float64Array(n * 3); o.set(xyz.subarray(0, n * 3)); normaliseInto(o, n, captureExtent(o, n)); return o; };
+
+  // K1 — the truncation flag means a level was SKIPPED, never "the last level was long" (39.A6(b)'s false flag).
+  const fullLen = (r, d) => { let s = r.axiom; for (let i = 0; i < d; i++) { let o = ''; for (const c of s) o += r.productions[c] ?? c; s = o; } return s.length; };
+  let falseFlags = 0, realMissed = 0, realOk = 0;
+  for (const r of LSYSTEM_RULES) {
+    for (let d = r.recursionRange[1]; d <= r.recursionRange[1] + 1; d++) {
+      const e = expandRule(r, d);
+      if (e.truncated && e.text.length === fullLen(r, d)) falseFlags++;
+    }
+    let d = 1; while (fullLen(r, d) <= EXPAND_SYMBOL_BUDGET) d++;
+    const e = expandRule(r, d + 1);
+    if (e.truncated) realOk++; else realMissed++;
+  }
+  chk('K1: "truncated" is never raised over a COMPLETE expansion, and still raised where a level is skipped',
+    falseFlags === 0 && realMissed === 0 && realOk === LSYSTEM_RULES.length,
+    `${falseFlags} false flags up to rMax+1; ${realOk}/${LSYSTEM_RULES.length} real skips flagged`);
+  // Seed: the OLD rule (flag whenever the string passes the budget, last level included).
+  let oldFalse = 0;
+  for (const r of LSYSTEM_RULES) for (let d = r.recursionRange[1]; d <= r.recursionRange[1] + 2; d++) {
+    if (fullLen(r, d) > EXPAND_SYMBOL_BUDGET && fullLen(r, d - 1) <= EXPAND_SYMBOL_BUDGET) oldFalse++;
+  }
+  seed('K1 the pre-fix test (budget passed on the LAST level) flags complete strings', oldFalse);
+
+  // K2 — every rule with an exact generator SEEDS, and the seed draws the rule (generator path, frame applied).
+  const seedable = LSYSTEM_RULES.filter((r) => C.customSeedable(r.key));
+  let worst = 0, refused = 0, mismatch = 0;
+  for (const r of seedable) {
+    const cells = C.ruleStructure(r.key).draw === 'cells';
+    const lo = Math.max(1, r.recursionRange[0]);
+    for (const d of [lo, lo + 1]) {
+      const y = cells ? r.publishedAngle : (r.publishedAngle + r.angleRange[1]) / 2;
+      const s = C.seedCustom(r.key, d, y, y, y);
+      if (s === null) { refused++; continue; }
+      const b = C.buildCustom(s, d, y, y, 0, 1, cells ? C.customTile(s) : null);
+      const a = cells ? r.publishedAngle : y;
+      const t = walkTurtle(r, d, a, a, a);
+      if (b === null || b.count !== t.count) { mismatch++; continue; }
+      const p = norm(b.xyz, b.count), q = norm(t.xyz, t.count);
+      for (let i = 0; i < t.count * 3; i++) worst = Math.max(worst, Math.abs(p[i] - q[i]));
+    }
+  }
+  chk('K2: every seedable rule seeds, and the seed draws the RULE through the generator path (frame applied)',
+    seedable.length >= 12 && refused === 0 && mismatch === 0 && worst < 1e-9,
+    `${seedable.length} seedable rules, worst ${worst.toExponential(2)} of the extent, ${refused} refused, ${mismatch} count mismatches`);
+  const noSeed = LSYSTEM_RULES.filter((r) => !C.customSeedable(r.key)).map((r) => r.key);
+  chk('K2b: a rule with NO exact generator cannot seed Customize (the option is disabled with its reason)',
+    noSeed.every((k) => G.LSYSTEM_GENERATORS[k] === null) && noSeed.length > 0, `not seedable: ${noSeed.join(', ')}`);
+
+  // K3 — the NO-OP (spec §3.3), by ROUTING: an unedited seed resolves to its own rule.
+  const routed = seedable.filter((r) => {
+    const s = C.seedCustom(r.key, Math.max(1, r.recursionRange[0]), r.publishedAngle, r.publishedAngle, r.publishedAngle);
+    const res = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: s });
+    return res.kind === 'named' && res.rule.key === r.key && res.customizedFrom === true;
+  });
+  chk('K3: choosing Customize is a visual no-op — every unedited seed resolves to its OWN rule (the same build path)',
+    routed.length === seedable.length, `${routed.length}/${seedable.length}`);
+  // Seed: equality is EXACT — one ulp on one turn is a different generator.
+  const kochSeed = C.seedCustom('koch', 3, 60, 60, 60);
+  const ulp = { ...kochSeed, steps: kochSeed.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, turn: s.turn + 1e-12 } : s)) };
+  seed('K3 a generator one ulp off a rule is NOT that rule', C.customMatchesRule(ulp) === null ? 1 : 0);
+
+  // K4 — validation: V1/V2 are failures, V3 a warning (measured: shipped rules break V3 inside their ranges).
+  const mv = (turn, extra = {}) => ({ kind: 'move', turn, lift: 0, length: 1, reverse: false, orient: 0, twistable: false, stretchable: false, ...extra });
+  const g = (steps) => ({ steps, draw: 'path', frame: { rotate: 0, mirror: false } });
+  const v = (steps, yaw) => C.walkCustom(g(steps), yaw, 0, 1).validation;
+  const orphan = v([mv(0), { kind: 'retrace' }, { kind: 'retrace' }], 60);
+  const closed = v([mv(0), mv(4)], 45);            // 0 then 180 deg: start == end, no chord
+  const one = v([mv(0)], 60);
+  const grow = v([mv(0), mv(1, { reverse: true })], 134);   // the dragon at 134 deg: steps longer than the chord
+  chk('K4: V1 (an orphan retrace, too few steps) and V2 (no chord) FAIL; V3 only WARNS',
+    !orphan.ok && /retraces nothing/.test(orphan.error) && !closed.ok && /no direction/.test(closed.error)
+    && !one.ok && grow.ok && /grow instead of shrinking/.test(grow.warning ?? ''),
+    `orphan: ${orphan.error} | closed: ${closed.error} | one: ${one.error} | dragon@134: ok, ${grow.warning}`);
+  const bad = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: g([mv(0), { kind: 'retrace' }, { kind: 'retrace' }]) });
+  chk('K4b: a stored generator that fails V1 resolves to the DEFAULT rule on load (spec §3.5), never draws nothing',
+    bad.kind === 'named' && bad.rule.key === LSYSTEM_DEFAULT_RULE && bad.customizedFrom === false, `${bad.kind} ${bad.rule?.key}`);
+
+  // K5 — ONE reader of `custom` in the engine (spec §3.4): no generator module but custom.ts reads `cfg.custom`.
+  const engineFiles = ['src/generators/lissajous.ts', 'src/generators/lsystem/figure.ts', 'src/ui/synthesis-lab/score-canvas.ts'];
+  const readers = engineFiles.filter((f) => /\b(cfg|config|lsystem|ls)\.custom\b/.test(stripC(readFileSync(join(ROOT, f), 'utf8'))));
+  chk('K5: the engine and the Score read `custom` ONLY through resolveCustomRule (spec §3.4)', readers.length === 0,
+    readers.length ? `direct readers: ${readers.join(', ')}` : `${engineFiles.length} files scanned`);
+
+  // K6 — keep the LAST VALID build (spec §7.3): a Yaw that closes the path leaves the figure where it was.
+  // Turns 0, +1, +1: three unit steps whose chord VANISHES at yaw 120 (1 + e^iθ + e^2iθ = 0) — genuinely custom.
+  const edited = g([mv(0), mv(1), mv(1)]);
+  const res = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: edited });
+  const pose = (yaw) => ({ rule: LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE], recursion: 5, yaw, pitch: 0, roll: 0, multiAxis: false,
+    smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 1, anglesAnimated: false, twistAnimated: false,
+    stretchAnimated: false, generator: null, custom: { gen: res.gen, tile: null, maxDepth: res.maxDepth } });
+  const cache = F.createFigureCache(), N = 2000;
+  const okBuf = new Float64Array(N * 3), heldBuf = new Float64Array(N * 3);
+  F.resolveFigure(cache, pose(60), okBuf, N);
+  let closes = null;
+  for (let y = 1; y < 179 && closes === null; y += 0.5) if (!C.walkCustom(edited, y, 0, 1).validation.ok) closes = y;
+  F.resolveFigure(cache, pose(closes ?? 60), heldBuf, N);
+  let held = 0; for (let i = 0; i < N * 3; i++) held = Math.max(held, Math.abs(okBuf[i] - heldBuf[i]));
+  chk('K6: an invalid angle keeps the LAST VALID build and reports why (spec §7.3)',
+    res.kind === 'custom' && closes !== null && held === 0 && typeof cache.customError === 'string',
+    `closes at yaw ${closes}; figure moved by ${held}; error: ${cache.customError}`);
+
+  // K7 — the space-filling check: the two cell rules' seeds pass, an edit breaks it, a path rule never passes.
+  const hil = C.seedCustom('hilbert2d', 3, 90, 90, 90), pea = C.seedCustom('peano', 2, 90, 90, 90);
+  // ⚠️ Step 2, not step 1: the FIRST turn only rotates the whole generator, so editing it leaves a Hilbert curve.
+  const hilEdit = { ...hil, steps: hil.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, turn: s.turn + 1 } : s)) };
+  const dragonCells = { ...C.seedCustom('dragon', 6, 90, 90, 90), draw: 'cells' };
+  chk('K7: Cells/Descend are EARNED — Hilbert 2D and Peano pass, a one-turn edit fails, a 2-piece dragon cannot pass',
+    C.customTile(hil)?.tile === 'sqEdge' && C.customTile(hil)?.s === 2 && C.customTile(pea)?.tile === 'sqDiag'
+    && C.customTile(pea)?.s === 3 && C.customTile(hilEdit) === null && C.customTile(dragonCells) === null,
+    `hilbert2d ${C.customTile(hil)?.tile}/${C.customTile(hil)?.s}, peano ${C.customTile(pea)?.tile}/${C.customTile(pea)?.s}`);
+
+  // K8 — the Mixer SNAPS the generator WITH the rule (spec §2.4 / 39.C5): it travels with whichever rule wins.
+  const demo = VARIANT_PRESETS.find((x) => x.preset.generators.lsystem?.rule === C.CUSTOM_RULE_KEY);
+  const named = VARIANT_PRESETS.find((x) => x.preset.generators.lsystem?.rule === 'dragon');
+  const atLo = interpolatePreset(demo.preset, named.preset, 0.25, new Set()).generators.lsystem;
+  const atHi = interpolatePreset(demo.preset, named.preset, 0.75, new Set()).generators.lsystem;
+  chk('K8: the Mixer carries `custom` with the winning rule and never onto a named rule',
+    atLo.rule === C.CUSTOM_RULE_KEY && JSON.stringify(atLo.custom) === JSON.stringify(demo.preset.generators.lsystem.custom)
+    && atHi.rule === 'dragon' && atHi.custom === undefined,
+    `t=0.25 -> ${atLo.rule} (custom ${atLo.custom ? 'carried' : 'MISSING'}); t=0.75 -> ${atHi.rule} (custom ${atHi.custom === undefined ? 'absent' : 'LEAKED'})`);
+
+  // K9 — the Randomiser never produces Customize, and Evolution moves the block WHOLE (structure never mutated).
+  const rnd = stripC(readFileSync(join(ROOT, 'src/exploration/randomize.ts'), 'utf8'));
+  const evo = stripC(readFileSync(join(ROOT, 'src/exploration/evolution-ops.ts'), 'utf8'));
+  chk('K9: the Randomiser writes no curve block (so never `customize`), and Evolution copies it WHOLE',
+    !/generators\.lsystem\s*=/.test(rnd) && !/\.custom\s*=/.test(rnd) && !/\.custom\s*=/.test(evo)
+    && /result\.generators\.lsystem = deepCopy\(src\.generators\.lsystem\)/.test(evo), '');
+
+  // K10 — the filter drawer: a NAMED exemption, no chip (39.D14 / 39.C6), with ONE carrier in the library.
+  const facetSrc2 = stripC(readFileSync(join(ROOT, 'src/presets/preset-facets.ts'), 'utf8'));
+  chk('K10: no chip reads the custom generator — a named exemption (one carrier is not a population)',
+    !/\.custom\b|customize/.test(facetSrc2), '');
+
+  // K11 — the demo makes the format clause non-vacuous: at least one library preset is GENUINELY custom and valid.
+  const carriers = VARIANT_PRESETS.filter((x) => x.preset.generators.lsystem?.rule === C.CUSTOM_RULE_KEY);
+  const genuine = carriers.filter((x) => {
+    const r = C.resolveCustomRule(x.preset.generators.lsystem);
+    if (r.kind !== 'custom') return false;
+    const ls = x.preset.generators.lsystem;
+    return C.walkCustom(r.gen, ls.yaw.base, ls.pitch.base, ls.stretch?.base ?? 1).validation.ok;
+  });
+  chk('K11: the library carries a GENUINELY custom, valid generator (spec 39.C7 — the clauses above are not vacuous)',
+    genuine.length >= 1 && genuine.length === carriers.length, carriers.map((x) => x.name).join(', ') || 'NONE');
+  const stale = VARIANT_PRESETS.filter((x) => x.preset.generators.lsystem?.custom !== undefined
+    && x.preset.generators.lsystem.rule !== C.CUSTOM_RULE_KEY).map((x) => x.name);
+  chk('K11b: `custom` is present IFF the rule is `customize` across the library (spec §3.5)', stale.length === 0,
+    stale.length ? `stale: ${stale.join(', ')}` : 'none stale');
+
+  // K12 — the density bands are calibrated on the library: no named rule reads clumpy.
+  const dens = LSYSTEM_RULES.map((r) => {
+    const d = Math.min(r.recursionRange[1], Math.max(r.recursionRange[0], 4)), a = r.publishedAngle;
+    const w = walkTurtle(r, d, a, a, a);
+    return [r.key, C.customDensity(w.xyz, w.count)];
+  });
+  const clumpy = dens.filter(([, x]) => x > C.CUSTOM_DENSITY_BANDS.uneven);
+  chk('K12: the density readout calls NO named rule clumpy (the bands are the library\'s own envelope)',
+    clumpy.length === 0, `${dens.map(([k, x]) => `${k} ${x.toFixed(2)}`).join(', ')}`);
+  const hairpin = C.buildCustom(g([mv(0), mv(2), mv(-2)]), 6, 80, 0, 0, 1, null);
+  seed('K12 a self-overlapping hairpin generator reads clumpy',
+    C.customDensity(hairpin.xyz, hairpin.count) > C.CUSTOM_DENSITY_BANDS.uneven ? 1 : 0);
+
+  // K13 — TWO TABLES, TWO QUESTIONS: Hilbert 3D and Moore seed Customize while their NAMED rules still have no
+  // Twist/Stretch row. One table for both questions is what made Hilbert 3D un-customizable in the first place.
+  const extra = ['hilbert3d', 'moore'];
+  chk('K13: Hilbert 3D and Moore seed Customize, and their named rules STILL have no Twist/Stretch row',
+    extra.every((k) => C.customSeedable(k) && G.LSYSTEM_GENERATORS[k] === null), extra.map((k) => `${k}: seed ${C.customSeedable(k)}, twist-table ${G.LSYSTEM_GENERATORS[k] === null ? 'none' : 'SET'}`).join('; '));
+  const h3 = C.seedCustom('hilbert3d', 3, 90, 90, 90);
+  const h3tile = C.customTile(h3);
+  const h3edit = { ...h3, steps: h3.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, lift: s.lift + 1 } : s)) };
+  chk('K13b: Hilbert 3D EARNS the cube tile (k = 2³, depth-2 cells distinct and face-adjacent) and a 3-D frame',
+    h3tile?.tile === 'cubeEdge' && h3tile?.s === 2 && h3tile?.dim === 3 && Array.isArray(h3.frame.basis) && C.customTile(h3edit) === null,
+    `tile ${JSON.stringify(h3tile)}, basis ${JSON.stringify(h3.frame.basis)}; one lift edited -> ${JSON.stringify(C.customTile(h3edit))}`);
+
+  // K14 — the STARTING SHAPE: Moore's seed carries one; a one-step starting shape is the absent one (routing AND
+  // drawing), so ticking it is a no-op; a real one is structure.
+  const mo = C.seedCustom('moore', 3, 90, 90, 90);
+  const kc = C.seedCustom('koch', 3, 60, 60, 60);
+  const kEdited = { ...kc, steps: kc.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, turn: 1.5 } : s)) };
+  const plain = C.buildCustom(kEdited, 3, 60, 0, 0, 1, null);
+  const trivial = C.buildCustom({ ...kEdited, initiator: [C.newMoveStep()] }, 3, 60, 0, 0, 1, null);
+  let tdiff = 0; for (let i = 0; i < plain.xyz.length; i++) tdiff = Math.max(tdiff, Math.abs(plain.xyz[i] - trivial.xyz[i]));
+  const r1 = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: { ...kc, initiator: [C.newMoveStep()] } });
+  const r2 = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: { ...kc, initiator: [C.newMoveStep(), C.newMoveStep()] } });
+  chk('K14: the starting shape — Moore seeds one; a ONE-STEP shape is the absent one (same rule, bit-identical drawing)',
+    mo.initiator?.length === 4 && r1.kind === 'named' && r1.rule.key === 'koch' && r2.kind === 'custom' && tdiff === 0
+    && plain.count === trivial.count,
+    `moore start ${mo.initiator?.length} steps; koch+1 -> ${r1.kind} ${r1.rule?.key}; koch+2 -> ${r2.kind}; drawing difference ${tdiff}`);
+  seed('K14 a two-step starting shape is NOT the absent one', r2.kind === 'custom' ? 1 : 0);
+
+  // K15 — no Descend with a starting shape: the zoom's index window is a spatial one only inside ONE tile's grid.
+  // ⚠️ Edit the STARTING SHAPE, never the generator: the generator must still tile, or the zoom was never on and
+  // this clause would pass vacuously (its first version did exactly that — edited step 1's orient, tile null).
+  const moCustom = { ...mo, initiator: mo.initiator.map((s, i) => (i === 0 && s.kind === 'move' ? { ...s, turn: 1 } : s)) };
+  const moRes = C.resolveCustomRule({ rule: C.CUSTOM_RULE_KEY, custom: moCustom });
+  const moPose = (descend) => ({ rule: LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE], recursion: 3, yaw: 90, pitch: 90, roll: 0,
+    multiAxis: false, smoothness: 0, descend, centre: [0, 0, 0], twist: 0, stretch: 1, anglesAnimated: false,
+    twistAnimated: false, stretchAnimated: false, generator: null, custom: { gen: moRes.gen, tile: moRes.tile, maxDepth: moRes.maxDepth } });
+  const z1 = new Float64Array(3000 * 3), z4 = new Float64Array(3000 * 3);
+  F.resolveFigure(F.createFigureCache(), moPose(1), z1, 3000);
+  F.resolveFigure(F.createFigureCache(), moPose(4), z4, 3000);
+  let zdiff = 0; for (let i = 0; i < z1.length; i++) zdiff = Math.max(zdiff, Math.abs(z1[i] - z4[i]));
+  chk('K15: Descend does nothing on a generator WITH a starting shape (the index window is no longer spatial)',
+    moRes.kind === 'custom' && moRes.tile !== null && zdiff === 0, `${moRes.kind}, tile ${moRes.tile?.tile}; descend 4 vs 1 differ by ${zdiff}`);
+
+  // K16 — Bush 3D stays disabled, and its reason says WHY (a growth rule), not just "no generator".
+  const tipSrc = readFileSync(join(ROOT, 'src/ui/synthesis-lab/tooltips.ts'), 'utf8');
+  chk('K16: Bush 3D is the ONE unseedable rule, and its reason names the growth rule and the future phase',
+    LSYSTEM_RULES.filter((r) => !C.customSeedable(r.key)).map((r) => r.key).join() === 'bush3d'
+    && /'composer\.customizeUnavailable': 'Bush 3D cannot be customized: it is a GROWTH rule[\s\S]*?future phase/.test(tipSrc), '');
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

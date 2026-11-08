@@ -118,7 +118,17 @@ import {
   LSYSTEM_MIN_USEFUL_BRACKET_DEG, DESCEND_MIN, DESCEND_MAX, defaultLSystemConfig,
   ruleAngleUsage, type RuleKey,
 } from '../../../generators/lsystem/rules.ts';
-import type { FigureType, LSystemConfig, ModulatedValue } from '../../../core/interfaces.ts';
+import { ruleAngleEffect } from '../../../generators/lsystem/turtle.ts';
+import { LSYSTEM_GENERATORS } from '../../../generators/lsystem/generator.ts';
+import {
+  CUSTOM_RULE_KEY, CUSTOM_RULE_LABEL, CUSTOM_RANGES, CUSTOM_K_MAX, CUSTOM_K_MIN, CUSTOM_UNIT_RANGE,
+  CUSTOM_UNIT_STEP, CUSTOM_LENGTH_RANGE, CUSTOM_LENGTH_STEP, CUSTOM_DENSITY_BANDS, customSeedable, seedCustom,
+  resolveCustomRule, walkCustom, customTile, customDensity, buildCustom, newMoveStep, retracePartners,
+  customInitiatorError, CUSTOM_CELL_PITCH, type ResolvedCurveRule,
+} from '../../../generators/lsystem/custom.ts';
+import type {
+  FigureType, LSystemConfig, ModulatedValue, CustomCurveGenerator, CustomCurveStep,
+} from '../../../core/interfaces.ts';
 // ⚠️ The rate unit is Phase 34's `OP_RATE_*`, NOT the wave-slot `frequency` scale (`36.D6c`) — the two
 // fields share a NAME and not a unit, and `LSystemConfig`'s own declaration states which is which.
 import { OP_RATE_MAX } from '../../../core/deform-limits.ts';
@@ -136,8 +146,35 @@ import { OP_RATE_MAX } from '../../../core/deform-limits.ts';
 const CURVE_STEP = 0.015625;
 const ANGLE_STEP = 0.5;
 
-/** The five `ModulatedValue` members of `LSystemConfig`, so a row cannot name a field that is not one. */
-type CurveKey = 'recursion' | 'yaw' | 'pitch' | 'roll' | 'descend';
+/** The `ModulatedValue` members of `LSystemConfig`, so a row cannot name a field that is not one. */
+type CurveKey = 'recursion' | 'yaw' | 'pitch' | 'roll' | 'descend' | 'twist' | 'stretch';
+
+/**
+ * v8 `39.A3`/`39.A4` — read a curve parameter, with the IDENTITY for the two optional keys. ⚠️ `twist` is
+ * `?? 0` and `stretch` is `?? 1` — the same defaults the engine reads, so a preset that predates them shows
+ * the value it draws. A different default here would be a readout that lies about an unauthored field.
+ */
+function curveMV(cfg: LSystemConfig, key: CurveKey): ModulatedValue {
+  if (key === 'twist') return cfg.twist ?? { base: 0, amplitude: 0, frequency: 0 };
+  if (key === 'stretch') return cfg.stretch ?? { base: 1, amplitude: 0, frequency: 0 };
+  return cfg[key];
+}
+
+/**
+ * v8 `39.C3` — **what the curve body was built FOR: the rule, and under `Customize` the generator too.** The row set
+ * and the editor table depend on both, so a body keyed on the rule alone kept one custom preset's table under
+ * another's generator when both named `customize`.
+ */
+function curveBodyKey(cfg: LSystemConfig): string {
+  return cfg.rule === CUSTOM_RULE_KEY ? `${cfg.rule}|${JSON.stringify(cfg.custom ?? null)}` : cfg.rule;
+}
+
+/** A copy of the block with no `custom` key — present IFF the rule is `customize` (spec §3.5). */
+function withoutCustom(cfg: LSystemConfig): LSystemConfig {
+  const c = { ...cfg };
+  delete c.custom;
+  return c;
+}
 import type { Collapsible } from '../collapsible.ts';
 import {
   readFigure, writeFigure, applyStack, seedFigure, applyMutes, blankAxisCell,
@@ -548,6 +585,13 @@ export class ComposerTab implements TabModule {
   private figureTypeSelect: HTMLSelectElement | null = null;
   private figureTypeDescEl: HTMLElement | null = null;
   private dormantNoticeEl: HTMLElement | null = null;
+  /**
+   * v8 `39.Q2` (c) — the Twist/Yaw exclusion on a CELL rule (Hilbert 2D, Peano): the rows to disable and the
+   * note that says why. Null on every other rule. Rebuilt by `render()`, re-evaluated by `sync()`.
+   */
+  private curveExclusion: {
+    yawRows: HTMLElement[]; twistRows: HTMLElement[]; landmark: number; note: HTMLElement;
+  } | null = null;
   /*
    * ⚠️ **THERE IS NO SEPARATE CURVE-ROW SYNC LIST, AND THAT IS THE POINT OF REUSING `framingRow()`.**
    * Every numeric curve row is built by that method, which registers itself in `framingSliders` — the
@@ -622,7 +666,7 @@ export class ComposerTab implements TabModule {
      *
      * ⚠️ `render()` ends with the slot bodies and `sync()`, so this returns rather than falling through.
      */
-    if (this.liveFigureType() !== this.builtType) { this.render(); return; }
+    if (this.bodyStale()) { this.render(); return; }
     for (let w = 0; w < MAX_WAVES; w++) this.renderSlotBody(w);
     this.sync();
   }
@@ -656,7 +700,7 @@ export class ComposerTab implements TabModule {
    * ⚠️ `render()` ends with `sync()`, so the branches do not both run it.
    */
   activate(): void {
-    if (this.liveFigureType() !== this.builtType) this.render();
+    if (this.bodyStale()) this.render();
     else this.sync();
   }
   /** Nothing per-frame is owned here — no rAF, no interval, no `GridTileRenderer`. */
@@ -922,6 +966,20 @@ export class ComposerTab implements TabModule {
    * comparison cannot drift.
    */
   private builtType: FigureType | null = null;
+  /**
+   * v8 `39.A3` — **the curve RULE the body was built for.** The curve body's ROW SET depends on the rule
+   * (Pitch/Roll since Phase 36, Twist/Stretch now), so a body keyed on the type alone showed the previous curve
+   * preset's rows under a new rule — found by `uicheck` §V: `Curve Fold` loaded over a Plant body kept the
+   * Plant's rows and clamped the dragon's 90° yaw to the Plant's 60° ceiling.
+   */
+  private builtRule: string | null = null;
+  /** Does the built body still match the live figure? Type AND, for a curve, rule. */
+  private bodyStale(): boolean {
+    if (this.liveFigureType() !== this.builtType) return true;
+    return this.builtType === 'lsystem' && curveBodyKey(this.liveLSystem()) !== this.builtRule;
+  }
+  /** v8 `39.C3` — whether the generator editor shows its Lift column (a view choice, never stored). */
+  private showLift = false;
 
   private render(): void {
     const el = this.container!;
@@ -1110,6 +1168,7 @@ export class ComposerTab implements TabModule {
      * writer of the same fact.
      */
     this.builtType = this.liveFigureType();
+    this.builtRule = this.builtType === 'lsystem' ? curveBodyKey(this.liveLSystem()) : null;
     if (this.builtType === 'lsystem') el.appendChild(this.buildLSystemSection());
     else for (let w = 0; w < MAX_WAVES; w++) el.appendChild(this.buildSlotSection(w));
 
@@ -1183,6 +1242,12 @@ export class ComposerTab implements TabModule {
     input.value = String(toPos(spec.get()));
     input.className = 'sl-vfx-slider';
     input.title = tip;
+    /*
+     * ⚠️⚠️ v8 `39.A9` — **the `aria-label` the settings search indexes, equal to the visible label.** It was
+     * missing, so every `framingRow` control (the whole curve body since Phase 36, and Framing & Timing) was
+     * INVISIBLE to the search — found by `uicheck` §V, which looked for the new `Twist` row and found nothing.
+     */
+    input.setAttribute('aria-label', label);
     // Also on the wrapper and the row, so the hover target is the whole cell rather than the handle track —
     // Visual FX's `slider()` titles the wrap and `makeRow` lifts it onto the row; both are set by hand here.
     wrap.title = tip;
@@ -3132,6 +3197,7 @@ export class ComposerTab implements TabModule {
     if (!this.container) return;
     // v8 `36.11` — the type row; the curve's numeric rows sync through `framingSliders` like the rest.
     this.syncFigureType();
+    this.syncCurveExclusion();
 
     /*
      * The Region D precondition, re-evaluated on every sync.
@@ -3608,6 +3674,32 @@ export class ComposerTab implements TabModule {
     return sec;
   }
 
+  /**
+   * v8 `39.Q2` (c) — apply the Twist/Yaw exclusion on a cell rule. ⚠️ Twist WINS while it is in use (as the
+   * engine resolves it), so Yaw is disabled then; Twist is disabled only while Yaw is off its landmark AND Twist
+   * is idle — the state in which moving Twist would silently snap Yaw back.
+   */
+  private syncCurveExclusion(): void {
+    const ex = this.curveExclusion;
+    if (ex === null) return;
+    const live = this.liveLSystem();
+    const tw = curveMV(live, 'twist');
+    const twistActive = tw.base !== 0 || tw.amplitude !== 0;
+    const yawOff = live.yaw.base !== ex.landmark || live.yaw.amplitude !== 0;
+    const setRows = (rows: HTMLElement[], off: boolean, why: string): void => {
+      for (const row of rows) {
+        row.classList.toggle('sl-row-disabled', off);
+        for (const el of Array.from(row.querySelectorAll('input, button, select'))) {
+          (el as HTMLInputElement).disabled = off;
+        }
+        row.dataset.disabledReason = off ? why : '';
+      }
+    };
+    setRows(ex.yawRows, twistActive, 'Twist is in use, and it works at the lattice angle only.');
+    setRows(ex.twistRows, !twistActive && yawOff, 'Yaw is off its landmark, and Twist works at the lattice angle only.');
+    ex.note.style.display = twistActive || yawOff ? '' : 'none';
+  }
+
   /** Refresh the type row from the live preset. Called from `sync()` and at build time. */
   private syncFigureType(): void {
     const live = this.liveFigureType();
@@ -3697,7 +3789,15 @@ export class ComposerTab implements TabModule {
     sec.appendChild(title);
 
     const cfg = this.liveLSystem();
-    const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+    /*
+     * v8 `39.C` — through the ONE resolver. Under `Customize` the rows follow what is DRAWN: while the generator
+     * still equals a named rule the figure IS that rule, so its rows and ranges are that rule's (a readout that
+     * matches the engine); once it is genuinely custom, the custom ranges apply.
+     */
+    const resolved = resolveCustomRule(cfg);
+    const isCustom = cfg.rule === CUSTOM_RULE_KEY && cfg.custom !== undefined;
+    const own = resolved.kind === 'custom' ? resolved : null;
+    const rule = resolved.kind === 'named' ? resolved.rule : LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
 
     // ---- Rule, in the tab's own select row shape ----
     const ruleRow = document.createElement('div');
@@ -3717,27 +3817,55 @@ export class ComposerTab implements TabModule {
       opt.textContent = r.name;
       ruleSel.appendChild(opt);
     }
-    ruleSel.value = rule.key;
+    /*
+     * v8 `39.C` — **`Customize`, LAST, exactly as `Film Look → Customize`** (spec §3.1). ⚠️ DISABLED, with its reason
+     * on the option, where the current rule has no exact generator to seed from (Hilbert 3D, Moore, Bush 3D): a
+     * seed that is not the rule would make the first pick change the picture, which §3.3 forbids.
+     */
+    const custOpt = document.createElement('option');
+    custOpt.value = CUSTOM_RULE_KEY;
+    custOpt.textContent = CUSTOM_RULE_LABEL;
+    const seedable = isCustom || customSeedable(rule.key as RuleKey);
+    custOpt.disabled = !seedable;
+    custOpt.title = seedable ? TAB_TIPS['composer.customize']! : TAB_TIPS['composer.customizeUnavailable']!;
+    ruleSel.appendChild(custOpt);
+    ruleSel.value = isCustom ? CUSTOM_RULE_KEY : rule.key;
     ruleSel.addEventListener('change', () => {
       const live = this.liveLSystem();
+      /*
+       * ⚠️⚠️ **CHOOSING `Customize` IS A VISUAL NO-OP (spec §3.3): seed the generator from the rule being drawn and
+       * reset NOTHING.** The seed equals the rule structurally, so the resolver keeps drawing the rule itself.
+       */
+      if (ruleSel.value === CUSTOM_RULE_KEY) {
+        if (live.rule === CUSTOM_RULE_KEY) return;
+        const seed = seedCustom(rule.key as RuleKey, live.recursion.base, live.yaw.base, live.pitch.base, live.roll.base);
+        if (seed === null) { ruleSel.value = rule.key; return; }
+        this.commitLSystem({ ...live, rule: CUSTOM_RULE_KEY, custom: seed });
+        this.render();
+        this.sync();
+        return;
+      }
       const next = LSYSTEM_RULE_BY_KEY[ruleSel.value as RuleKey] ?? rule;
       /*
-       * ⚠️⚠️ **THE ANGLES ARE RE-SEATED ON THE NEW RULE'S PUBLISHED LANDMARK, AND THAT IS NOT A
-       * CONVENIENCE.** Each rule's `angleRange` is its own, so carrying a 120° terdragon yaw onto a 26°
-       * plant would clamp at the plant's ceiling and hand back a figure that is neither — a control that
-       * silently discards the number it was given. ⚠️ The wobble SIZE and RATE survive, because those are
-       * the author's gesture rather than the rule's identity.
+       * ⚠️⚠️ **A RULE PICK RESETS THE SHAPE PARAMETERS — BASES AND MODULATION — TO THE NEW RULE'S DEFAULTS
+       * (owner, `39.Q6`, 2026-11-05: *"reset everything"*).** Recursion, Yaw/Pitch/Roll, Twist and Stretch all
+       * return to the rule's own starting point with no wobble: each rule's ranges are its own, so carrying a
+       * 120° terdragon yaw onto a 26° plant would clamp and hand back a figure that is neither, and a wobble
+       * sized for one rule's sweep can be meaningless on another's. ⚠️ **This RETIRES Phase 36's behaviour**
+       * (re-seat the angles, keep the wobble size and rate) — a shipped behaviour changed on purpose.
+       * ⚠️ `smoothness`, `descend` and `centre` are NOT reset: they are not shape parameters (spec §2.4).
        */
-      const seat = (mv: ModulatedValue): ModulatedValue =>
-        ({ base: next.publishedAngle, amplitude: mv.amplitude, frequency: mv.frequency });
+      const fresh = defaultLSystemConfig();
+      const still = (base: number): ModulatedValue => ({ base, amplitude: 0, frequency: 0 });
+      // ⚠️ A named pick DROPS the custom generator — it is stored only under `customize` (spec §3.5), and the
+      // next `Customize` pick re-seeds from the rule then on screen (spec §3.1: "edits replaced, no confirmation").
       this.commitLSystem({
-        ...live,
+        ...withoutCustom(live),
         rule: next.key,
-        recursion: {
-          ...live.recursion,
-          base: Math.min(next.recursionRange[1], Math.max(next.recursionRange[0], live.recursion.base)),
-        },
-        yaw: seat(live.yaw), pitch: seat(live.pitch), roll: seat(live.roll),
+        recursion: still(Math.min(next.recursionRange[1], next.recursionRange[0] + 1)),
+        yaw: still(next.publishedAngle), pitch: still(next.publishedAngle), roll: still(next.publishedAngle),
+        twist: { ...fresh.twist },
+        stretch: { ...fresh.stretch },
       });
       this.render();
       this.sync();
@@ -3752,30 +3880,108 @@ export class ComposerTab implements TabModule {
      */
     const prov = document.createElement('p');
     prov.className = 'sl-row-note';
-    prov.textContent = `Named at ${rule.publishedAngle}°`
-      + `  ·  recursion ${rule.recursionRange[0]}\u2013${rule.recursionRange[1]}`
-      + `  ·  ${rule.closed ? 'closed loop' : 'open curve'}`;
+    /*
+     * v8 `39.D8` — **the landmark readout under `Customize`**: while the generator still equals a named rule it
+     * names that rule and its published angle (the figure IS that rule); after the first structural edit it
+     * describes the custom generator instead. Undoing the edit brings the rule's name back.
+     */
+    prov.textContent = own !== null
+      ? `Custom generator  ·  ${own.gen.steps.length} pieces  ·  recursion 1\u2013${own.maxDepth}`
+      : (isCustom ? `Same generator as ${rule.name}  ·  ` : '') + `Named at ${rule.publishedAngle}°`
+        + `  ·  recursion ${rule.recursionRange[0]}\u2013${rule.recursionRange[1]}`
+        + `  ·  ${rule.closed ? 'closed loop' : 'open curve'}`;
+    if (isCustom) prov.title = TAB_TIPS['composer.customizeNote']!;
     sec.appendChild(prov);
 
+    this.curveExclusion = null;
+    const rowsAdded = (fn: () => void): HTMLElement[] => {
+      const before = sec.children.length;
+      fn();
+      return Array.from(sec.children).slice(before) as HTMLElement[];
+    };
+    let yawRows: HTMLElement[] = [];
+
     // ---- the modulated parameters, each a value plus its wobble pair ----
-    const usage = ruleAngleUsage(rule);
+    // ⚠️ v8 `39.A6(c)`: a row is shown only if its angle MOVES the figure, not merely because the symbol
+    // appears — `Bush 3D`'s yaw symbols sit in a block that draws nothing, so its Yaw row moved nothing.
+    const ownSteps = own !== null ? own.gen.steps : null;
+    const ownCells = own !== null && own.gen.draw === 'cells' && own.tile !== null;
+    const usage = own !== null
+      ? { yaw: true, pitch: !ownCells && own.gen.steps.some((s) => s.kind === 'move' && s.lift !== 0), roll: false }
+      : ruleAngleEffect(rule, ruleAngleUsage(rule));
     const deg = (v: number): string => `${v.toFixed(1)}°`;
     const num = (v: number): string => v.toFixed(2);
+    const recRange: readonly [number, number] = own !== null ? [1, own.maxDepth] : rule.recursionRange;
+    const yawRange: readonly [number, number] = own !== null ? CUSTOM_RANGES.yaw : rule.angleRange;
+    const pitchRange: readonly [number, number] = own !== null ? CUSTOM_RANGES.pitch : rule.angleRange;
 
     this.appendCurveTriple(sec, 'Recursion', TAB_TIPS['composer.recursion']!, 'recursion',
-      rule.recursionRange[0], rule.recursionRange[1], CURVE_STEP, num);
+      recRange[0], recRange[1], CURVE_STEP, num);
     if (usage.yaw) {
-      this.appendCurveTriple(sec, 'Yaw', TAB_TIPS['composer.yaw']!, 'yaw',
-        rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
+      yawRows = rowsAdded(() => this.appendCurveTriple(sec, 'Yaw', TAB_TIPS['composer.yaw']!, 'yaw',
+        yawRange[0], yawRange[1], ANGLE_STEP, deg));
+      /*
+       * ⚠️ A `Cells` generator draws at the 90° lattice only, so the engine HOLDS Yaw there (`39.Q2`'s hybrid). The
+       * rows stay visible and DISABLED with the reason below, because `Path` (the other state) uses them.
+       */
+      if (ownCells) {
+        for (const r of yawRows) {
+          r.classList.add('sl-row-disabled');
+          r.querySelectorAll('input').forEach((i) => { (i as HTMLInputElement).disabled = true; });
+        }
+        const held = document.createElement('p');
+        held.className = 'sl-composer-precondition';
+        held.textContent = 'Cells draw at the 90° lattice, so Yaw (and Pitch) are held there. Set Draw to Path to bend the turns.';
+        sec.appendChild(held);
+      }
     }
     if (usage.pitch) {
       this.appendCurveTriple(sec, 'Pitch', TAB_TIPS['composer.pitch']!, 'pitch',
-        rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
+        pitchRange[0], pitchRange[1], ANGLE_STEP, deg);
     }
     if (usage.roll) {
       this.appendCurveTriple(sec, 'Roll', TAB_TIPS['composer.roll']!, 'roll',
         rule.angleRange[0], rule.angleRange[1], ANGLE_STEP, deg);
     }
+    /*
+     * v8 `39.A3`/`39.A4` — **`Twist` and `Stretch`, shown only where the rule's generator has a twistable /
+     * stretchable copy** (`LSYSTEM_GENERATORS`). ⚠️ ABSENT, never disabled, elsewhere (`36`'s rule): on a rule
+     * with no such copy the row would move nothing. ⚠️ Twist's range is the rule's own (`39.A0(d)`), and the
+     * dragon / Lévy C rows name their landmark in the tooltip — 180° is the OTHER named curve.
+     */
+    const genFlags = own !== null ? null : LSYSTEM_GENERATORS[rule.key];
+    // v8 `39.C` — a custom generator's Twist / Stretch rows exist iff some piece is MARKED for them.
+    if (ownSteps !== null && ownSteps.some((s) => s.kind === 'move' && s.twistable)) {
+      this.appendCurveTriple(sec, 'Twist', TAB_TIPS['composer.twist']!, 'twist',
+        CUSTOM_RANGES.twist[0], CUSTOM_RANGES.twist[1], ANGLE_STEP, deg);
+    }
+    if (ownSteps !== null && ownSteps.some((s) => s.kind === 'move' && s.stretchable)) {
+      this.appendCurveTriple(sec, 'Stretch', TAB_TIPS['composer.stretch']!, 'stretch',
+        CUSTOM_RANGES.stretch[0], CUSTOM_RANGES.stretch[1], CURVE_STEP, (v) => `${v.toFixed(2)}×`);
+    }
+    if (genFlags !== null && genFlags.twistable.length > 0) {
+      const twistRows = rowsAdded(() => this.appendCurveTriple(sec, 'Twist', TAB_TIPS['composer.twist']!, 'twist',
+        genFlags.twistRange[0], genFlags.twistRange[1], ANGLE_STEP, deg));
+      /*
+       * ⚠️⚠️ **ON A CELL RULE TWIST AND YAW ARE MUTUALLY EXCLUSIVE, AND EACH IS DISABLED WITH ITS REASON
+       * (owner `39.Q2` (c), the pattern `39.D9` gives Descend).** The tiles exist only at the lattice angle, so
+       * the engine holds Yaw at the landmark while Twist acts; a Yaw row that stayed live would move nothing.
+       * The note is set ONCE and only its `display` toggles, so `tipcheck`'s inline-copy scan can see it.
+       */
+      if (genFlags.cells !== undefined) {
+        const note = document.createElement('p');
+        note.className = 'sl-composer-precondition';
+        note.textContent = 'On this rule Twist works at the lattice angle only, so Twist and Yaw take turns: '
+          + 'set Twist and its wobble to 0 to change Yaw, or Yaw back to its landmark with no wobble to use Twist.';
+        sec.appendChild(note);
+        this.curveExclusion = { yawRows, twistRows, landmark: rule.publishedAngle, note };
+      }
+    }
+    if (genFlags !== null && genFlags.stretchable.length > 0) {
+      this.appendCurveTriple(sec, 'Stretch', TAB_TIPS['composer.stretch']!, 'stretch',
+        genFlags.stretchRange[0], genFlags.stretchRange[1], CURVE_STEP, (v) => `${v.toFixed(2)}×`);
+    }
+
     /*
      * ⚠️⚠️ **`Descend` HIDES WHERE THE RULE HAS NO INVERSE INDEX MAP (`36.D13`), BECAUSE IT WOULD BE A
      * CONTROL THAT LIES.** On a rule without one the index band is not contiguous, so a zoom selects a
@@ -3784,7 +3990,15 @@ export class ComposerTab implements TabModule {
      * ⚠️ **A LOG track, and the one row on this body that is not linear.** `toPos` is `log2(v)/log2(max)`,
      * so each screen octave is one octave of zoom.
      */
-    if (rule.zoomInverse) {
+    // v8 `39.C` — a custom generator EARNS Descend by passing the space-filling check (spec §2.6), in Cells mode.
+    // ⚠️ Not with a STARTING SHAPE: the zoom's index window is a spatial one only inside ONE tile's grid.
+    if (own !== null ? ownCells && own.gen.initiator === undefined : rule.zoomInverse) {
+      if (own !== null) {
+        const pre = document.createElement('p');
+        pre.className = 'sl-composer-precondition';
+        pre.textContent = 'Descend works only at the space-filling shape: Twist at 0 and Stretch at 1, neither wobbling.';
+        sec.appendChild(pre);
+      }
       const span = Math.log2(DESCEND_MAX);
       sec.appendChild(this.framingRow('Descend', TAB_TIPS['composer.descend']!, {
         min: 0, max: 1, step: 1 / 128,
@@ -3814,7 +4028,7 @@ export class ComposerTab implements TabModule {
      * needs it before the first drag rather than after. **Measured, and a property of the RULE.**
      */
     const br = LSYSTEM_ANGLE_BRACKET[rule.key];
-    if (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG) {
+    if (own === null && (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG)) {
       const cost = document.createElement('p');
       cost.className = 'sl-composer-precondition';
       cost.textContent = 'On this rule a wobbling angle rebuilds the curve every frame, which costs more '
@@ -3822,7 +4036,340 @@ export class ComposerTab implements TabModule {
       sec.appendChild(cost);
     }
 
+    if (isCustom) this.buildGeneratorEditor(sec, cfg.custom!, resolved);
     return sec;
+  }
+
+  /** Commit a new generator. ⚠️ Always a NEW object: `resolveCustomRule` memoises by identity. */
+  private commitGenerator(next: CustomCurveGenerator): void {
+    this.commitLSystem({ ...this.liveLSystem(), rule: CUSTOM_RULE_KEY, custom: next });
+    this.render();
+    this.sync();
+  }
+
+  /**
+   * v8 `39.C3`/`39.C4` — **the generator editor**, inline below the parameter rows (spec §4.1: not a dialog, as
+   * `Film Look → Customize` opens inline). A Draw select, the step table, the add buttons, the status line and the
+   * density readout.
+   *
+   * ⚠️ **Every edit builds a NEW generator and rebuilds the body** — the row set (Pitch, Twist, Stretch, Descend)
+   * depends on the structure, and the resolver memoises by identity. Number inputs commit on `change` (blur or
+   * Enter), not per keystroke, so a half-typed value never reaches the figure.
+   * ⚠️ **A retrace row shows its PARTNER's values, disabled** — they are derived (spec §2.2.1), so an editable
+   * copy would be a second source for one fact.
+   */
+  private buildGeneratorEditor(sec: HTMLElement, gen: CustomCurveGenerator, resolved: ResolvedCurveRule): void {
+    const steps = gen.steps;
+    const head = document.createElement('div');
+    head.className = 'sl-section-title';
+    head.textContent = 'Generator';
+    head.title = TAB_TIPS['composer.customizeNote']!;
+    sec.appendChild(head);
+
+    const copy = (): CustomCurveStep[] => steps.map((s) => ({ ...s }));
+    const commitSteps = (next: CustomCurveStep[]): void => this.commitGenerator({ ...gen, steps: next, frame: { ...gen.frame } });
+
+    // ---- Draw: Path / Cells. Cells only where the generator passes the space-filling check.
+    const drawRow = document.createElement('div');
+    drawRow.className = 'sl-vfx-row';
+    drawRow.title = TAB_TIPS['composer.genDraw']!;
+    const drawLab = document.createElement('span');
+    drawLab.className = 'sl-vfx-label';
+    drawLab.textContent = 'Draw';
+    drawRow.appendChild(drawLab);
+    const drawSel = document.createElement('select');
+    drawSel.className = 'sl-dropdown';
+    drawSel.title = TAB_TIPS['composer.genDraw']!;
+    drawSel.setAttribute('aria-label', 'Draw');
+    const canCells = customTile({ ...gen, draw: 'cells' }) !== null;
+    for (const [v, label] of [['path', 'Path'], ['cells', 'Cells']] as const) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      if (v === 'cells') o.disabled = !canCells && gen.draw !== 'cells';
+      drawSel.appendChild(o);
+    }
+    drawSel.value = gen.draw;
+    drawSel.addEventListener('change', () => {
+      this.commitGenerator({ ...gen, steps: copy(), draw: drawSel.value === 'cells' ? 'cells' : 'path', frame: { ...gen.frame } });
+    });
+    drawRow.appendChild(drawSel);
+    sec.appendChild(drawRow);
+
+    // ---- the step table
+    const partners = retracePartners(steps);
+    const anyLift = steps.some((s) => s.kind === 'move' && s.lift !== 0);
+    const liftCol = this.showLift || anyLift;
+    const table = document.createElement('div');
+    table.className = liftCol ? 'sl-gen-table sl-gen-table--lift' : 'sl-gen-table';
+    const headCells = ['#', 'Kind', 'Turn', ...(liftCol ? ['Lift'] : []), 'Length', 'Reverse', 'Orient', 'Twist', 'Stretch', ''];
+    for (const h of headCells) {
+      const c = document.createElement('span');
+      c.className = 'sl-gen-head';
+      c.textContent = h;
+      table.appendChild(c);
+    }
+    const numberCell = (label: string, tip: string, value: number | null, range: readonly [number, number],
+      step: number, onSet: (v: number) => void): HTMLInputElement => {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.className = 'sl-gen-num';
+      inp.min = String(range[0]);
+      inp.max = String(range[1]);
+      inp.step = String(step);
+      inp.title = tip;
+      inp.setAttribute('aria-label', label);
+      if (value === null) { inp.value = ''; inp.disabled = true; } else inp.value = String(value);
+      inp.addEventListener('change', () => {
+        const v = parseFloat(inp.value);
+        if (!Number.isFinite(v)) { inp.value = value === null ? '' : String(value); return; }
+        onSet(Math.min(range[1], Math.max(range[0], Math.round(v / step) * step)));
+      });
+      return inp;
+    };
+    const checkCell = (label: string, tip: string, on: boolean, enabled: boolean, onSet: (v: boolean) => void): HTMLInputElement => {
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'sl-vfx-check';
+      box.checked = on;
+      box.disabled = !enabled;
+      box.title = tip;
+      box.setAttribute('aria-label', label);
+      box.addEventListener('change', () => onSet(box.checked));
+      return box;
+    };
+    const button = (text: string, label: string, tip: string, enabled: boolean, onClick: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.className = 'sl-btn sl-gen-btn';
+      b.textContent = text;
+      b.title = tip;
+      b.setAttribute('aria-label', label);
+      b.disabled = !enabled;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+    steps.forEach((st, i) => {
+      const n = i + 1;
+      const pid = partners[i];
+      const src = st.kind === 'move' ? st : (pid !== undefined && pid >= 0 ? steps[pid] : undefined);
+      const mv = src !== undefined && src.kind === 'move' ? src : null;
+      const idx = document.createElement('span');
+      idx.className = 'sl-gen-idx';
+      idx.textContent = String(n);
+      table.appendChild(idx);
+      const kind = document.createElement('select');
+      kind.className = 'sl-dropdown sl-gen-kind';
+      kind.title = TAB_TIPS['composer.genKind']!;
+      kind.setAttribute('aria-label', `Step ${n} kind`);
+      for (const [v, label] of [['move', 'Move'], ['retrace', 'Retrace']] as const) {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = label;
+        kind.appendChild(o);
+      }
+      kind.value = st.kind;
+      kind.addEventListener('change', () => {
+        const next = copy();
+        next[i] = kind.value === 'retrace' ? { kind: 'retrace' } : newMoveStep();
+        commitSteps(next);
+      });
+      table.appendChild(kind);
+      const setMove = (patch: Partial<Extract<CustomCurveStep, { kind: 'move' }>>): void => {
+        const next = copy();
+        const cur = next[i]!;
+        if (cur.kind === 'move') next[i] = { ...cur, ...patch };
+        commitSteps(next);
+      };
+      const isMove = st.kind === 'move';
+      table.appendChild(numberCell(`Step ${n} turn`, TAB_TIPS['composer.genTurn']!, isMove ? st.turn : null,
+        CUSTOM_UNIT_RANGE, CUSTOM_UNIT_STEP, (v) => setMove({ turn: v })));
+      if (liftCol) {
+        table.appendChild(numberCell(`Step ${n} lift`, TAB_TIPS['composer.genLift']!, isMove ? st.lift : null,
+          CUSTOM_UNIT_RANGE, CUSTOM_UNIT_STEP, (v) => setMove({ lift: v })));
+      }
+      table.appendChild(numberCell(`Step ${n} length`, TAB_TIPS['composer.genLength']!, isMove ? st.length : null,
+        CUSTOM_LENGTH_RANGE, CUSTOM_LENGTH_STEP, (v) => setMove({ length: v })));
+      // A retrace shows its partner's flags (reverse INVERTED), disabled: they are derived, never stored.
+      table.appendChild(checkCell(`Step ${n} reverse`, TAB_TIPS['composer.genReverse']!,
+        mv !== null ? (isMove ? mv.reverse : !mv.reverse) : false, isMove, (v) => setMove({ reverse: v })));
+      const orient = document.createElement('select');
+      orient.className = 'sl-dropdown sl-gen-orient';
+      orient.title = TAB_TIPS['composer.genOrient']!;
+      orient.setAttribute('aria-label', `Step ${n} orient`);
+      for (const deg of [0, 90, 180, 270] as const) {
+        const o = document.createElement('option');
+        o.value = String(deg);
+        o.textContent = `${deg}°`;
+        orient.appendChild(o);
+      }
+      orient.value = String(mv?.orient ?? 0);
+      orient.disabled = !isMove;
+      orient.addEventListener('change', () => setMove({ orient: Number(orient.value) as 0 | 90 | 180 | 270 }));
+      table.appendChild(orient);
+      table.appendChild(checkCell(`Step ${n} twist`, TAB_TIPS['composer.genTwistable']!, mv?.twistable ?? false,
+        isMove, (v) => setMove({ twistable: v })));
+      table.appendChild(checkCell(`Step ${n} stretch`, TAB_TIPS['composer.genStretchable']!, mv?.stretchable ?? false,
+        isMove, (v) => setMove({ stretchable: v })));
+      const acts = document.createElement('span');
+      acts.className = 'sl-gen-acts';
+      acts.appendChild(button('\u2191', `Step ${n} up`, TAB_TIPS['composer.genMoveUp']!, i > 0, () => {
+        const next = copy();
+        [next[i - 1], next[i]] = [next[i]!, next[i - 1]!];
+        commitSteps(next);
+      }));
+      acts.appendChild(button('\u2193', `Step ${n} down`, TAB_TIPS['composer.genMoveDown']!, i < steps.length - 1, () => {
+        const next = copy();
+        [next[i + 1], next[i]] = [next[i]!, next[i + 1]!];
+        commitSteps(next);
+      }));
+      acts.appendChild(button('\u2715', `Step ${n} delete`, TAB_TIPS['composer.genDelete']!, steps.length > CUSTOM_K_MIN, () => {
+        // ⚠️ Deleting a MOVE deletes the retrace that walks back along it (spec §4.4) — an orphaned retrace
+        // would retrace something else.
+        commitSteps(copy().filter((_, j) => j !== i && !(isMove && partners[j] === i)));
+      }));
+      table.appendChild(acts);
+    });
+    sec.appendChild(table);
+
+    // ---- add buttons, the Lift toggle
+    // An open move exists iff a retrace appended now would find a partner.
+    const open = retracePartners([...steps, { kind: 'retrace' }])[steps.length]! >= 0;
+    const addRow = document.createElement('div');
+    addRow.className = 'sl-gen-add';
+    addRow.appendChild(button('+ Move', 'Add move', TAB_TIPS['composer.genAddMove']!, steps.length < CUSTOM_K_MAX,
+      () => commitSteps([...copy(), newMoveStep()])));
+    addRow.appendChild(button('+ Retrace', 'Add retrace', TAB_TIPS['composer.genAddRetrace']!,
+      steps.length < CUSTOM_K_MAX && open, () => commitSteps([...copy(), { kind: 'retrace' }])));
+    const liftLab = document.createElement('label');
+    liftLab.className = 'sl-gen-lift';
+    liftLab.title = TAB_TIPS['composer.genShowLift']!;
+    const liftBox = checkCell('Show lift', TAB_TIPS['composer.genShowLift']!, liftCol, !anyLift, (v) => {
+      this.showLift = v;
+      this.render();
+    });
+    liftLab.appendChild(liftBox);
+    liftLab.appendChild(document.createTextNode(' Show lift'));
+    addRow.appendChild(liftLab);
+    sec.appendChild(addRow);
+
+    /*
+     * ---- v8 Phase 39 — the STARTING SHAPE (the spec's initiator): the segments the copies are laid along at the top
+     * level. ⚠️ Ticking it adds ONE straight step, which draws exactly the plain generator — so switching it on is a
+     * no-op too, like choosing Customize. Moves only: a retrace in the top-level shape would have nothing to walk back
+     * to. ⚠️ A new object on every commit (the resolver memoises by identity).
+     */
+    const ini = gen.initiator;
+    const startRow = document.createElement('label');
+    startRow.className = 'sl-gen-lift';
+    startRow.title = TAB_TIPS['composer.genStart']!;
+    startRow.appendChild(checkCell('Starting shape', TAB_TIPS['composer.genStart']!, ini !== undefined, true, (v) => {
+      const next: CustomCurveGenerator = { ...gen, steps: copy(), frame: { ...gen.frame } };
+      if (v) next.initiator = [newMoveStep()];
+      else delete next.initiator;
+      this.commitGenerator(next);
+    }));
+    startRow.appendChild(document.createTextNode(' Starting shape'));
+    sec.appendChild(startRow);
+    if (ini !== undefined) {
+      const iniCopy = (): CustomCurveStep[] => ini.map((s) => ({ ...s }));
+      const commitIni = (next: CustomCurveStep[]): void =>
+        this.commitGenerator({ ...gen, steps: copy(), frame: { ...gen.frame }, initiator: next });
+      const st2 = document.createElement('div');
+      st2.className = liftCol ? 'sl-gen-table sl-gen-table--start sl-gen-table--start-lift' : 'sl-gen-table sl-gen-table--start';
+      for (const h of ['#', 'Turn', ...(liftCol ? ['Lift'] : []), 'Length', 'Reverse', 'Orient', 'Twist', 'Stretch', '']) {
+        const c = document.createElement('span');
+        c.className = 'sl-gen-head';
+        c.textContent = h;
+        st2.appendChild(c);
+      }
+      ini.forEach((st, i) => {
+        if (st.kind !== 'move') return;
+        const n = i + 1;
+        const setIni = (patch: Partial<Extract<CustomCurveStep, { kind: 'move' }>>): void => {
+          const next = iniCopy();
+          const cur = next[i]!;
+          if (cur.kind === 'move') next[i] = { ...cur, ...patch };
+          commitIni(next);
+        };
+        const idx = document.createElement('span');
+        idx.className = 'sl-gen-idx';
+        idx.textContent = String(n);
+        st2.appendChild(idx);
+        st2.appendChild(numberCell(`Start ${n} turn`, TAB_TIPS['composer.genTurn']!, st.turn, CUSTOM_UNIT_RANGE, CUSTOM_UNIT_STEP, (v) => setIni({ turn: v })));
+        if (liftCol) st2.appendChild(numberCell(`Start ${n} lift`, TAB_TIPS['composer.genLift']!, st.lift, CUSTOM_UNIT_RANGE, CUSTOM_UNIT_STEP, (v) => setIni({ lift: v })));
+        st2.appendChild(numberCell(`Start ${n} length`, TAB_TIPS['composer.genLength']!, st.length, CUSTOM_LENGTH_RANGE, CUSTOM_LENGTH_STEP, (v) => setIni({ length: v })));
+        st2.appendChild(checkCell(`Start ${n} reverse`, TAB_TIPS['composer.genReverse']!, st.reverse, true, (v) => setIni({ reverse: v })));
+        const orient = document.createElement('select');
+        orient.className = 'sl-dropdown sl-gen-orient';
+        orient.title = TAB_TIPS['composer.genOrient']!;
+        orient.setAttribute('aria-label', `Start ${n} orient`);
+        for (const deg of [0, 90, 180, 270] as const) {
+          const o = document.createElement('option');
+          o.value = String(deg);
+          o.textContent = `${deg}°`;
+          orient.appendChild(o);
+        }
+        orient.value = String(st.orient);
+        orient.addEventListener('change', () => setIni({ orient: Number(orient.value) as 0 | 90 | 180 | 270 }));
+        st2.appendChild(orient);
+        st2.appendChild(checkCell(`Start ${n} twist`, TAB_TIPS['composer.genTwistable']!, st.twistable, true, (v) => setIni({ twistable: v })));
+        st2.appendChild(checkCell(`Start ${n} stretch`, TAB_TIPS['composer.genStretchable']!, st.stretchable, true, (v) => setIni({ stretchable: v })));
+        const acts = document.createElement('span');
+        acts.className = 'sl-gen-acts';
+        acts.appendChild(button('\u2191', `Start ${n} up`, TAB_TIPS['composer.genMoveUp']!, i > 0, () => {
+          const next = iniCopy();
+          [next[i - 1], next[i]] = [next[i]!, next[i - 1]!];
+          commitIni(next);
+        }));
+        acts.appendChild(button('\u2193', `Start ${n} down`, TAB_TIPS['composer.genMoveDown']!, i < ini.length - 1, () => {
+          const next = iniCopy();
+          [next[i + 1], next[i]] = [next[i]!, next[i + 1]!];
+          commitIni(next);
+        }));
+        acts.appendChild(button('\u2715', `Start ${n} delete`, TAB_TIPS['composer.genStartDelete']!, ini.length > 1,
+          () => commitIni(iniCopy().filter((_, j) => j !== i))));
+        st2.appendChild(acts);
+      });
+      sec.appendChild(st2);
+      const addIni = document.createElement('div');
+      addIni.className = 'sl-gen-add';
+      addIni.appendChild(button('+ Start step', 'Add start step', TAB_TIPS['composer.genStartAdd']!, ini.length < CUSTOM_K_MAX,
+        () => commitIni([...iniCopy(), newMoveStep()])));
+      sec.appendChild(addIni);
+    }
+
+    // ---- status and density, at the live BASES (a breathing parameter can pass through an invalid angle; the
+    // figure then holds its last valid build, and this line says why).
+    const live = this.liveLSystem();
+    const cellsOn = gen.draw === 'cells' && customTile(gen) !== null;
+    const yaw = cellsOn ? 90 : Math.min(CUSTOM_RANGES.yaw[1], Math.max(CUSTOM_RANGES.yaw[0], live.yaw.base));
+    const pitch = cellsOn ? CUSTOM_CELL_PITCH : live.pitch.base;
+    const stretch = live.stretch?.base ?? 1;
+    const { validation: v0 } = walkCustom(gen, yaw, pitch, stretch);
+    const iniErr = customInitiatorError(gen, yaw, pitch, stretch);
+    const validation = iniErr !== null ? { ok: false, error: iniErr, warning: null } : v0;
+    const status = document.createElement('p');
+    status.className = validation.ok ? 'sl-row-note' : 'sl-composer-precondition';
+    status.title = TAB_TIPS['composer.genStatus']!;
+    const maxDepth = resolved.kind === 'custom' ? resolved.maxDepth : 0;
+    status.textContent = `${steps.length} steps`
+      + (maxDepth > 0 ? `  ·  recursion up to ${maxDepth}` : '')
+      + `  ·  ${validation.error ?? validation.warning ?? '\u2713 Valid'}`;
+    sec.appendChild(status);
+    // ⚠️ `39.D6`: the density readout is shown under Customize only, and only for a drawable generator.
+    if (validation.ok) {
+      const depth = Math.max(1, Math.min(4, Math.floor(live.recursion.base)));
+      const b = buildCustom(gen, depth, yaw, pitch, live.twist?.base ?? 0, stretch, cellsOn ? customTile(gen) : null);
+      if (b !== null) {
+        const d = customDensity(b.xyz, b.count);
+        const band = d <= CUSTOM_DENSITY_BANDS.clean ? 'even' : d <= CUSTOM_DENSITY_BANDS.uneven ? 'uneven' : 'clumpy';
+        const dens = document.createElement('p');
+        dens.className = 'sl-row-note';
+        dens.title = TAB_TIPS['composer.genDensity']!;
+        dens.textContent = `Density ${d.toFixed(2)}  ·  ${band}`;
+        sec.appendChild(dens);
+      }
+    }
   }
 
   /** The value row plus its wobble pair, all three through `framingRow()`. */
@@ -3832,10 +4379,10 @@ export class ComposerTab implements TabModule {
   ): void {
     sec.appendChild(this.framingRow(label, tip, {
       min: lo, max: hi, step,
-      get: () => this.liveLSystem()[key].base,
+      get: () => curveMV(this.liveLSystem(), key).base,
       set: (v) => {
         const live = this.liveLSystem();
-        this.commitLSystem({ ...live, [key]: { ...live[key], base: v } });
+        this.commitLSystem({ ...live, [key]: { ...curveMV(live, key), base: v } });
       },
       toPos: (v) => v, fromPos: (q) => q, fmt,
     }));
@@ -3857,19 +4404,19 @@ export class ComposerTab implements TabModule {
   ): void {
     sec.appendChild(this.framingRow(`${label} size`, TAB_TIPS['composer.curveDepth']!, {
       min: lo, max: hi, step,
-      get: () => this.liveLSystem()[key].amplitude,
+      get: () => curveMV(this.liveLSystem(), key).amplitude,
       set: (v) => {
         const live = this.liveLSystem();
-        this.commitLSystem({ ...live, [key]: { ...live[key], amplitude: v } });
+        this.commitLSystem({ ...live, [key]: { ...curveMV(live, key), amplitude: v } });
       },
       toPos: (v) => v, fromPos: (q) => q, fmt,
     }));
     sec.appendChild(this.framingRow(`${label} rate`, TAB_TIPS['composer.curveRate']!, {
       min: 0, max: OP_RATE_MAX, step: CURVE_STEP,
-      get: () => this.liveLSystem()[key].frequency,
+      get: () => curveMV(this.liveLSystem(), key).frequency,
       set: (v) => {
         const live = this.liveLSystem();
-        this.commitLSystem({ ...live, [key]: { ...live[key], frequency: v } });
+        this.commitLSystem({ ...live, [key]: { ...curveMV(live, key), frequency: v } });
       },
       toPos: (v) => v, fromPos: (q) => q, fmt: (v) => v.toFixed(2),
     }));

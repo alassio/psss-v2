@@ -4,7 +4,10 @@ import {
   LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, DESCEND_MIN, DESCEND_MAX, type RuleKey,
 } from './lsystem/rules.ts';
 import { createFigureCache, resolveFigure } from './lsystem/figure.ts';
+import { LSYSTEM_GENERATORS } from './lsystem/generator.ts';
+import { resolveCustomRule, CUSTOM_RANGES, type ResolvedCurveRule } from './lsystem/custom.ts';
 import { LSYSTEM_DESIGN_FRACTION } from './lsystem/curve.ts';
+import { resolveSym3d, type Sym3dConfig, type Sym3dOperator } from '../core/symmetry-groups.ts';
 import { createAttractorState, initAttractorState, iterateAttractor, type AttractorState } from './attractors.ts';
 import type { CurlNoiseConfig, PhysarumConfig, MaterialConfig, BuoyancyConfig, SparkConfig, CrystalRenderConfig, CohesionConfig, LiquidFieldConfig } from '../presets/types.ts';
 import { CrystalPool } from '../crystal/crystal-pool.ts';
@@ -282,6 +285,8 @@ export class LissajousGenerator implements Generator {
   // what keeps all 177 legacy presets byte-identical until someone enables it.
   private symmetryFold = 1;
   private symmetryMirror = true;
+  /** v8 Phase 42 — the resolved 3-D Symmetry operator, or null (OFF: the stage does not run). */
+  private sym3d: Sym3dOperator | null = null;
 
   // --- v8 30.1 (E129a) Barr twist, turns per half-extent of the design box, per axis -----------------
   //
@@ -1158,6 +1163,17 @@ export class LissajousGenerator implements Generator {
   }
 
   /**
+   * v8 Phase 42 — **3-D Symmetry**: one setter for the whole operator (`setSymmetry`'s shape). The group is resolved
+   * and memoised in `core/symmetry-groups.ts`; `off` stores null, so the per-frame stage is skipped entirely.
+   */
+  setSymmetry3d(cfg: Sym3dConfig): void {
+    this.sym3d = resolveSym3d(cfg);
+  }
+  getSymmetry3dCopies(): number {
+    return this.sym3d?.copies ?? 1;
+  }
+
+  /**
    * Per-axis rotation SPEED, in **degrees per second** — the unit `generators.rotation` is stored in.
    *
    * ⚠️ **The unit is derived, not assumed** (invariant 10). `update()` does `angle[i] += rotationSpeed[i] *
@@ -1218,6 +1234,46 @@ export class LissajousGenerator implements Generator {
    */
   setLSystem(config: LSystemConfig | null): void {
     this.lsystem = config;
+  }
+
+  /**
+   * v8 `39.A3`/`39.A4` — resolve `Twist` and `Stretch` for one frame through `resolveOp`, clamped to the rule's
+   * own range, plus the "is it breathing" facts `resolveFigure` brackets on.
+   *
+   * ⚠️⚠️ **A RULE WITH NO TWISTABLE / STRETCHABLE COPY RETURNS THE IDENTITY REGARDLESS OF THE PRESET**, so a
+   * stored `twist` on a rule that has no Twist row (e.g. left by a rule switch in an older file) can never
+   * reach the figure — the row is ABSENT there, and an absent row must mean an inert key.
+   */
+  private resolveGeneratorAxes(cfg: LSystemConfig, key: RuleKey, scaledTime: number, custom: ResolvedCurveRule | null = null): {
+    twist: number; stretch: number; anglesAnimated: boolean; twistAnimated: boolean; stretchAnimated: boolean;
+    generator: (typeof LSYSTEM_GENERATORS)[RuleKey];
+  } {
+    const gen = LSYSTEM_GENERATORS[key];
+    const anglesAnimated = cfg.yaw.amplitude !== 0 || cfg.pitch.amplitude !== 0 || cfg.roll.amplitude !== 0;
+    const tw = cfg.twist, st = cfg.stretch;
+    /*
+     * v8 `39.C` — a custom generator's masks and ranges are its OWN (`CUSTOM_RANGES`), and an axis with no masked
+     * copy is inert exactly as on a named rule: the row is absent, so the key must be too.
+     */
+    const steps = custom !== null && custom.kind === 'custom' ? custom.gen.steps : null;
+    const twistable = steps !== null ? steps.some((s) => s.kind === 'move' && s.twistable)
+      : gen !== null && gen.twistable.length > 0;
+    const stretchable = steps !== null ? steps.some((s) => s.kind === 'move' && s.stretchable)
+      : gen !== null && gen.stretchable.length > 0;
+    const twistRange: readonly [number, number] = steps !== null ? CUSTOM_RANGES.twist : gen?.twistRange ?? [0, 0];
+    const stretchRange: readonly [number, number] = steps !== null ? CUSTOM_RANGES.stretch : gen?.stretchRange ?? [1, 1];
+    const twistOn = twistable && tw !== undefined;
+    const stretchOn = stretchable && st !== undefined;
+    return {
+      twist: twistOn ? this.resolveOp(tw.base, tw.amplitude, tw.frequency, scaledTime,
+        twistRange[0], twistRange[1]) : 0,
+      stretch: stretchOn ? this.resolveOp(st.base, st.amplitude, st.frequency, scaledTime,
+        stretchRange[0], stretchRange[1]) : 1,
+      anglesAnimated,
+      twistAnimated: twistOn && tw.amplitude !== 0,
+      stretchAnimated: stretchOn && st.amplitude !== 0,
+      generator: gen,
+    };
   }
 
   /** v8 `36.1` — which source fills the `[wave]` block. Resolved by the caller (`resolveFigureType`). */
@@ -2021,18 +2077,27 @@ export class LissajousGenerator implements Generator {
     let lsysFit = 0;
     if (this.figureType === 'lsystem' && this.lsystem !== null) {
       const cfg = this.lsystem;
-      const rule = LSYSTEM_RULE_BY_KEY[cfg.rule as RuleKey] ?? LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+      /*
+       * v8 `39.C` — THE ONE RESOLVER (`resolveCustomRule`, spec §3.4): a named rule, a `Customize` generator that
+       * equals one (resolved to THAT rule — the no-op), or a genuinely custom generator with its own ranges.
+       */
+      const resolved = resolveCustomRule(cfg);
+      const custom = resolved.kind === 'custom' ? resolved : null;
+      const rule = resolved.kind === 'named' ? resolved.rule : LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+      const recRange: readonly [number, number] = custom !== null ? [1, custom.maxDepth] : rule.recursionRange;
+      const yawRange: readonly [number, number] = custom !== null ? CUSTOM_RANGES.yaw : rule.angleRange;
+      const pitchRange: readonly [number, number] = custom !== null ? CUSTOM_RANGES.pitch : rule.angleRange;
       if (this.lsysPoints.length < this.particleCount * 3) {
         this.lsysPoints = new Float64Array(this.particleCount * 3);
       }
       // The five modulated parameters go through the SHIPPED operator law (`36.D6`) -- no new law, and
       // `resolveOp`'s `depth === 0` branch is what makes a preset authoring only bases bit-exact.
       const recursion = this.resolveOp(cfg.recursion.base, cfg.recursion.amplitude, cfg.recursion.frequency,
-        scaledTime, rule.recursionRange[0], rule.recursionRange[1]);
+        scaledTime, recRange[0], recRange[1]);
       const yaw = this.resolveOp(cfg.yaw.base, cfg.yaw.amplitude, cfg.yaw.frequency,
-        scaledTime, rule.angleRange[0], rule.angleRange[1]);
+        scaledTime, yawRange[0], yawRange[1]);
       const pitch = this.resolveOp(cfg.pitch.base, cfg.pitch.amplitude, cfg.pitch.frequency,
-        scaledTime, rule.angleRange[0], rule.angleRange[1]);
+        scaledTime, pitchRange[0], pitchRange[1]);
       const roll = this.resolveOp(cfg.roll.base, cfg.roll.amplitude, cfg.roll.frequency,
         scaledTime, rule.angleRange[0], rule.angleRange[1]);
       resolveFigure(this.lsysCache, {
@@ -2046,6 +2111,14 @@ export class LissajousGenerator implements Generator {
         descend: this.resolveOp(cfg.descend.base, cfg.descend.amplitude, cfg.descend.frequency,
           scaledTime, DESCEND_MIN, DESCEND_MAX),
         centre: cfg.centre,
+        /*
+         * v8 `39.A3`/`39.A4` — the generator axes, through the SAME operator law and clamped to the RULE's own
+         * range. ⚠️ Both keys are optional and read at their IDENTITY (`twist ?? 0`, `stretch ?? 1`), and a
+         * rule with no twistable/stretchable copy ignores them entirely, so a preset that predates Phase 39
+         * resolves exactly as before. "Animated" is a non-zero modulation amplitude, the `multiAxis` rule.
+         */
+        ...this.resolveGeneratorAxes(cfg, rule.key as RuleKey, scaledTime, resolved),
+        custom: custom !== null ? { gen: custom.gen, tile: custom.tile, maxDepth: custom.maxDepth } : null,
       }, this.lsysPoints, this.particleCount);
       lsysPts = this.lsysPoints;
       lsysFit = LSYSTEM_DESIGN_FRACTION * Math.min(this.designW, this.designH);
@@ -2786,6 +2859,36 @@ export class LissajousGenerator implements Generator {
 
         this.positions[idx] = r * Math.cos(th);
         this.positions[idx + 1] = r * Math.sin(th);
+      }
+    }
+
+    /*
+     * v8 Phase 42 — **3-D SYMMETRY: the figure REPLICATED around the centre, after the 2-D fold and before the
+     * rotation.** Particle `i` belongs to copy `c = i mod copies`; that copy is turned by its matrix (its place among the
+     * copies at its position, mirrored or not, then facing outward or kept parallel) and moved `radius · halfExtent` to
+     * its position — the 2-D fold's STRIDE rule, so every copy is a thinned copy of the WHOLE figure.
+     *
+     * ⚠️⚠️ **REPLICATE, NEVER FOLD (`42.D1`).** A fold cuts the curve at every mirror plane, and `E131`'s 3-D fold was
+     * dropped for exactly that (*"chops the figure into multiplied line segments"*). A replicated copy is whole.
+     * ⚠️ **Model space, before the rotation** — `E30`'s argument: the arrangement tumbles with the figure, and every
+     * field system upstream is replicated for free.
+     * ⚠️ **The arrangement is FITTED back to the figure's size**: the copies spread to about `(1 + radius)` half-extents,
+     * so the whole is scaled by `1 / (1 + radius)` and stays in the design box.
+     * ⚠️ **A copy index is a FIXED function of `i`**, so a particle never jumps between copies from frame to frame —
+     * nothing here can trip the three teleport guards downstream (`setSymmetry`'s note).
+     */
+    const s3 = this.sym3d;
+    if (s3 !== null) {
+      const M = s3.mats, D = s3.dirs, copies = s3.copies;
+      const shift = s3.radius * 0.5 * Math.min(this.designW, this.designH);
+      const fit = 1 / (1 + s3.radius);
+      for (let i = 0; i < this.particleCount; i++) {
+        const idx = i * 3;
+        const x = this.positions[idx]!, y = this.positions[idx + 1]!, z = this.positions[idx + 2]!;
+        const c = i % copies, m = c * 9, d = c * 3;
+        this.positions[idx] = (M[m]! * x + M[m + 1]! * y + M[m + 2]! * z + D[d]! * shift) * fit;
+        this.positions[idx + 1] = (M[m + 3]! * x + M[m + 4]! * y + M[m + 5]! * z + D[d + 1]! * shift) * fit;
+        this.positions[idx + 2] = (M[m + 6]! * x + M[m + 7]! * y + M[m + 8]! * z + D[d + 2]! * shift) * fit;
       }
     }
 

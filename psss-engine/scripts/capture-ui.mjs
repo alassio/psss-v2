@@ -107,6 +107,13 @@ const EXTRA_SHOTS = [
    */
   { tab: 'visual-fx', file: 'lab-visual-fx-figure-2', group: 'Figure', scrollTo: 'Blend' },
   /*
+   * v8 Phase 42 — 3-D Symmetry switched on (`Cube`), so the gated body, its solid-only `On` row and the copies notice are visible. ⚠️ `scrollTo` leaves its target at the BOTTOM, so the anchor
+   * is the `Twist` row directly BELOW the notice — the last thing the shot must hold.
+   */
+  // ⚠️ On the BOOT preset with `Cube` picked, not on a demo: loading a 3-D Symmetry demo (`Rosette Crystal`, since replaced) before opening the Lab stalled this
+  // script's Lab click twice (a hand-driven probe clicks it in ~0.8 s, so it is this flow, not the engine).
+  { tab: 'visual-fx', file: 'lab-visual-fx-sym3d', group: 'Figure', options: ['Cube'], scrollTo: 'Twist' },
+  /*
    * The cross-tab settings search, open over Visual FX. ⚠️ **`symme` is chosen because it shows all three
    * kinds of row the manual explains**: two controls with the SAME name told apart only by their path
    * (Visual FX's and Sliders' `Symmetry`), and two rows that matched only on their TOOLTIP, each carrying
@@ -219,6 +226,14 @@ const EXTRA_SHOTS = [
    * `Curve Tilt` is the only shipped preset that modulates both.
    */
   { tab: 'composer', file: 'lab-composer-curve-3d', preset: 'Curve Tilt', scrollTo: 'Pitch' },
+  /*
+   * v8 Phase 39 Stage C — the Customize editor. ⚠️ `Curve Rosette Chain` is the one preset AUTHORED under Customize,
+   * so it opens WITH the editor and needs no option pick; `Curve Weave` is Moore, and picking Customize there shows
+   * the generator table AND the starting-shape table — the only seed that has both.
+   */
+  { tab: 'composer', file: 'lab-composer-customize', preset: 'Curve Rosette Chain', scrollTo: 'Draw' },
+  // ⚠️ `scrollTo` leaves its target at the BOTTOM, so the anchor is the LAST thing the shot must hold.
+  { tab: 'composer', file: 'lab-composer-customize-moore', preset: 'Curve Weave', options: ['Customize'], scrollTo: '+ Start step' },
   { tab: 'composer', file: 'lab-composer-setup', group: 'Framing & Preview' },
 
   /*
@@ -1083,8 +1098,11 @@ if (MODE === 'panels' || MODE === 'all') {
         await page.locator(LAB_BTN).waitFor({ state: 'visible', timeout: 60_000 });
         await page.waitForTimeout(3000);
         if (!await pickPreset(page, extra.file, extra.preset)) continue;
-        await page.locator(LAB_BTN).click();
-        await page.locator('.sl-tab-bar').waitFor({ state: 'visible', timeout: 20_000 });
+        // ⚠️ 120 s, not the default 30: after a curve preset is picked from the grid the Lab takes 21–26 s to open on
+        // a loaded machine under SwiftShader (measured 2026-11-07, identical with the previous library — the grid
+        // tiles' readback, not the Lab), so the default timeout killed the whole run on `Curve Rosette Chain`.
+        await page.locator(LAB_BTN).click({ timeout: 120_000 });
+        await page.locator('.sl-tab-bar').waitFor({ state: 'visible', timeout: 120_000 });
         await openTab(page, id);
       } else {
         await page.goto(`${BASE}/?tab=${id}`, { waitUntil: 'load' });
