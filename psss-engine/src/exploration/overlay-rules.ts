@@ -487,6 +487,15 @@ export const UNCONDITIONAL_KEYS = [
    * The export is gated on the layout, so no exported preset gains the key.
    */
   'sym3dRadius',
+  /*
+   * v8 Phase 38 — the Fractal Fold's six continuous keys. ⚠️ **Inert at every reader, twice over:** (1) the gate
+   * `fractalFoldIterations` SNAPS and is not on this list, so at t = 0 the result carries deck A's absent count,
+   * read as 0, and the stage never runs — none of the six is read; (2) the value written is the identity, which
+   * `SCALAR_IDENTITIES` pins equal to the `?? default` every reader uses (`FRACTAL_FOLD_DEFAULT_LIMIT`/`_SCALE`,
+   * and 0 for the depths and rates). The export is gated on the iteration count, so no exported preset gains them.
+   */
+  'fractalFoldLimit', 'fractalFoldScale',
+  'fractalFoldLimitDepth', 'fractalFoldLimitRate', 'fractalFoldScaleDepth', 'fractalFoldScaleRate',
 ] as const;
 
 /**
@@ -915,6 +924,49 @@ export const OVERLAY_RULES = {
     group: 'shape', law: { kind: 'snap' },
     mutate: { kind: 'frozen', why: 'Follows boxFoldIterations, and it is the one fold field that compounds.' },
     scale: { kind: 'none', why: 'Gated by the iteration count; no scaler owns a fold.' },
+  },
+  /*
+   * v8 Phase 38 — the Fractal Fold. ⚠️ **The ITERATION COUNT snaps (there is no figure between one fold and two,
+   * `boxFoldIterations`' argument), the cell and the scale LERP** — unlike the box fold's, because they are
+   * continuous and the operator ANIMATES them (`38.D4`): a crossfade through them is the same motion the
+   * breathing makes. The four breathing keys lerp, as `34.4`'s do. **All seven are FROZEN for the Randomiser**:
+   * a fold is an arrangement OF the figure (the rule this group's header states), and rolling one into a preset
+   * never designed for it replaces the figure.
+   */
+  fractalFoldIterations: {
+    group: 'shape', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'A fold is an arrangement OF the figure, not a new figure — boxFoldIterations’ argument.' },
+    scale: { kind: 'categorical' },
+  },
+  fractalFoldLimit: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldIterations: a cell size with no fold folds nothing.' },
+    scale: { kind: 'none', why: 'Gated by the iteration count; no scaler owns a fold.' },
+  },
+  fractalFoldScale: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldIterations; a roll could land anywhere between two figures the author never chose.' },
+    scale: { kind: 'none', why: 'Gated by the iteration count; no scaler owns a fold.' },
+  },
+  fractalFoldLimitDepth: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldIterations: the breathing of a fold that is off moves nothing.' },
+    scale: { kind: 'none', why: 'Identity is 0, where the modulator is SKIPPED; no scaler owns it.' },
+  },
+  fractalFoldLimitRate: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldLimitDepth: a rate with no depth is read by nothing.' },
+    scale: { kind: 'none', why: 'A rate is not a magnitude a Sliders multiplier could mean anything by.' },
+  },
+  fractalFoldScaleDepth: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldIterations: the breathing of a fold that is off moves nothing.' },
+    scale: { kind: 'none', why: 'Identity is 0, where the modulator is SKIPPED; no scaler owns it.' },
+  },
+  fractalFoldScaleRate: {
+    group: 'shape', law: { kind: 'lerp' },
+    mutate: { kind: 'frozen', why: 'Follows fractalFoldScaleDepth: a rate with no depth is read by nothing.' },
+    scale: { kind: 'none', why: 'A rate is not a magnitude a Sliders multiplier could mean anything by.' },
   },
 
   /*

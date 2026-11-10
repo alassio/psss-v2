@@ -237,6 +237,24 @@ export const CONTROL_TIPS: Record<string, string> = {
     + 'folds into self-similar nesting rather than the same reflection twice. It compounds: at 4 folds a '
     + 'scale of 1.5 is already 5× and 0.5 is a 16× contraction. It also changes brightness, because '
     + 'squeezing the figure genuinely does put more particles in each pixel.',
+  // ---- v8 Phase 38 — the Fractal Fold ----
+  fractalFoldIterations: 'Folds the figure back into itself again and again, and pulls every fold back toward '
+    + 'where each point started — so a smooth figure turns into nested, self-similar structure: rings within '
+    + 'rings, layered shells, a boxy frame. Each step adds a level. It stays one continuous curve, so trails, '
+    + 'ribbons and Neon Lines keep working, and the figure is scaled back to its own size. Off changes nothing.',
+  fractalFoldLimit: 'The size of the invisible box the figure is folded into, as a share of its design box. '
+    + 'This picks the family of shapes: small cells shatter the figure, then come layered sheets, a boxy '
+    + 'frame, and at the largest a lobed ring. Small changes morph smoothly, so it animates well.',
+  fractalFoldScale: 'How strongly each fold stretches the figure before it is pulled back. Negative values '
+    + 'turn it inside out as well and often give the most striking shapes. At 0 the fold does nothing.',
+  fractalFoldLimitDepth: 'Makes the cell size breathe: how far it swings either side of its setting. Off holds '
+    + 'it still. A swing that would leave the cell’s range rests at the limit for a moment.',
+  fractalFoldLimitRate: 'How fast the cell size breathes, as a period that follows the figure’s own '
+    + 'speed. Only matters while Cell Breath is on.',
+  fractalFoldScaleDepth: 'Makes the fold strength breathe: how far the scale swings either side of its '
+    + 'setting. A swing through 0 passes through the unfolded figure.',
+  fractalFoldScaleRate: 'How fast the fold strength breathes, as a period that follows the figure’s own '
+    + 'speed. Only matters while Scale Breath is on.',
 
   wScale: 'Treats the figure as a slice of a FOUR-dimensional object and sets how far it extends into '
     + 'that fourth direction, using each particle’s place along the curve as its fourth coordinate. On its '

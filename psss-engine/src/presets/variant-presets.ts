@@ -34535,4 +34535,1095 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       },
     },
   },
+  /**
+   * **Fractal Cross** -- v8 Phase 38, the Fractal Fold: `Cycloid`'s ring of loops folded twice at scale −1.75 into a four-armed cross, drawn as glowing LiquidLight splats; the cell breathes gently.
+   *
+   * Body and look from `Cycloid`; only the Fractal Fold keys, the render mode and material
+   * and the name differ. Authored 2026-11-10 from three render rounds; frame measured; the owner's review BY USE is OWED.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Fractal Cross',
+    atEnd: true,   // demos sit at the END of the library (31.R)
+    preset: {
+      metadata: {
+        name: 'Fractal Cross',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: [
+          'refined',
+          'geo',
+          'demo',
+          'fractal-fold',
+        ],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 40000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 0,
+                  amplitude: 25,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 25,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 3,
+                  frequency: 11,
+                },
+                fm: {
+                  base: 625,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 12.5,
+                  amplitude: 12.5,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 18,
+                am: {
+                  base: 12.5,
+                  amplitude: 12.5,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 6.25,
+                  amplitude: 6.25,
+                  frequency: 15,
+                },
+                fm: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 3.6,
+                am: {
+                  base: 6.25,
+                  amplitude: 6.25,
+                  frequency: 15,
+                },
+                fm: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [0.1, 0.1, 0.1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.617283950617284,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        filmLook: 'Customize',
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.3,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 0.66,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Neon',
+          paletteMapping: 'phase',
+        },
+        sliderBaseFilmLook: 'Neon',
+        fractalFoldIterations: 2,
+        fractalFoldLimit: 0.3125,
+        fractalFoldScale: -1.75,
+        fractalFoldLimitDepth: 0.0625,
+        fractalFoldLimitRate: 3,
+        renderMode: 'splat',
+        material: {
+          preset: 'LiquidLight',
+          splatRadius: 2,
+          coreBrightness: 1.1,
+          haloStrength: 1,
+          falloffExponent: 1.6,
+          thermalLag: 0.57,
+          emissionIntensity: 1.5,
+          heatMode: 'velocity',
+          heatGain: 1.5,
+          blendMode: 'additive',
+          colourRamp: 'liquid',
+          velocityStretch: 0.84,
+        },
+      },
+    },
+  },
+  /**
+   * **Fractal Butterfly** -- v8 Phase 38, the Fractal Fold: `Quader`'s ring folded into four lobes, in the flat-luminance `Pastel` palette so the shape reads without a brightness ramp; the cell breathes.
+   *
+   * Body and look from `Quader`; only the Fractal Fold keys, the palette
+   * and the name differ. Authored 2026-11-10 from three render rounds; frame measured; the owner's review BY USE is OWED.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Fractal Butterfly',
+    atEnd: true,   // demos sit at the END of the library (31.R)
+    preset: {
+      metadata: {
+        name: 'Fractal Butterfly',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        createdWith: 'refined-presets generator',
+        tags: [
+          'refined',
+          'geo',
+          'demo',
+          'fractal-fold',
+        ],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 25000,
+        waveSpeed: 0.05,
+        rotation: [0, 0.2, 0.3],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 24,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 21,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 24,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 21,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 90,
+                am: {
+                  base: 24,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0.5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 4,
+                  amplitude: 6,
+                  frequency: 63,
+                },
+                fm: {
+                  base: 63,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 4,
+                  amplitude: 6,
+                  frequency: 60,
+                },
+                fm: {
+                  base: 63,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 90,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 96,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 1,
+                  amplitude: 1,
+                  frequency: 63,
+                },
+                fm: {
+                  base: 105,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 1,
+                  amplitude: 1,
+                  frequency: 60,
+                },
+                fm: {
+                  base: 105,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [21, 21, 21],
+        colorAmp: [64, 32, 32],
+        colorFreq: [0, 0.1, 1],
+        colorShift: [1, 2, 3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.617283950617284,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: true,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [10, -10, 5, -5],
+            [0.1, 0.101, 0.505, 0.5],
+            [10, -10, 5, -5],
+            [0.1, 0.101, 0.505, 0.5],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        filmLook: 'Customize',
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.3,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.16,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Pastel',
+          paletteMapping: 'index',
+        },
+        sliderBaseFilmLook: 'Neon',
+        fractalFoldIterations: 2,
+        fractalFoldLimit: 0.3125,
+        fractalFoldScale: -1.75,
+        fractalFoldLimitDepth: 0.125,
+        fractalFoldLimitRate: 3,
+        palette: 'Pastel',
+        paletteMapping: 'index',
+      },
+    },
+  },
+  /**
+   * **Fractal Star** -- v8 Phase 38, the Fractal Fold: `Cycloid` folded once at the strongest negative scale into a spiky star, in the `Warm` palette; the SCALE breathes, so the spikes reach and recede.
+   *
+   * Body and look from `Cycloid`; only the Fractal Fold keys, the palette
+   * and the name differ. Authored 2026-11-10 from three render rounds; frame measured; the owner's review BY USE is OWED.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Fractal Star',
+    atEnd: true,   // demos sit at the END of the library (31.R)
+    preset: {
+      metadata: {
+        name: 'Fractal Star',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: [
+          'refined',
+          'geo',
+          'demo',
+          'fractal-fold',
+        ],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 40000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 0,
+                  amplitude: 25,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 25,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 3,
+                  frequency: 11,
+                },
+                fm: {
+                  base: 625,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 12.5,
+                  amplitude: 12.5,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 18,
+                am: {
+                  base: 12.5,
+                  amplitude: 12.5,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 6.25,
+                  amplitude: 6.25,
+                  frequency: 15,
+                },
+                fm: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 3.6,
+                am: {
+                  base: 6.25,
+                  amplitude: 6.25,
+                  frequency: 15,
+                },
+                fm: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [0.1, 0.1, 0.1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.617283950617284,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        filmLook: 'Customize',
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.3,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 0.66,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Warm',
+          paletteMapping: 'index',
+        },
+        sliderBaseFilmLook: 'Neon',
+        fractalFoldIterations: 1,
+        fractalFoldLimit: 0.625,
+        fractalFoldScale: -2.5,
+        fractalFoldScaleDepth: 0.75,
+        fractalFoldScaleRate: 2,
+        palette: 'Warm',
+        paletteMapping: 'index',
+      },
+    },
+  },
+  /**
+   * **Fractal Lattice** -- v8 Phase 38, the Fractal Fold: the Hilbert 3-D lattice (a self-similar CURVE, so the fold is shown to be type-agnostic) folded once into a jagged architecture; the cell breathes.
+   *
+   * Body and look from `Curve Lattice`; only the Fractal Fold keys
+   * and the name differ. Authored 2026-11-10 from three render rounds; frame measured; the owner's review BY USE is OWED.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Fractal Lattice',
+    atEnd: true,   // demos sit at the END of the library (31.R)
+    preset: {
+      metadata: {
+        name: 'Fractal Lattice',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: [
+          'demo',
+          'lsystem',
+          'review',
+          'fractal-fold',
+        ],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 36000,
+        waveSpeed: 0.05,
+        rotation: [0.15, 4, -1.22],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'hilbert3d',
+          recursion: {
+            base: 3,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 90,
+            amplitude: 6,
+            frequency: 1.1,
+          },
+          pitch: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0,
+          centre: [0, 0, 0],
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.561,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Prismatic',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 7,
+        transMapChain: [
+          {
+            style: 7,
+            enabled: true,
+            weight: 1,
+            refraction: {
+              strength: 0.49,
+              reach: 2.3,
+              invert: false,
+              source: 'density',
+            },
+          },
+        ],
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1,
+        particleSize: 1.8,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 4,
+          depthSize: 0.4,
+          depthBrightness: 0.4,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.15,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.15,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+        fractalFoldIterations: 1,
+        fractalFoldLimit: 0.75,
+        fractalFoldScale: 2,
+        fractalFoldLimitDepth: 0.25,
+        fractalFoldLimitRate: 4,
+      },
+    },
+  },
 ];

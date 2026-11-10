@@ -659,6 +659,7 @@ const MOTION_GROUP: FacetGroup = {
       + 'is exactly how an old tip once named a dropped operator while the code named nothing.',
       (r) => (r.ov.twistX ?? 0) !== 0 || (r.ov.twistY ?? 0) !== 0 || (r.ov.twistZ ?? 0) !== 0
         || (r.ov.boxFoldIterations ?? 0) > 0
+        || (r.ov.fractalFoldIterations ?? 0) > 0   // v8 Phase 38 — in the SAME edit as the operator (`38.D12`)
         // v8 31.4 — the EXTENT is the activation scalar, never the three angles: at extent 0 the stage is
         // skipped, so a preset carrying three authored angles deforms nothing at all. This is `22.D4`'s
         // point in its sharpest form yet — four keys, and only one of them says whether anything happens.

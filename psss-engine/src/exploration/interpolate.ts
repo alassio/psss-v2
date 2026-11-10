@@ -503,6 +503,11 @@ const SCALAR_IDENTITIES: Record<KeysWithLaw<'lerp' | 'geometric'>, number> = {
   taperX: 0.0, taperY: 0.0, taperZ: 0.0,
   bendX: 0.0, bendY: 0.0, bendZ: 0.0,
   invertAmount: 0.0, invertRadius: 1.0,
+  // v8 Phase 38 — the Fractal Fold's six continuous keys. The cell and scale identities are the READER's `?? default`
+  // (`FRACTAL_FOLD_DEFAULT_LIMIT` 0.3125, `FRACTAL_FOLD_DEFAULT_SCALE` 2 — `deformcheck` holds them equal), inert
+  // while the snapped iteration count is 0, which is `invertRadius`'s standing; the depths and rates are 0.
+  fractalFoldLimit: 0.3125, fractalFoldScale: 2.0,
+  fractalFoldLimitDepth: 0.0, fractalFoldLimitRate: 0.0, fractalFoldScaleDepth: 0.0, fractalFoldScaleRate: 0.0,
   /*
    * v8 `33.3`. ⚠️ **AN IDENTITY IN THE STRONG FORM — the value at which the code does not RUN, not merely
    * the value at which it computes something neutral** — which is the condition for membership here.

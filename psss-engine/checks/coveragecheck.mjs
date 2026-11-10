@@ -1263,14 +1263,22 @@ const fixture = () => new Map([...LIB].map(([k, v]) => [k, JSON.parse(JSON.strin
   const leaves = walkLeaves(LIB, ship);
   const merged = ENUMS.filter((e) => e.id === 'paletteMapping');
   const firstPathOnly = merged.map((e) => ({ ...e, paths: [pathsOf(e)[0]] }));
-  const idx = (vs) => vs.filter((v) => v.includes("'index'")).length;
-  const caughtNarrow = idx(enumViolations(leaves, firstPathOnly, ENUM_STATUS));
-  const caughtMerged = idx(enumViolations(leaves, merged, ENUM_STATUS));
-  seed("enum-member rule: a row over the OLD path alone calls `paletteMapping: 'index'` uncovered",
-    caughtNarrow > 0 && caughtMerged === 0 ? 1 : 0,
-    `narrow row reported ${caughtNarrow} 'index' findings, merged row ${caughtMerged} — if the narrow row is `
-    + 'silent the two paths are not distinct and the merge asserts nothing; if the MERGED row reports one, the '
-    + "gate is calling 21.4d's 114 adoptions uncovered and the basis is wrong rather than the library");
+  /*
+   * ⚠️ **THE MEMBER IS DERIVED, NOT NAMED (v8 Phase 38, 2026-11-10).** This seed used to hard-code `'index'`, on the
+   * library FACT that `index` was authored at the overlay path and nowhere else. Phase 38's demos author it inside a
+   * `Customize` look too (a look's own palette outranks the overlay's), so that fact ended — and a seed whose fixture
+   * is a coincidence of library content is the fragile basis this file warns about. The property is unchanged:
+   * **some member is authored ONLY at the second path**, so the narrow row calls it uncovered and the merged row
+   * does not. That member is now computed from the library on every run.
+   */
+  const members = (vs) => new Set(vs.flatMap((v) => [...v.matchAll(/'([^']+)'/g)].map((m) => m[1])));
+  const narrowSet = members(enumViolations(leaves, firstPathOnly, ENUM_STATUS));
+  const mergedSet = members(enumViolations(leaves, merged, ENUM_STATUS));
+  const onlySecond = [...narrowSet].filter((m) => !mergedSet.has(m));
+  seed(`enum-member rule: a row over the OLD path alone calls a second-path-only member uncovered (${onlySecond.join(', ') || 'none'})`,
+    onlySecond.length,
+    'no member is authored only at the second path, so the two paths are not distinct and the merge asserts nothing '
+    + '— or the vocabulary failed to derive; read which before believing the library');
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'}  coveragecheck: ${pass} passed, ${fail} failed, ${notes} note(s)\n`);

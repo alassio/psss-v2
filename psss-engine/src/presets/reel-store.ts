@@ -588,6 +588,10 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Tilt Octahedron',
       'Chaos to Order',
       'Growing Corals',
+      'Fractal Cross',
+      'Fractal Butterfly',
+      'Fractal Star',
+      'Fractal Lattice',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
@@ -615,7 +619,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   },
   {
     name: 'Materials',
-    // GENERATED (91) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
+    // GENERATED (92) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
     // `'None'` (invariant 18: a material's inactive state is the STRING `'None'`, not absence).
     presets: [
       "Anima Electrica",
@@ -709,6 +713,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       "Quader Star Twelve",
       "Curve Fold Discharge",
       "Liquid Maze",
+      "Fractal Cross",
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,

@@ -84,7 +84,7 @@ console.log('\n=== C. the wiring (main.ts, the rule table, the demos) ===\n');
 {
   const main = strip(read('main.ts'));
   chk('OFF IS A BRANCH: apply() runs only inside `if (discharge.enabled)`, on presentSource',
-    /if \(discharge\.enabled\) \{\s*presentSource = electricDischarge\.apply\(presentSource,/.test(main),
+    /if \(discharge\.enabled\) \{\s*(?:perfHud\?\.begin\('discharge'\);\s*)?presentSource = electricDischarge\.apply\(presentSource,/.test(main),   // the `?perf=1` bracket is allowed, nothing else
     'an unconditional call would cost a full-screen pass on every preset and break bit-identity');
   const readers = (main.match(/discharge = readDischarge\(ov\);/g) ?? []).length;
   chk('ONE reader for BOTH apply paths (applyPresetChange and resetOverlays)', readers === 2,

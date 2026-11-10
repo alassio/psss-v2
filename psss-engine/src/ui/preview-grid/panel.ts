@@ -529,6 +529,11 @@ export class PreviewGridPanel {
   }
 
   /** `throttle` is `PerfGuard.tileThrottle()`, forwarded verbatim — see `GridTileRenderer.tick`. */
+  /** v8 performance pass — the grid renderer's counters for the `?perf=1` overlay (null before it is built). */
+  getTileStats(): ReturnType<GridTileRenderer['getStats']> | null {
+    return this.gridRenderer?.getStats() ?? null;
+  }
+
   tick(dt: number, throttle = 1): void {
     if (this.visible) {
       this.gridRenderer?.tick(dt, throttle);

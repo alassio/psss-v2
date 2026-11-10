@@ -308,6 +308,10 @@ const UNCONDITIONAL_LEAVES = {
    * radius because a skipped loop never reads it.
    */
   'overlay.invertAmount': 0, 'overlay.invertRadius': 1,
+  // v8 Phase 38 — the Fractal Fold's six lerped keys; the gate `fractalFoldIterations` snaps and is not here.
+  'overlay.fractalFoldLimit': 0.3125, 'overlay.fractalFoldScale': 2,
+  'overlay.fractalFoldLimitDepth': 0, 'overlay.fractalFoldLimitRate': 0,
+  'overlay.fractalFoldScaleDepth': 0, 'overlay.fractalFoldScaleRate': 0,
   // v8 31.2. ⚠️ **THE SAME STRONG FORM: the operator's gate is a three-way test against 0** — all three
   // amounts at 0 makes `writeChannels()` return `undefined`, so nothing is computed, nothing is published
   // and both render passes upload their neutral pad. A written 0 cannot change a frame by one bit, which

@@ -2,6 +2,7 @@ import './ui/layout.css';
 import { resolveFigureType } from './generators/figure-types.ts';
 import { detectBackend } from './core/compute-backend.ts';
 import { BOX_FOLD_DEFAULT_LIMIT, CHANNEL_DRIVERS } from './core/deform-limits.ts';
+import { FRACTAL_FOLD_DEFAULT_LIMIT, FRACTAL_FOLD_DEFAULT_SCALE } from './core/fractal-fold.ts';
 import { createDefaultConfig } from './core/config.ts';
 import { compileProgram, TRAIL_SANITISE_GLSL, DIAG_SENTINEL, DIAG_SENTINEL_THRESHOLD } from './core/gl-program.ts';
 import { PresetManager } from './presets/manager.ts';
@@ -56,6 +57,7 @@ import {
 } from './ui/synthesis-lab/tabs/visual-fx.ts';
 import { computePresetStatistics } from './exploration/preset-stats.ts';
 import { PerfGuard } from './exploration/perf-guard.ts';
+import { PerfHud } from './ui/perf-hud.ts';
 import { stripDeploymentAssignment } from './presets/deployment-format.ts';
 import { PreviewGridPanel } from './ui/preview-grid/panel.ts';
 import { GridTileRenderer } from './ui/preview-grid/grid-tile-renderer.ts';
@@ -841,9 +843,24 @@ async function init() {
   // `PresetManager` is the authoritative owner. Each consumer gets its own array, and `refreshPresetNames()`
   // re-reads from the manager after an import so nobody diverges.
   let presetNames = presetManager.list();
-  const presetName = presetManager.has(config.defaultPreset)
-    ? config.defaultPreset
-    : (presetNames[0] ?? 'default');
+  /*
+   * The STARTUP preset (owner, 2026-11-10: *"start with a random preset chosen from the grid"*), resolved in ONE place:
+   *   1. `?preset=<name>` names it (a shareable link), when the library has it;
+   *   2. ⚠️ under AUTOMATION (`navigator.webdriver`, true for every Playwright run — the suite, `uicheck`,
+   *      `democheck`, `capture-ui`) the deterministic `config.defaultPreset`, because specs assert on the boot
+   *      preset and the manual's screenshots are byte-deterministic — a random boot would make both flaky;
+   *   3. otherwise a RANDOM preset from the grid's own list.
+   * ⚠️ It only CHOOSES the name — the preset still goes through the one startup path (invariant 23).
+   */
+  const bootParam = new URLSearchParams(window.location.search).get('preset');
+  const automated = typeof navigator !== 'undefined' && navigator.webdriver === true;
+  const presetName = bootParam !== null && presetManager.has(bootParam)
+    ? bootParam
+    : automated
+      ? (presetManager.has(config.defaultPreset) ? config.defaultPreset : (presetNames[0] ?? 'default'))
+      : (presetNames.length > 0
+        ? presetNames[Math.floor(Math.random() * presetNames.length)]!
+        : config.defaultPreset);
   let preset = presetManager.getWorkingCopy(presetName);
 
   // Generator
@@ -1337,6 +1354,40 @@ async function init() {
     boxFold.scale = live.scale;
   }
   adoptBoxFold(preset?.overlay);
+
+  /*
+   * v8 Phase 38 — the Fractal Fold, adopted on both apply paths for the box fold's reason (one state object, one
+   * hand-off, the engine's CLAMPED and SNAPPED values read back so the panel and every export carry what runs).
+   * Defaults are `core/fractal-fold.ts`' constants — the same values `SCALAR_IDENTITIES` pins.
+   */
+  const fractalFold = {
+    iterations: 0, limit: FRACTAL_FOLD_DEFAULT_LIMIT, scale: FRACTAL_FOLD_DEFAULT_SCALE,
+    limitDepth: 0, limitRate: 0, scaleDepth: 0, scaleRate: 0,
+  };
+  function adoptFractalFold(ov: OverlayState | undefined): void {
+    fractalFold.iterations = ov?.fractalFoldIterations ?? 0;
+    fractalFold.limit = ov?.fractalFoldLimit ?? FRACTAL_FOLD_DEFAULT_LIMIT;
+    fractalFold.scale = ov?.fractalFoldScale ?? FRACTAL_FOLD_DEFAULT_SCALE;
+    fractalFold.limitDepth = ov?.fractalFoldLimitDepth ?? 0;
+    fractalFold.limitRate = ov?.fractalFoldLimitRate ?? 0;
+    fractalFold.scaleDepth = ov?.fractalFoldScaleDepth ?? 0;
+    fractalFold.scaleRate = ov?.fractalFoldScaleRate ?? 0;
+    handFractalFold();
+  }
+  function handFractalFold(): void {
+    generator.setFractalFold(fractalFold.iterations, fractalFold.limit, fractalFold.scale);
+    generator.setFractalFoldBreath(fractalFold.limitDepth, fractalFold.limitRate,
+      fractalFold.scaleDepth, fractalFold.scaleRate);
+    Object.assign(fractalFold, generator.getFractalFold());
+  }
+  adoptFractalFold(preset?.overlay);
+  /** The export, gated on the ITERATION COUNT (the operator's own gate) — ONE helper for BOTH export sites. */
+  const fractalFoldExport = (): Partial<OverlayState> => (fractalFold.iterations > 0 ? {
+    fractalFoldIterations: fractalFold.iterations, fractalFoldLimit: fractalFold.limit,
+    fractalFoldScale: fractalFold.scale,
+    ...(fractalFold.limitDepth !== 0 ? { fractalFoldLimitDepth: fractalFold.limitDepth, fractalFoldLimitRate: fractalFold.limitRate } : {}),
+    ...(fractalFold.scaleDepth !== 0 ? { fractalFoldScaleDepth: fractalFold.scaleDepth, fractalFoldScaleRate: fractalFold.scaleRate } : {}),
+  } : {});
 
 
   /*
@@ -2018,7 +2069,9 @@ async function init() {
     transMap.setDispersion(currentTransMapDispersion);
     transMap.setFractalFade(fade);
     if (transMap.isEnabled()) {
+      perfHud?.begin('warp');
       transMap.apply(fboState.texB, fboState.fboA, currentIfsParams, elapsedTime, currentProceduralFlow);
+      perfHud?.end('warp');
     } else {
       // No TransMap — just copy B to A
       gl.bindFramebuffer(gl.FRAMEBUFFER, fboState.fboA);
@@ -2343,6 +2396,8 @@ async function init() {
   const target: GPUTarget = { width: canvas.width, height: canvas.height, handle: null };
   let evoTileRenderer: GridTileRenderer;
   let perfGuard: PerfGuard;
+  /** v8 performance pass — the `?perf=1` overlay, or null (the default: it costs nothing when off). */
+  let perfHud: PerfHud | null = null;
 
   /**
    * How much of the TransMap effect survives the active attractor blend — `1.0` = full, `0.0` = off.
@@ -3290,7 +3345,9 @@ async function init() {
     // velocities/temperatures are current and `modelPos` still holds this frame's model space.
     // The Phase 8a debug driver used to nucleate here, between update() and getState(), which
     // published every freeze one frame late — a visible flicker. Nothing to do from here now.
+    perfHud?.begin('figure');
     generator.update(dt * speedFactor);
+    perfHud?.end('figure');
 
     // Apply force field to sparks if enabled
     if (currentTransMapForceSparks && currentTransMapForceBlend > 0 && currentTransMapEnabled && transMapForce.isActive()) {
@@ -3690,11 +3747,13 @@ async function init() {
       // Sliced to exactly `n`, not passed whole. A scratch buffer keeps the high-water mark of every
       // earlier frame, and uploading that would both waste bandwidth and hand the renderer arrays whose
       // length disagrees with `count` — the shape its own `array.length < state.count` guards test.
+      perfHud?.begin('particles');
       renderer.render({
         positions: subsetPos.subarray(0, n * 3), colors: subsetCol.subarray(0, n * 3),
         depths: subsetDep.subarray(0, n), velocities: subsetVel.subarray(0, n), count: n,
         ...(wantFrozen ? { frozen: subsetFrozen.subarray(0, n) } : {}),
       }, target);
+      perfHud?.end('particles');
     };
 
     /**
@@ -3799,7 +3858,9 @@ async function init() {
        * carries a warning about: neon never draws a single particle, so sparks had no draw path here at
        * all and *vanished whenever neon was enabled*. Skipping the sparks too would re-make it.
        */
+      perfHud?.begin('lines');
       if (!dyeHidesFigure()) neonLineRenderer.render(state, target);
+      perfHud?.end('lines');
       // Neon draws trail geometry ONLY — never a single particle. Sparks therefore had no draw path
       // here at all and vanished whenever neon was enabled, despite the pool still simulating them.
       drawSparkSubset();
@@ -3809,7 +3870,9 @@ async function init() {
       ribbonRenderer.setAttractorBlend(currentAttractorIndex >= 0 ? currentBlend : 0);
       // v8 28.5 — the ribbon pass is the curve's trajectory, so a hidden curve skips it. See the neon
       // branch above for why the spark draws below must survive this.
+      perfHud?.begin('ribbons');
       if (!dyeHidesFigure()) ribbonRenderer.render(state, target);
+      perfHud?.end('ribbons');
 
       // Draw everything the ribbon pass did NOT: the non-ribboned wave particles in hybrid mode,
       // and in EVERY mode the spark block (screen-space embers with no trajectory, so no ribbon
@@ -3841,7 +3904,9 @@ async function init() {
       // reference never catches the figure, which reads as the smoothing being inert rather than as a units
       // error — the same load-bearing conversion `depthField.render(…, dtMs * 0.001)` carries at line 753.
       // NOT speed-factored: this is real wall-clock smoothing of a measurement, not simulation time.
+      perfHud?.begin('particles');
       renderer.render(state, target, dt * 0.001);
+      perfHud?.end('particles');
     }
 
     // Physarum trail overlay — updateTrail was already called inside generator.update()
@@ -3883,7 +3948,9 @@ async function init() {
      * `presentSource` (not `fboState.texA`) for the cross-fade's reason above, and never writes the trail.
      */
     if (discharge.enabled) {
+      perfHud?.begin('discharge');
       presentSource = electricDischarge.apply(presentSource, canvas.width, canvas.height, discharge, elapsedTime);
+      perfHud?.end('discharge');
     }
 
     // Step 4: Post-processing (bloom + tone map) or direct blit
@@ -3892,13 +3959,17 @@ async function init() {
 
       if (bloom.isEnabled()) {
         // Bloom composites scene + bloom → postFBO
+        perfHud?.begin('glow');
         bloom.apply(srcTex, postFBO.fbo);
+        perfHud?.end('glow');
         srcTex = postFBO.tex;
       }
 
       if (toneMap.isEnabled()) {
         // Tone map to screen
+        perfHud?.begin('grade');
         toneMap.apply(srcTex, null);
+        perfHud?.end('grade');
       } else {
         // Blit post-processed to screen
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -3934,12 +4005,19 @@ async function init() {
     // animating slowly instead of stopping dead mid-warm-up. Freezing a warming tile is what produced "the
     // previews never start animating": a frozen tile has no warm-up left to finish.
     perfGuard.tick(time);
-    if (!perfGuard.tilesFrozen()) {
-      const tileThrottle = perfGuard.tileThrottle();
+    {
+      // ⚠️ v8 performance pass (owner, 2026-11-10): level 2 no longer SKIPS the tick — it passes `Infinity`, the
+      // renderers' FIRST-IMAGES-ONLY mode (no animation, but every tile still reaches an image). Skipping it is what
+      // left a slow machine's grid blank or frozen mid-warm-up. Each renderer also scales its own animation budget
+      // by the main loop's measured headroom (`GridTileRenderer.tick`), so this guard is the coarse tier only.
+      const tileThrottle = perfGuard.tilesFrozen() ? Number.POSITIVE_INFINITY : perfGuard.tileThrottle();
+      perfHud?.begin('tiles');
       evoTileRenderer.tick(dt, tileThrottle);
       historyTileRenderer.tick(dt, tileThrottle);
       reelTileRenderer.tick(dt, tileThrottle);
       previewGrid.tick(dt, tileThrottle);
+      perfHud?.end('tiles');
+      perfHud?.frame(dt);
     }
     // ⚠️ NO `requestAnimationFrame` here. The re-arm lives in `drawFrame`'s `finally` — see the note there.
     // Re-adding one here would double the frame rate AND restore the "one throw kills the canvas" failure for
@@ -4854,11 +4932,11 @@ async function init() {
    * touches it, so it survives for free.
    *
    * ⚠️ **THE DEFORMATION HALF IS A SEPARATE DECISION FROM THE GRADE HALF AND IT IS A LOAD-BEARING ONE.** The
-   * bypass strips BY OMISSION, so a key that is not named here is neutralised: the twist, taper, bend,
-   * inversion, box-fold, 4D rotation and the three per-particle channels are listed because a deformation
-   * describes the FIGURE, not the atmosphere, and *Strip to figure* exists to show the bare curve — the twisted
-   * curve still being that curve. A new deformation left out of this function would read as *the strip
-   * un-deforms my figure*, which is not a defect anyone would attribute to a bypass.
+   * bypass strips BY OMISSION, so a key that is not named here is neutralised. **The Visual FX deformation
+   * operators and the per-particle channels are deliberately NOT named (owner, 2026-11-10)**: `Apply Visual FX`
+   * off promises no Visual FX at all, and keeping them made the Fractal Fold (and every other deformation) keep
+   * running under it. **A NEW VISUAL FX operator must stay out of this function; a new COMPOSER figure operator
+   * joins `figureOperatorKeys()`.**
    *
    * ⚠️ **AND IT IS WHY THE EXPORT STAYS BYTE-IDENTICAL EITHER WAY.** `getSnapshot()`'s bypass branch returns
    * `{ ...bypassAuthoredOverlay, ...livePreservedOverlay() }`, so a key here is reported LIVE and every other
@@ -4962,17 +5040,6 @@ async function init() {
        * change with them: two copies of one rule, and the byte-identity assertion is what catches a drift.**
        */
       ...(particleSizeScale !== 1.0 ? { particleSize: particleSizeScale } : {}),
-      ...(symmetryFold > 1 ? { symmetryFold, symmetryMirror } : {}),
-      ...sym3dExport(),   // v8 Phase 42 — the same gate at both export sites
-      /*
-       * v8 `30.1` — the twist triple, identity-gated with **exactly** the gate the plain branch below uses.
-       * The warning above this block applies to it verbatim: this function is spread OVER the frozen
-       * capture, so an unconditional key is ADDED rather than matched and `16.18`'s byte-identity assertion
-       * fails. ⚠️ **ONE GATE FOR ALL THREE AXES, per-BLOCK rather than per-field, for `symmetryMirror`'s
-       * reason one line up** — a twist of `(0, 0, 0.4)` must export all three or a reader cannot tell an
-       * authored zero from an absent key, and the operator's own gate tests the whole triple.
-       */
-      ...(twist.some(v => v !== 0) ? { twistX: twist[0], twistY: twist[1], twistZ: twist[2] } : {}),
       /*
        * v8 `33.2`/`33.3`/`34.2`/`34.3`/`34.4` — the four figure operators and all 31 of their keys, gated by
        * **`figureOperatorKeys()`, the ONE owner shared with `getSnapshot()`'s plain branch.** Read its header
@@ -4989,48 +5056,14 @@ async function init() {
       // comment names, not one of the four block rules.
       ...(escapeFlowMode !== 'contour' ? { escapeFlow: escapeFlowMode } : {}),
       /*
-       * v8 `32.1`/`32.2` — ⚠️ **ONE GATE OVER THE WHOLE SIX-TUPLE, not one per operator**, because the
-       * generator's own gate is the six-tuple: a taper with every bend at 0 still runs the stage. Two
-       * gates here would emit three inert keys whenever only the other operator was in use.
+       * ⚠️⚠️ **THE VISUAL FX DEFORMATION OPERATORS AND THE PER-PARTICLE CHANNELS ARE NOT HERE, AND THAT IS THE RULE
+       * (owner, 2026-11-10).** `Apply Visual FX` off promises *no Visual FX at all*, and Symmetry, 3-D Symmetry, Twist,
+       * Taper, Bend, Fold, Inversion, the Fractal Fold, the 4D rotation and the channels are Visual FX controls — they
+       * used to be preserved here ("a deformation describes the FIGURE"), which left them running under the bypass
+       * and contradicted the manual. Absent from this function, the bypass neutralises them BY OMISSION and the
+       * export takes them from the frozen capture, so Export / Snapshot / the Mixer stay byte-identical either way.
+       * **The Composer's own figure operators (`figureOperatorKeys()`) stay**: they ARE the figure.
        */
-      ...(taper.some(v => v !== 0) || bend.some(v => v !== 0)
-        ? {
-          taperX: taper[0], taperY: taper[1], taperZ: taper[2],
-          bendX: bend[0], bendY: bend[1], bendZ: bend[2],
-        }
-        : {}),
-      // v8 32.7 — gated on the AMOUNT, which is the operator's own gate. The radius is meaningless at
-      // amount 0, so emitting it there would put an inert key in every export.
-      ...(inversion.amount > 0
-        ? { invertAmount: inversion.amount, invertRadius: inversion.radius }
-        : {}),
-      // v8 30.2 — ONE gate on the ITERATION COUNT, which is the operator's own gate. The other three are
-      // meaningless at 0 iterations, so emitting them there would put three inert keys in every export.
-      ...(boxFold.iterations > 0 ? {
-        boxFoldIterations: boxFold.iterations, boxFoldLimit: boxFold.limit,
-        boxFoldScale: boxFold.scale,
-      } : {}),
-      /*
-       * v8 31.2 — ONE gate on the THREE AMOUNTS, which is the operator's own gate: the driver names which
-       * quantity is read and is meaningless with every amount at 0, so emitting it alone would put an
-       * inert key in every export. ⚠️ **Two copies of one rule** with the other branch; 16.18's
-       * byte-identity assertion is what catches a drift.
-       */
-      ...(channels.size !== 0 || channels.alpha !== 0 || channels.light !== 0 ? {
-        channelDriver: channels.driver, channelSize: channels.size,
-        channelAlpha: channels.alpha, channelLight: channels.light,
-      } : {}),
-      /*
-       * v8 31.3 + 31.4 — TWO gates, because they are two operators that happen to share a state object.
-       * ⚠️ **The fold's gate is the boolean and the rotation's is `wScale` ALONE, never the angles** — at
-       * `wScale` 0 the stage is skipped, so emitting three angles there would put inert keys in every
-       * export. ⚠️ **Two copies of each rule** with the other branch; 16.18's byte-identity assertion is
-       * what catches a drift.
-       */
-      ...(deform4d.wScale > 0 ? {
-        wScale: deform4d.wScale, wXW: deform4d.xw, wYW: deform4d.yw, wZW: deform4d.zw,
-        wWinding: deform4d.winding,
-      } : {}),
       /*
        * v8 Step 21.4c — the palette override JOINS THE PRESERVED SET, identity-gated on `!== undefined` exactly
        * as the plain branch gates it. **This widens the owner's stated scope ("Film Look, and all of Framing &
@@ -5276,6 +5309,7 @@ async function init() {
     adoptEscapeFlow(preset.overlay);   // v8 33.4 - the escape foliation, same obligation
     adoptInversion(preset.overlay);   // v8 32.7 — ditto
     adoptBoxFold(preset.overlay); // v8 30.2 — same four paths
+    adoptFractalFold(preset.overlay); // v8 Phase 38 — the same path, the same obligation
     adoptChannels(preset.overlay);  // v8 31.2 — the per-particle channels, same four paths
     adoptDeform4d(preset.overlay);  // v8 31.3 + 31.4 — the fold and the 4D rotation, same four paths
     const newCurl = preset.overlay?.curlNoise ?? DEFAULT_CURL;
@@ -5814,6 +5848,8 @@ async function init() {
     setBoxFoldIterations: (v: number) => { boxFold.iterations = v; handBoxFold(); },
     setBoxFoldLimit: (v: number) => { boxFold.limit = v; handBoxFold(); },
     setBoxFoldScale: (v: number) => { boxFold.scale = v; handBoxFold(); },
+    getFractalFold: () => ({ ...fractalFold }),
+    setFractalFold: (patch) => { Object.assign(fractalFold, patch); handFractalFold(); },
     /*
      * v8 `31.2` — the live per-particle channels. One getter for the whole operator and one setter per
      * field, the box-fold's shape. ⚠️ **The driver's setter takes a `ChannelDriver`, not a string**, so the
@@ -6550,6 +6586,7 @@ async function init() {
           boxFoldIterations: boxFold.iterations, boxFoldLimit: boxFold.limit,
           boxFoldScale: boxFold.scale,
         } : {}),
+        ...fractalFoldExport(),   // v8 Phase 38 — the same gate at both export sites
         // v8 31.2 — gated on the three AMOUNTS, the operator's own gate. ⚠️ **Two copies of one rule** with
         // the bypass branch above, exactly as the plate's pair and the fold's pair are.
         ...(channels.size !== 0 || channels.alpha !== 0 || channels.light !== 0 ? {
@@ -7161,6 +7198,7 @@ async function init() {
       adoptEscapeFlow(ov);   // v8 33.4 - a Reset must revert the foliation too
       adoptInversion(ov);   // v8 32.7 — ditto
       adoptTwist(ov);   // v8 30.1 — a Reset must REVERT the deformation, not leave the live one standing
+      adoptFractalFold(ov); // v8 Phase 38 — a Reset must REVERT it too
       adoptBoxFold(ov); // v8 30.2 — same
       adoptChannels(ov);  // v8 31.2 — and the per-particle channels with it
       adoptDeform4d(ov);  // v8 31.3 + 31.4 — a Reset reverts the fold and the 4D pose too
@@ -7967,6 +8005,17 @@ async function init() {
   labPanel.hideInPanel();
 
   perfGuard = new PerfGuard();
+  if (new URLSearchParams(window.location.search).get('perf') === '1') {
+    perfHud = new PerfHud(gl, {
+      tiles: () => [
+        { label: 'grid', stats: previewGrid.getTileStats() },
+        { label: 'reel', stats: reelTileRenderer.getStats() },
+        { label: 'evo', stats: evoTileRenderer.getStats() },
+        { label: 'hist', stats: historyTileRenderer.getStats() },
+      ],
+      main: () => ({ guardLevel: perfGuard.level(), canvasW: canvas.width, canvasH: canvas.height }),
+    });
+  }
 
   installTestHook();
 

@@ -1680,6 +1680,29 @@ export interface OverlayState {
   boxFoldLimit?:         number;
   boxFoldScale?:         number;
   /**
+   * v8 Phase 38 — **the Fractal Fold**: the box fold and a ball fold composed with a FEEDBACK term, so each
+   * iteration is re-anchored to where the particle started and the figure becomes nested, self-similar
+   * structure instead of a repeated reflection (`core/fractal-fold.ts` owns the law and its compensation).
+   *
+   * `fractalFoldIterations` is **the gate**: 0 skips the operator entirely, so every preset authored before
+   * Phase 38 is bit-identical. 1–3 (`FRACTAL_FOLD_MAX_ITERATIONS`, the range `38.0` licensed).
+   * `fractalFoldLimit` is the cell half-width as a FRACTION of the figure's own XY RMS radius (0.125–1). `fractalFoldScale` is SIGNED (−2.5…2.5) and `0` is a SECOND exact identity.
+   * The four breathing keys (`…LimitDepth`/`…LimitRate`, `…ScaleDepth`/`…ScaleRate`) follow `34.4`'s depth +
+   * rate convention; a depth of 0 is exact.
+   *
+   * ⚠️ **XY ONLY — Z IS NEVER FOLDED** (owner, 2026-11-10): measured through the engine, the three-axis form swapped
+   * near and far with little image change on too many presets at too many settings for any cut-off to fix, so depth
+   * is left bit-identical — the box fold's own conclusion (`boxFoldZ`), reached a second time.
+   * ⚠️ **Flat scalars read as `?? default`** (invariant 14), so no `MigrationLayer` backfill is owed.
+   */
+  fractalFoldIterations?:  number;
+  fractalFoldLimit?:       number;
+  fractalFoldScale?:       number;
+  fractalFoldLimitDepth?:  number;
+  fractalFoldLimitRate?:   number;
+  fractalFoldScaleDepth?:  number;
+  fractalFoldScaleRate?:   number;
+  /**
    * v8 `31.2` (`E112`/`E113`/`E137`) — **per-particle appearance: ONE shared driver and THREE amounts.**
    *
    * `channelDriver` picks the ordered quantity (`31.D4`): `index` (position along the curve), `velocity`,

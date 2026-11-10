@@ -9,6 +9,7 @@ import { getColourRampData } from '../../generators/colour-ramps.ts';
 import { DEFAULT_LIQUID_CONFIG } from '../../generators/material-presets.ts';
 // v8 33 — the fold's default limit, so a tile's fold matches the main view's rather than a local guess.
 import { BOX_FOLD_DEFAULT_LIMIT } from '../../core/deform-limits.ts';
+import { FRACTAL_FOLD_DEFAULT_LIMIT, FRACTAL_FOLD_DEFAULT_SCALE } from '../../core/fractal-fold.ts';
 // v8 15.1b — the ONE owner of the liquid density reference, shared with `HDRParticleRenderer` so a tile
 // cannot drift from the view it previews.
 import {
@@ -28,6 +29,8 @@ import {
 
 const TILE_W = 256;
 const TILE_H = 192;
+const ATLAS_W_PX = TILE_W * 4;   // x ATLAS_COLS (4), which is declared further down
+const ATLAS_H_PX = TILE_H * 4;   // x ATLAS_ROWS (4)
 
 /**
  * Hard ceiling on concurrent slots, and the argument for why it is no longer 32 (H16).
@@ -67,6 +70,24 @@ const TILE_H = 192;
  * throttles rather than refuses.
  */
 const MAX_SLOTS = 128;
+
+/*
+ * v8 performance pass (owner, 2026-11-10: *"the main preview works smoothly and the grid tiles at least show an image
+ * and animate as much as the machine allows"*).
+ *
+ * ⚠️⚠️ **THE READBACK IS ASYNCHRONOUS AND BATCHED, AND THE SYNCHRONOUS FORM WAS THE MEASURED COST.** Every tile used to
+ * end in its own `readPixels` into client memory — a full pipeline FLUSH-AND-WAIT, and because the tiles share ONE
+ * WebGL context with the main view, each wait also drained the main view's queued work. Measured on a software GPU:
+ * 430–530 ms of every second inside those calls with the grid visible, ~5–6 forced waits per main frame, and the
+ * main view at 1.7 vs 3.4 fps with the grid vs without. Now every tile due for a blit is tone-mapped into one cell of
+ * an ATLAS, ONE `readPixels` per pass goes into a PIXEL_PACK buffer with a fence and RETURNS, and a later tick paints
+ * the canvases once the fence has signalled. A tile's picture is therefore one or two frames late — invisible at a
+ * thumbnail's 15 fps — and no tile ever blocks the main view on the GPU.
+ */
+const ATLAS_COLS = 4;
+const ATLAS_ROWS = 4;
+/** Tiles per readback pass; the rest wait for the next pass with `needsBlit` still set. */
+const ATLAS_CELLS = ATLAS_COLS * ATLAS_ROWS;
 
 // Floor for the adaptive cap: never shrink below a plausible viewport's worth,
 // since starving visible tiles is worse than a slightly long tick.
@@ -774,6 +795,23 @@ export class GridTileRenderer {
   // Readback FBO (RGBA8) — blit from RGBA16F to this before readPixels
   private readbackFbo: WebGLFramebuffer | null = null;
   private readbackTex: WebGLTexture | null = null;
+  /** The async readback (see `ATLAS_CELLS`): the PIXEL_PACK buffer, its CPU staging copy, and the pass in flight. */
+  private packBuffer: WebGLBuffer | null = null;
+  private packStaging: Uint8Array | null = null;
+  private inflight: {
+    fence: WebGLSync; rows: number; issuedAt: number;
+    entries: { name: string; slot: SlotState; canvas: HTMLCanvasElement; cell: number }[];
+  } | null = null;
+  /**
+   * v8 performance pass — the frame-budget controller (`#3`). `refreshMs` is the display's frame interval, estimated as
+   * the best recent frame (it drifts up slowly so a monitor change is followed); `pressure` is how far the main loop is
+   * from it (1 = every frame on time). The STEADY animation budget scales from full at pressure ≤ 1.25 to NONE at ≥ 2.5
+   * (on a 60 Hz screen: full above ~48 fps, none below 24) — wide enough that a merely weak machine keeps some motion.
+   */
+  private refreshMs = 1000 / 60;
+  private pressureEma = 1;
+  /** Cumulative counters for the `?perf=1` overlay (read by `getStats`, never reset here). */
+  private stats = { rendered: 0, warmRendered: 0, delivered: 0, readbacks: 0, readbackLatencyMs: 0 };
 
   /**
    * 1x1 white stand-in, bound to any sampler unit a slot has no real texture for. Its purpose is to
@@ -903,9 +941,7 @@ export class GridTileRenderer {
   private freePool: number[] = [];
   private activeSlots: Map<string, SlotState> = new Map();
 
-  // Readback scratch, both reused by every tile in `blitToCanvases` — see the note there. Every tile is
-  // TILE_W x TILE_H, so one of each serves all of them.
-  private pixelBuffer: Uint8Array;
+  // The one `ImageData` every tile is painted through in `pollReadback` (every tile is TILE_W x TILE_H).
   private tileImageData: ImageData | null = null;
 
   private frameCount = 0;
@@ -935,7 +971,6 @@ export class GridTileRenderer {
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
-    this.pixelBuffer = new Uint8Array(TILE_W * TILE_H * 4);
   }
 
   init(): void {
@@ -952,7 +987,8 @@ export class GridTileRenderer {
     // Readback FBO (RGBA8) for readPixels from float FBOs
     this.readbackTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.readbackTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, TILE_W, TILE_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // ⚠️ An ATLAS of ATLAS_CELLS tiles, not one tile — see `ATLAS_CELLS` for why the readback is batched.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, ATLAS_W_PX, ATLAS_H_PX, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1196,6 +1232,12 @@ export class GridTileRenderer {
       ov?.boxFoldLimit ?? BOX_FOLD_DEFAULT_LIMIT,
       ov?.boxFoldScale ?? 1,
     );
+    // v8 Phase 38 — the Fractal Fold, forwarded with the box fold (`38.D11`: a tile without it shows a different
+    // SHAPE, Phase 33's nine-operator gap). Defaults are the module's, the same `?? default` `main.ts` reads.
+    generator.setFractalFold(ov?.fractalFoldIterations ?? 0, ov?.fractalFoldLimit ?? FRACTAL_FOLD_DEFAULT_LIMIT,
+      ov?.fractalFoldScale ?? FRACTAL_FOLD_DEFAULT_SCALE);
+    generator.setFractalFoldBreath(ov?.fractalFoldLimitDepth ?? 0, ov?.fractalFoldLimitRate ?? 0,
+      ov?.fractalFoldScaleDepth ?? 0, ov?.fractalFoldScaleRate ?? 0);
     generator.setWRotation(ov?.wScale ?? 0, ov?.wXW ?? 0, ov?.wYW ?? 0, ov?.wZW ?? 0, ov?.wWinding ?? 3);
     generator.setChannels(
       ov?.channelDriver ?? 'index',
@@ -1681,7 +1723,10 @@ export class GridTileRenderer {
   tick(dt: number, throttle = 1): void {
     if (!this.active || this.activeSlots.size === 0) return;
     this.frameCount++;
-    this.throttle = Math.max(1, throttle);
+    // ⚠️ `throttle = Infinity` is the FIRST-IMAGES-ONLY mode (`PerfGuard` level 2): no steady animation at all, but a
+    // tile still WARMS — the owner's floor is that every tile shows an image, however slow the machine.
+    const firstImagesOnly = !Number.isFinite(throttle);
+    this.throttle = firstImagesOnly ? 1 : Math.max(1, throttle);
 
     // ONE stall-clamped reading of this frame, used by both the budget basis and the step accumulator, so the
     // two can never disagree about how long a frame is. The old code fed raw `dt * FRAME_SKIP` to the
@@ -1690,6 +1735,12 @@ export class GridTileRenderer {
     // EMA over ~1/3 s so one janky frame cannot collapse every budget at once — the same reasoning
     // `updateSlotCap`'s EMA carries.
     this.frameMsEma = this.frameMsEma * 0.9 + frameMs * 0.1;
+    // #3 — the refresh estimate and the main loop's pressure against it (see the fields).
+    this.refreshMs = Math.max(4, Math.min(34, Math.min(this.refreshMs * 1.0005, frameMs)));
+    this.pressureEma = this.pressureEma * 0.95 + (frameMs / this.refreshMs) * 0.05;
+    const steadyScale = firstImagesOnly ? 0 : Math.max(0, Math.min(1, (2.5 - this.pressureEma) / 1.25));
+    // The async readback is polled EVERY tick — a fence check, no wait — so a finished pass paints at once.
+    this.pollReadback();
     this.blitAccumMs = Math.min(TILE_STEP_INTERVAL_MS, this.blitAccumMs + frameMs);
 
     // Math warm-up is plain arithmetic with no GL calls, so it runs EVERY frame
@@ -1750,12 +1801,13 @@ export class GridTileRenderer {
     // Phase 2: settled tiles — the live animation. Budgeted, and walked from a
     // rotating cursor so that when the budget cannot cover every tile the
     // shortfall is shared evenly instead of always starving the same tail.
-    if (due.length > 0) {
+    if (due.length > 0 && steadyScale > 0) {
       const t0 = performance.now();
       // The ONLY site the throttle reaches. `frameSliceMs` turns the duty cycle into this frame's slice; the
       // divisor is `PerfGuard`'s. The loop below still always renders one tile, so a throttle can slow the
       // grid but never stop it — which is the whole difference between level 1 and level 2.
-      const deadline = t0 + this.frameSliceMs(STEADY_DUTY) / this.throttle;
+      // #3 — the steady budget scales with the main view's headroom; at pressure >= 2.5 it is ZERO.
+      const deadline = t0 + this.frameSliceMs(STEADY_DUTY) * steadyScale / this.throttle;
       const start = this.steadyCursor % due.length;
       let rendered = 0;
       for (let i = 0; i < due.length; i++) {
@@ -1767,6 +1819,7 @@ export class GridTileRenderer {
         slot.needsBlit = true;
         this.blitPending = true;
         rendered++;
+        this.stats.rendered++;
         // Always advance at least one tile, else a single over-budget tile
         // would deadlock progress at the cursor.
         if (performance.now() >= deadline) break;
@@ -1779,8 +1832,12 @@ export class GridTileRenderer {
     }
 
     if (glPending.length > 0) {
-      // NOT divided by the throttle — see `tick`'s warm-up exemption.
-      const deadline = performance.now() + this.frameSliceMs(GL_WARM_DUTY);
+      // NOT divided by the throttle — see `tick`'s warm-up exemption. ⚠️ Under pressure (or in first-images-only
+      // mode) a warm-up still progresses, but ONE render per tick, so every tile reaches its first image without
+      // taking a frame's worth of time from the main view.
+      const starved = firstImagesOnly || this.pressureEma >= 2.5;
+      const deadline = starved ? Number.POSITIVE_INFINITY : performance.now() + this.frameSliceMs(GL_WARM_DUTY);
+      let starvedBudget = 1;
       // One render per tile per pass, re-passing until the deadline. Every
       // warming tile therefore advances before any tile advances twice, so a
       // screenful brightens together instead of resolving front-to-back.
@@ -1804,6 +1861,8 @@ export class GridTileRenderer {
           slot.needsBlit = true;
           this.blitPending = true;
           progressed = true;
+          this.stats.warmRendered++;
+          if (starved && --starvedBudget <= 0) { progressed = false; break; }
           if (performance.now() >= deadline) break;
         }
       }
@@ -1813,10 +1872,10 @@ export class GridTileRenderer {
     // measurement that says why this is the one pass that may not be spread. Timed together with the steady
     // renders: the readback is the bulk of a tile's true cost, so the cap must be derived from both, not from
     // the render alone.
-    if (this.blitPending && this.blitAccumMs >= TILE_STEP_INTERVAL_MS) {
+    if (this.blitPending && this.blitAccumMs >= TILE_STEP_INTERVAL_MS && this.inflight === null) {
       const tBlit = performance.now();
-      this.blitToCanvases();
-      this.blitPending = false;
+      // ONE async readback per pass; `blitPending` stays set while tiles beyond the atlas still wait.
+      this.blitPending = this.blitToCanvases();
       this.blitAccumMs = 0;
       if (this.steadyRendered > 0) {
         const total = this.steadyRenderMs + (performance.now() - tBlit);
@@ -2272,56 +2331,98 @@ export class GridTileRenderer {
     this.slotCap = Math.max(this.demandFloor(), Math.min(MAX_SLOTS, affordable));
   }
 
-  private blitToCanvases(): void {
+  /**
+   * #1 + #2 — tone-map every tile that rendered since its last blit into one ATLAS cell, then issue ONE asynchronous
+   * `readPixels` into the PIXEL_PACK buffer with a fence. Returns whether tiles beyond the atlas's capacity still
+   * wait (they keep `needsBlit` and go in the next pass). The canvases are painted by `pollReadback()`.
+   */
+  private blitToCanvases(): boolean {
     const gl = this.gl;
-
-    for (const slot of this.activeSlots.values()) {
-      // Only tiles that re-rendered this tick need a readback. readPixels is a
-      // synchronous GPU→CPU stall, so skipping unchanged tiles is the main
-      // saving: a tile the steady budget skipped keeps its last frame on canvas
-      // instead of paying to re-read identical pixels.
+    const entries: { name: string; slot: SlotState; canvas: HTMLCanvasElement; cell: number }[] = [];
+    let more = false;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.readbackFbo);
+    gl.disable(gl.BLEND);
+    gl.useProgram(this.tonemapProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(this.uTonemapTex, 0);
+    gl.bindVertexArray(this.tonemapVao);
+    for (const [name, slot] of this.activeSlots) {
       if (!slot.needsBlit) continue;
+      if (entries.length >= ATLAS_CELLS) { more = true; break; }
+      const cell = entries.length;
       slot.needsBlit = false;
-
-      // Tonemap blit: RGBA16F → RGBA8 readback FBO (Reinhard prevents white saturation)
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.readbackFbo);
-      gl.viewport(0, 0, TILE_W, TILE_H);
-      gl.disable(gl.BLEND);
-      gl.useProgram(this.tonemapProgram);
-      gl.activeTexture(gl.TEXTURE0);
+      // Tonemap blit: RGBA16F -> one RGBA8 atlas cell (Reinhard prevents white saturation).
+      gl.viewport((cell % ATLAS_COLS) * TILE_W, Math.floor(cell / ATLAS_COLS) * TILE_H, TILE_W, TILE_H);
       gl.bindTexture(gl.TEXTURE_2D, this.slotTexA[slot.index]!);
-      gl.uniform1i(this.uTonemapTex, 0);
-      gl.bindVertexArray(this.tonemapVao);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.bindVertexArray(null);
+      entries.push({ name, slot, canvas: slot.canvas, cell });
+    }
+    gl.bindVertexArray(null);
+    if (entries.length === 0) return more;
+    const rows = Math.ceil(entries.length / ATLAS_COLS);
+    const bytes = ATLAS_W_PX * TILE_H * rows * 4;
+    if (!this.packBuffer) {
+      this.packBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, ATLAS_W_PX * ATLAS_H_PX * 4, gl.STREAM_READ);
+    } else {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+    }
+    // ⚠️ With a PIXEL_PACK buffer bound the last argument is a byte OFFSET and the call does NOT wait.
+    gl.readPixels(0, 0, ATLAS_W_PX, TILE_H * rows, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    if (!fence) {
+      // No fence available: fall back to collecting on the next poll anyway (the read then waits, once).
+      return more;
+    }
+    this.inflight = { fence, rows, issuedAt: performance.now(), entries };
+    void bytes;
+    return more;
+  }
 
-      // Now readPixels from the RGBA8 readback FBO
-      gl.readPixels(0, 0, TILE_W, TILE_H, gl.RGBA, gl.UNSIGNED_BYTE, this.pixelBuffer);
-
-      // Reuse ONE `ImageData` for every tile instead of allocating a fresh one per tile per tick.
-      //
-      // Every tile is exactly TILE_W x TILE_H, so a single buffer serves all of them, and the row loop
-      // below overwrites all of it — there is no stale data to carry between tiles. The old code
-      // allocated 196 KB per tile per tick (up to 32 of them, all immediately garbage) purely to have
-      // somewhere to flip into. Lazily created so a renderer that never blits allocates nothing.
-      //
-      // ⚠️ `readPixels` deliberately still targets the `Uint8Array` staging buffer rather than
-      // `imageData.data` directly. Reading straight in would remove this copy, but the WebGL2 spec pairs
-      // `UNSIGNED_BYTE` readback with `Uint8Array`, and a rejected `Uint8ClampedArray` would raise
-      // `INVALID_OPERATION` and leave the tile UNPAINTED — a silent blank tile, not an exception. Not
-      // worth one memcpy of 196 KB.
-      const imageData = this.tileImageData ?? (this.tileImageData = new ImageData(TILE_W, TILE_H));
-
+  /**
+   * The other half of the async readback: if the pass in flight has finished on the GPU (a fence check with a ZERO
+   * timeout — never a wait), copy it out and paint each tile's canvas. A slot released or reassigned meanwhile is
+   * skipped: its entry names the slot AND the canvas it was rendered for.
+   */
+  private pollReadback(): void {
+    const job = this.inflight;
+    if (!job) return;
+    const gl = this.gl;
+    const st = gl.clientWaitSync(job.fence, 0, 0);
+    if (st === gl.TIMEOUT_EXPIRED) return;
+    gl.deleteSync(job.fence);
+    this.inflight = null;
+    if (st === gl.WAIT_FAILED) return;
+    const bytes = ATLAS_W_PX * TILE_H * job.rows * 4;
+    if (!this.packStaging || this.packStaging.length < bytes) this.packStaging = new Uint8Array(ATLAS_W_PX * ATLAS_H_PX * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.packStaging, 0, bytes);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.stats.readbacks++;
+    this.stats.readbackLatencyMs += performance.now() - job.issuedAt;
+    // Reuse ONE `ImageData` for every tile (every tile is exactly TILE_W x TILE_H).
+    const imageData = this.tileImageData ?? (this.tileImageData = new ImageData(TILE_W, TILE_H));
+    const src = this.packStaging, rowBytes = TILE_W * 4, atlasRowBytes = ATLAS_W_PX * 4;
+    for (const en of job.entries) {
+      if (this.activeSlots.get(en.name) !== en.slot || en.slot.canvas !== en.canvas) continue;
+      const cx = en.cell % ATLAS_COLS, cy = Math.floor(en.cell / ATLAS_COLS);
       // GL's origin is bottom-left and the canvas's is top-left, so the rows arrive inverted.
       for (let r = 0; r < TILE_H; r++) {
-        const srcRow = (TILE_H - 1 - r) * TILE_W * 4;
-        const dstRow = r * TILE_W * 4;
-        imageData.data.set(this.pixelBuffer.subarray(srcRow, srcRow + TILE_W * 4), dstRow);
+        const srcOff = (cy * TILE_H + (TILE_H - 1 - r)) * atlasRowBytes + cx * rowBytes;
+        imageData.data.set(src.subarray(srcOff, srcOff + rowBytes), r * rowBytes);
       }
-
-      const ctx = slot.canvas.getContext('2d');
-      if (ctx) ctx.putImageData(imageData, 0, 0);
+      const ctx = en.canvas.getContext('2d');
+      if (ctx) { ctx.putImageData(imageData, 0, 0); this.stats.delivered++; }
     }
+  }
+
+  /** v8 performance pass — cumulative counters and the live controller state, for the `?perf=1` overlay. */
+  getStats(): { slots: number; rendered: number; warmRendered: number; delivered: number; readbacks: number;
+    readbackLatencyMs: number; pressure: number; refreshMs: number } {
+    return { slots: this.activeSlots.size, ...this.stats, pressure: this.pressureEma, refreshMs: this.refreshMs };
   }
 
   dispose(): void {
@@ -2356,6 +2457,9 @@ export class GridTileRenderer {
     this.slotTexA = [];
     this.slotTexB = [];
 
+    if (this.inflight) { gl.deleteSync(this.inflight.fence); this.inflight = null; }
+    if (this.packBuffer) { gl.deleteBuffer(this.packBuffer); this.packBuffer = null; }
+    this.packStaging = null;
     if (this.readbackFbo) gl.deleteFramebuffer(this.readbackFbo);
     if (this.readbackTex) gl.deleteTexture(this.readbackTex);
     if (this.particleProgram) gl.deleteProgram(this.particleProgram);

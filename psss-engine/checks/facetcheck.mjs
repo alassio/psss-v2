@@ -358,7 +358,7 @@ for (const [name, text, re, labels, why] of unionScans) {
  * and nowhere else.**
  */
 const SHAPE_FAMILY_OF = (k) => {
-  const m = /^(twist|taper|bend|boxFold|invert|channel|travel|sharpness|offset|grow)/.exec(k);
+  const m = /^(twist|taper|bend|boxFold|fractalFold|invert|channel|travel|sharpness|offset|grow)/.exec(k);   // v8 Phase 38: + fractalFold
   if (m) return m[1];
   if (/^w[A-Z]/.test(k)) return 'rot4d';
   return k;

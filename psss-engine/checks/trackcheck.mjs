@@ -2293,11 +2293,49 @@ console.log('\n=== N. the breathing RATE: geometric with a sticky zero, shared b
     + 'failed to reproduce would mean the clause above is passing for a reason other than the fix');
 
   const rateSites = (vfx.match(/toPos: OP_RATE_TRACK\.toPos/g) ?? []).length;
-  chk('all four breathing-rate rows read the SHARED track rather than restating the curve',
-    rateSites === 4 && !/Math\.pow\(OP_RATE_MAX/.test(vfx),
-    `${rateSites} call site(s) found; 4 expected (Temper Rate, Stretch Rate, Sway Rate, Flare Rate). ⚠ A `
+  chk('all six breathing-rate rows read the SHARED track rather than restating the curve',
+    rateSites === 6 && !/Math\.pow\(OP_RATE_MAX/.test(vfx),
+    `${rateSites} call site(s) found; 6 expected (Temper Rate, Stretch Rate, Sway Rate, Flare Rate, and v8 `
+    + 'Phase 38\'s Cell Rate and Scale Rate). ⚠ A '
     + 'restated curve is the copy this file exists to prevent: a differently-SHAPED row is visible, a '
     + 'drifted one is not');
+}
+
+/*
+ * v8 Phase 38 (`38.11`) — **the Fractal Fold's five value tracks.** Each step must be a NEGATIVE POWER OF TWO
+ * and `max/step` an integer, or a form control stepping in base-10 `Decimal` REFUSES the endpoint (the +90°
+ * defect only a browser saw); the default, the dead zones and both ends must sit ON the grid; and the SIGNED
+ * tracks (scale, both depths) must be symmetric, so quantising a magnitude and re-applying the sign lands on
+ * the grid either way.
+ */
+{
+  console.log('\n=== FF. v8 Phase 38 — the Fractal Fold tracks ===\n');
+  const FF = await import('../src/core/fractal-fold.ts');
+  const pow2 = (s) => s > 0 && Number.isInteger(Math.log2(1 / s));
+  const onGrid = (v, lo, step) => Math.abs((v - lo) / step - Math.round((v - lo) / step)) < 1e-9;
+  const TRACKS = [
+    ['Fractal Cell', FF.FRACTAL_FOLD_MIN_LIMIT, FF.FRACTAL_FOLD_MAX_LIMIT, FF.FRACTAL_FOLD_LIMIT_STEP, [FF.FRACTAL_FOLD_DEFAULT_LIMIT]],
+    ['Fractal Scale', -FF.FRACTAL_FOLD_MAX_SCALE, FF.FRACTAL_FOLD_MAX_SCALE, FF.FRACTAL_FOLD_SCALE_STEP, [FF.FRACTAL_FOLD_DEFAULT_SCALE, 0]],
+    ['Cell Breath', -FF.FRACTAL_FOLD_LIMIT_DEPTH_MAX, FF.FRACTAL_FOLD_LIMIT_DEPTH_MAX, FF.FRACTAL_FOLD_LIMIT_STEP, [0]],
+    ['Scale Breath', -FF.FRACTAL_FOLD_SCALE_DEPTH_MAX, FF.FRACTAL_FOLD_SCALE_DEPTH_MAX, FF.FRACTAL_FOLD_SCALE_STEP, [0]],
+  ];
+  const bad = [];
+  for (const [label, lo, hi, step, marks] of TRACKS) {
+    if (!pow2(step)) bad.push(`${label}: step ${step} is not a negative power of two`);
+    if (!Number.isInteger(Math.round((hi - lo) / step)) || !onGrid(hi, lo, step)) bad.push(`${label}: (max-min)/step not an integer`);
+    for (const m of marks) if (!onGrid(m, lo, step)) bad.push(`${label}: ${m} is off the grid`);
+    if (lo < 0 && Math.abs(lo + hi) > 1e-12) bad.push(`${label}: signed track is not symmetric`);
+  }
+  chk('every Fractal Fold track steps by a negative power of two, spans a whole number of steps, and holds its default, dead zone centre and ends on the grid',
+    bad.length === 0, bad.join('; ') || `${TRACKS.length} tracks`);
+  const snaps = [FF.FRACTAL_FOLD_SCALE_SNAP, FF.FRACTAL_FOLD_LIMIT_DEPTH_SNAP, FF.FRACTAL_FOLD_SCALE_DEPTH_SNAP];
+  chk('the three dead zones are each 8 % of their half travel (DEAD_ZONE_FRACTION, derived, never typed)',
+    Math.abs(snaps[0] - FF.FRACTAL_FOLD_MAX_SCALE * DL.DEAD_ZONE_FRACTION) < 1e-12
+    && Math.abs(snaps[1] - FF.FRACTAL_FOLD_LIMIT_DEPTH_MAX * DL.DEAD_ZONE_FRACTION) < 1e-12
+    && Math.abs(snaps[2] - FF.FRACTAL_FOLD_SCALE_DEPTH_MAX * DL.DEAD_ZONE_FRACTION) < 1e-12, snaps.map((s) => s.toFixed(4)).join(' / '));
+  // Seed: a base-10 step (1/100) on the cell track is exactly the class the first clause exists to refuse.
+  console.log(`  ${!pow2(0.01) ? 'CALIB' : 'CALIBRATION FAIL'}  §FF a 0.01 step is refused as not a power of two — seeded defect ${!pow2(0.01) ? 'caught' : 'NOT CAUGHT'}`);
+  if (pow2(0.01)) fail++;
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'}  trackcheck: ${pass} passed, ${fail} failed\n`);

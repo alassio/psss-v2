@@ -50,6 +50,7 @@ substantially the original mathematics. The full account is
     - [Box-fold](#box-fold)
     - [Taper and bend](#taper-and-bend)
     - [Spherical inversion](#spherical-inversion)
+    - [Fractal Fold](#fractal-fold)
     - [4D rotation](#4d-rotation)
     - [Depth ordering](#depth-ordering)
     - [Symmetry](#symmetry)
@@ -634,8 +635,9 @@ quantity, which is why the Score's envelope traces exist.
 
 ### 1.3 Model-space operators
 
-**Seven operators act on the figure in model space, after every displacement field and before the
-rotation** — the 4D rotation, twist, taper, bend, spherical inversion, box-fold and the symmetry fold.
+**Eight operators act on the figure in model space, after every displacement field and before the
+rotation** — the 4D rotation, twist, taper, bend, spherical inversion, box-fold, the Fractal Fold and the
+symmetry fold.
 They are a different kind of thing from the six field systems: a field adds a displacement **to** a
 point, while these are functions **of** the point — so they compose with every field for free, and the
 result reads as a solid being deformed rather than as an image being distorted.
@@ -643,7 +645,7 @@ result reads as a solid being deformed rather than as an image being distorted.
 ```
   waves + secular term → attractor blend → the five positional-nudge fields
         → 4D rotation → Twist → Taper + Bend → Inversion
-        → Box-fold → Symmetry fold → 3-D Symmetry              ← this stage, in order
+        → Box-fold → Fractal Fold → Symmetry fold → 3-D Symmetry   ← this stage, in order
         → modelPos snapshot (crystals nucleate HERE)
         → 3D rotation → perspective projection
 ```
@@ -782,6 +784,44 @@ Restricting the map to an outer shell, which the study proposed for exactly this
 failing the discriminator on the same 31 bodies as no restriction at all: a figure spanning the design
 extent has most of its particles outside any such shell. **A control whose rationale is falsified is
 worse than no control**, so the amount is the one that carries the guarantee.
+
+#### Fractal Fold
+
+**The Fractal Fold** iterates the Mandelbox step — a box fold, a ball fold and a scale — with a **feedback** term
+that adds the particle's own position back after every iteration. Without the feedback, repeating a fold only
+reflects the figure again; with it, each iteration is re-anchored to where the point started, so detail nests
+inside detail and a plain figure becomes self-similar structure. Per iteration, on X and Y only:
+
+```
+  box fold    x, y:  |x| > L  →  x = sign(x)·2L − x
+  ball fold   r² = x² + y²:  r² < (L/2)²  →  (x, y) ·= 4 ;   r² < L²  →  (x, y) ·= L²/r²
+  scale       (x, y) ·= s
+  feedback    (x, y) += (x₀, y₀)
+```
+
+- **Iterations** 1–3 are the operator's gate (0 skips the stage entirely, bit-exact). The ball fold's two radii
+  are tied to the cell (`L/2` and `L`), so three of the Mandelbox's constants are one control.
+- **Z is never folded, scaled or moved.** Folding depth was measured through the engine over 204 strongly
+  three-dimensional presets: at about a third of the settings in range it swapped near and far while the
+  picture barely changed — the pattern that also keeps z out of the box fold — and no range of the scale
+  avoided it. With z untouched, depth order is preserved by construction.
+- **The unit is the figure's own size.** The cell `L` and the whole fold work in units of the unfolded
+  figure's XY RMS radius, measured every frame from the INPUT. Measured against the design box instead, the
+  compensated size varied from a tenth to eighty-five times across the library, because the fold's growth
+  depends on how large a figure is relative to the cell. The input's size changes only when the figure itself
+  moves, so animating a fold setting never makes the figure pulse in size.
+- **The figure keeps its size.** The fold grows a figure by a factor that depends strongly on the settings and
+  weakly on the figure, so the result is divided by a growth measured through the engine over 24 library
+  presets and interpolated over iterations × cell × scale. The median residual is 1.00 and most figures land
+  within ±6 % of their unfolded size; at the extreme setting the worst figure lands between 0.4× and 1.3× of it. A logarithmic radial limiter beyond 2.5×
+  the figure's radius pulls the few far-flung points back onto the canvas, point by point.
+- **Scale 0 is a second exact identity** (the law reduces to `x = x₀`) with a dead zone around it; negative
+  scales are in range and often give the most striking shapes.
+- **Cell and scale breathe**: each has a signed depth and a rate on the same convention as the other breathing
+  operators; a depth of 0 is exact. In the Mixer the iteration count snaps and the rest lerp; the Randomiser does
+  not roll them. The preview tiles apply it.
+- It runs after the box fold and before the symmetry folds, so a symmetric figure is folded first and then
+  repeated.
 
 #### 4D rotation
 
@@ -3555,7 +3595,7 @@ fraction is refresh-rate-invariant:
 |---|---|---|---|
 | **Math warm-up** | 4.0 ms | the nominal frame (16.67 ms) | plain arithmetic, no GL — runs **every** frame, because a tile is unshowable until its math completes |
 | **GL warm-up** | 12.0 ms | the tile step (66.7 ms) | pre-accumulating a trail so a new tile is recognisable |
-| **Steady state** | 10.0 ms | the tile step | the live animation: one render + one synchronous `readPixels` per tile |
+| **Steady state** | 10.0 ms | the tile step | the live animation: one render per tile, with the picture returned by the asynchronous readback below |
 
 ⚠️ **The two divisors are different and neither is interchangeable**, because the two kinds of budget
 were spent at different cadences — the math slice was already per-frame, the GL slices once per tile
@@ -3569,6 +3609,32 @@ different frames; a tile that does not fit this frame's slice is **skipped and p
 rotating cursor**, so it loses frame rate rather than stopping. That rotation is why a shortfall is
 shared instead of always starving the same tail.
 
+**The steady slice also scales with the main view's headroom.** Each tile renderer estimates the display's
+frame interval as its best recent frame and tracks the main loop's *pressure* — frame time over that interval,
+1 when every frame is on time. The steady budget is full at pressure ≤ 1.25 and falls linearly to **zero at
+2.5** (on a 60 Hz screen: full above about 48 fps, none below 24), so the main view is served first and the tiles
+animate with whatever is left. **Warm-up is never zeroed**: under pressure it advances one render per tick, so
+every tile still reaches its first image.
+
+**The picture comes back asynchronously, in one batch.** A tile used to end in its own synchronous
+`readPixels`, and because the tiles share one WebGL context with the main view, each of those waited for all
+queued GPU work, the main view's frame included — measured on a software GPU, 430–530 ms of every second with
+the grid visible. Now every tile due for a blit is tone-mapped into one cell of a 4 × 4 **atlas**, **one**
+`readPixels` per pass goes into a pixel-pack buffer with a fence and returns at once, and a later frame paints
+the tiles once the fence has signalled (a fence check, never a wait). A tile's picture is therefore one or two
+frames late, which a 15 fps thumbnail does not show; a slot that was released or reassigned meanwhile is skipped.
+Measured on the same machine: no time left in `readPixels`, and the main view's loss to the grid fell from
+30–50 % to 7–16 %.
+
+**`?perf=1` measures all of this on the machine it runs on.** It brackets each section of the main frame —
+the figure computation, the particle or splat draw, Neon Lines, ribbons, the Translation Map warp, Electric
+Discharge, bloom, the grade and the tiles — and reports CPU milliseconds per frame always, and GPU milliseconds
+where the browser offers `EXT_disjoint_timer_query_webgl2`. The GPU queries are collected frames later, never
+waited on, and a window in which the GPU reports a disjoint event is discarded. Sections not bracketed (the
+trail fade, the warp's plain copy, the final present) are in the frame time but in no row. The CPU column of a
+drawing section is small by nature: the GPU does that work later, which is why the GPU column is the one to
+read for drawing.
+
 #### 9.2.2 The three levels, and how the thresholds were derived
 
 The guard averages **30 frames**, then moves at most one rung per evaluation:
@@ -3577,7 +3643,7 @@ The guard averages **30 frames**, then moves at most one rung per evaluation:
 |---|---|---|---|
 | **0** full cadence | — | below **30 fps** → 1 | tiles at their full 15 fps |
 | **1** throttled | below 30 fps | **45 fps** sustained → 0 | the steady slice is **divided by 3** → about **5 tile-fps**. ⚠️ **Warm-up is EXEMPT** |
-| **2** frozen | below **15 fps** | **22 fps** → 1 | the gate skips every tile `tick()` entirely |
+| **2** first images only | below **15 fps** | **22 fps** → 1 | no tile animates, but `tick()` still runs, so every new tile still reaches its first image |
 
 Four properties of that ladder are load-bearing, and each was a measured defect first:
 
@@ -3709,7 +3775,7 @@ diagnostic rather than merely cheap.
      └ draw     particles → fboA or fboB  (order permuted by Warp First)
                 liquid mode REPLACES the draw with its own field + surface pair
   4. (bloom)    DELETED — see below
-  5. blit out   fboA ─tonemap→ RGBA8 FBO ─readPixels→ putImageData onto the canvas
+  5. blit out   fboA ─tonemap→ one cell of the RGBA8 atlas ─async readPixels (one per pass)→ putImageData later
 ```
 
 Four details in that sequence are not simplifications of the main path but *different* decisions:
@@ -3741,7 +3807,7 @@ Four details in that sequence are not simplifications of the main path but *diff
 | **Bloom** | 4 programs over a 5-level mip pyramid ([§8.1](#81-bloom)) | ⚠️ **omitted entirely** |
 | **Tone map + grade** | 3 curves + lift/gamma/gain/saturation/vignette ([§8.2](#82-tone-mapping)–[§8.3](#83-lift-gamma-gain-saturation-vignette)) | ⚠️ **one fixed exponential curve**, `1 − exp(−1.5·hdr)` |
 | Film look's 11 grading fields | applied | **none of them** |
-| Present | blit to the default framebuffer | `readPixels` → `putImageData` |
+| Present | blit to the default framebuffer | an atlas cell, read back asynchronously → `putImageData` |
 
 > **If a tile looks *better* than the main view, the defect is in the grading chain** — because the tile
 > runs the same geometry through a shorter one. That is the whole diagnostic value of the reduction, and
@@ -4837,6 +4903,14 @@ fix.
 | **The trail**, **ribbons**, **neon lines** | at least one modulated curve parameter, or a non-zero Rotation | A completely static curve gives the trail nothing to accumulate and the trajectory renderers nothing to join, so all three go quiet while appearing to be on. | Give one row a non-zero **Depth** and **Rate**. Every shipped curve preset does. |
 | **Ribbon Mode: Streaks** | particles with real velocity | **The figure disappears** and is replaced by a sparse field of isolated dots. A ribbon mode draws instead of the points, and this one draws along each particle's motion — on a slowly-turning curve there is almost no motion to draw along. Measured mean brightness 0.19 of 255. | Use **Hybrid**, which does not read velocity, or raise **Rotation** until the figure is genuinely moving. |
 | **Curl Noise**, on this figure type | nothing — it works, and that is the problem | **The figure drifts out of its own frame and scatters.** Curl pushes each particle along a flowing field and nothing pulls it back, so a shape whose whole identity is its exact geometry comes apart. Measured: the lit centre of the picture wanders halfway to the canvas edge and never settles, against a tenth of that with curl off on the same preset. | Use **Fluid Advection** instead — it has a return force, so the figure drifts and recovers. No Turbulence setting makes Curl Noise safe here. |
+
+**The Fractal Fold's own preconditions:**
+
+| Control | Needs | When unmet it looks like | Fix |
+|---|---|---|---|
+| **Fractal Cell**, **Fractal Scale**, the breathing rows | **Fractal Fold** at 1 or more | **Absent** — the rows are hidden while the fold is Off. | Raise Fractal Fold. |
+| **Fractal Fold** | a **Fractal Scale** other than 0 | The figure is exactly unchanged, and a note under the scale row says so. | Move Fractal Scale away from the centre, either way. |
+| **Cell Rate**, **Scale Rate** | its own Breath above Off | No motion: a rate with no depth moves nothing. | Raise Cell Breath or Scale Breath. |
 
 > ⚠️ **A control this table says is inert may now be INVISIBLE instead, and the two symptoms need
 > different handling.** Visual FX, Materials and the Composer hide what is switched off: a section whose

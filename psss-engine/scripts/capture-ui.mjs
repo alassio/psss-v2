@@ -114,6 +114,17 @@ const EXTRA_SHOTS = [
   // script's Lab click twice (a hand-driven probe clicks it in ~0.8 s, so it is this flow, not the engine).
   { tab: 'visual-fx', file: 'lab-visual-fx-sym3d', group: 'Figure', options: ['Cube'], scrollTo: 'Twist' },
   /*
+   * v8 Phase 38 — the Fractal Fold switched on (2 iterations, scale −1.75, a breathing cell), so its six gated rows
+   * are visible. ⚠️ `scrollTo` leaves its target at the BOTTOM, so the anchor is `4D Extent`, the row directly BELOW
+   * the Fractal Fold block — the last thing the shot must hold.
+   */
+  { tab: 'visual-fx', file: 'lab-visual-fx-fractalfold', group: 'Figure',
+    // ⚠️ A PRESET, not `set`: `setControl` aims a slider by parsing its numeric readout, and these readouts are not
+    // bare numbers (`2×`, `−1.75`, `±0.13 cell`) — `set` overshot every row to its maximum. `Fractal Butterfly`
+    // authors the fold on (2 iterations, scale −1.75, a breathing cell), so the shot shows real authored values.
+    preset: 'Fractal Butterfly',
+    scrollTo: '4D Extent' },
+  /*
    * The cross-tab settings search, open over Visual FX. ⚠️ **`symme` is chosen because it shows all three
    * kinds of row the manual explains**: two controls with the SAME name told apart only by their path
    * (Visual FX's and Sliders' `Symmetry`), and two rows that matched only on their TOOLTIP, each carrying

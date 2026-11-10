@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.7.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.7.0](https://github.com/alassio/psss-v2/releases/tag/v1.7.0)** — **New since v1.3.0: 3-D Symmetry, an editor for your own self-similar curves, and Electric Discharge.** Repeat any figure in three dimensions on a ring, a sphere or a solid; design a curve generator step by step and watch it grow; and tear Neon Lines into crackling filaments. Twenty-three new demo presets show them off.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.7.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.3.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.3](https://github.com/alassio/psss-v2/releases/tag/v1.8.3)** — **New since v1.7.0: the Fractal Fold, smoother running on slower machines, and a performance readout.** Fold any figure into nested, self-similar structure; the main view now stays smooth while the preview grid animates only as much as the machine allows; and `?perf=1` shows what each part of the picture costs on your own machine. Four new demo presets show the fold.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.3)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
@@ -150,8 +150,9 @@ last two are Windows-only.
 
 No Python is needed anywhere.
 
-The page opens on the **preview grid**: a wall of live thumbnails, one per preset. Click one to make it
-the main animation, or press **▶ Play** to start the main reel. The user manual explains the rest.
+The page opens on the **preview grid**: a wall of live thumbnails, one per preset, with a randomly chosen
+preset playing behind it. Click one to make it the main animation, or press **▶ Play** to start the main reel.
+The user manual explains the rest.
 
 Some URL parameters are useful while developing:
 
@@ -159,8 +160,10 @@ Some URL parameters are useful while developing:
 |---|---|
 | `?reel=1` | Start the main reel immediately, full screen, with the UI hidden. `?reel=0` forces it off. |
 | `?screensaver=1` | Behave like the Windows screensaver: play, and quit on the first key press, click or mouse move. |
+| `?preset=<name>` | Start on a named preset instead of a random one, e.g. `?preset=Quader`. |
 | `?tab=<name>` | Open the Lab on a named tab, e.g. `?tab=reel`, `?tab=visual-fx`. |
 | `?renderscale=1` | Render at the display's native resolution instead of the default performance cap. |
+| `?perf=1` | Show a small performance readout: the main view's frame rate and frame times, the CPU and (where the browser can measure it) GPU time of each part of the frame, and per thumbnail grid how much it draws. Use it to judge a slower machine. |
 | `?gldiag=1` | Print graphics diagnostics. Off by default because it slows every frame. |
 | `?testhook=1` | Expose engine state for the browser tests. |
 

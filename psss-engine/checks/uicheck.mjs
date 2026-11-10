@@ -1217,6 +1217,58 @@ chk('the settings search finds 3-D Symmetry at Visual FX', sy.some((r) => /Visua
   sy.map((r) => `${r.label} [${segsOf(r.path).join(' › ')}]`).slice(0, 3).join(' | '));
 await page.locator(SEARCH_FIELD).fill('');
 
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== Z. v8 Phase 38 — the Fractal Fold: the gated rows, the visible dead zone, the note, the badge ===\n');
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/*
+ * DOM facts only. The iteration count is the gate (rows hidden at Off); the scale's dead zone must be VISIBLE —
+ * a drag inside it reads back `0 (no fold)`, because the row re-reads the engine (`rereadAfterSet`, `32.14`);
+ * the scale-0 note shows only while folding at scale 0 (invariant 25); the Deformation badge counts the operator.
+ */
+await page.locator('.sl-tab-btn[data-tab="visual-fx"]').click();
+await page.waitForTimeout(800);
+const ffz = await page.evaluate(() => {
+  const root = document.querySelector('.tab-content[data-tab="visual-fx"]');
+  for (const h of root.querySelectorAll('[aria-expanded="false"]')) h.click();
+  const rowOf = (label) => Array.from(root.querySelectorAll('.sl-vfx-row')).find((r) => r.querySelector('.sl-vfx-label')?.textContent?.trim() === label);
+  const shown = (label) => { const r = rowOf(label); return !!r && r.offsetParent !== null; };
+  const val = (label) => rowOf(label)?.querySelector('.sl-vfx-value')?.textContent?.trim() ?? null;
+  const slide = (label, v) => { const i = rowOf(label)?.querySelector('input[type="range"]'); if (i) { i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); } };
+  const note = () => Array.from(root.querySelectorAll('.sl-tab-desc')).find((n) => /At Scale 0 the fold/.test(n.textContent ?? ''));
+  const noteShown = () => { const n = note(); return !!n && getComputedStyle(n).display !== 'none'; };
+  const badge = () => {
+    const head = Array.from(root.querySelectorAll('[aria-expanded]')).find((h) => /Deformation/.test(h.textContent ?? ''));
+    const m = /(\d+)\s*$/.exec(head?.textContent?.trim() ?? '');
+    return m ? Number(m[1]) : 0;
+  };
+  const ROWS = ['Fractal Cell', 'Fractal Scale', 'Cell Breath', 'Cell Rate', 'Scale Breath', 'Scale Rate'];
+  const r = {};
+  slide('Fractal Fold', 0);
+  r.offRows = ROWS.filter(shown);
+  r.badgeOff = badge();
+  slide('Fractal Fold', 1);
+  r.onRows = ROWS.filter(shown);
+  r.badgeOn = badge();
+  slide('Fractal Scale', 0.1);          // inside the 0.2 dead zone
+  r.snapped = val('Fractal Scale');
+  r.noteAtZero = noteShown();
+  slide('Fractal Scale', 2);
+  r.atTwo = val('Fractal Scale');
+  r.noteAtTwo = noteShown();
+  slide('Fractal Fold', 0);
+  return r;
+});
+chk('the six Fractal Fold rows are HIDDEN while Fractal Fold is Off and SHOWN at 1 (31.U)',
+  ffz.offRows.length === 0 && ffz.onRows.length === 6, JSON.stringify({ off: ffz.offRows, on: ffz.onRows }));
+chk('...the scale dead zone is VISIBLE: a drag to 0.10 reads back `0 (no fold)`, and 2 reads `+2.00` (32.14)',
+  ffz.snapped === '0 (no fold)' && ffz.atTwo === '+2.00', `${ffz.snapped} | ${ffz.atTwo}`);
+chk('...the scale-0 note shows while folding at scale 0 and hides at scale 2 (invariant 25)',
+  ffz.noteAtZero === true && ffz.noteAtTwo === false, JSON.stringify({ zero: ffz.noteAtZero, two: ffz.noteAtTwo }));
+chk('...and the Deformation badge counts the operator (one more while it is on)',
+  ffz.badgeOn === ffz.badgeOff + 1, `${ffz.badgeOff} -> ${ffz.badgeOn}`);
+
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

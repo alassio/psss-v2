@@ -516,6 +516,12 @@ const AUTHORED_INDEX_PALETTES = {
   'Curve Rosette Chain': 'Material: liquid',
   // 2026-11-08 — the owner's own `Growing Corals` (`Curve Island` on Bush 3D, liquid): its OWN palette under `index`.
   'Growing Corals': 'Material: organic',
+  // 2026-11-10 — v8 Phase 38, the Fractal Fold demos. `Fractal Butterfly` and `Fractal Star` author their OWN palettes
+  // (a distinct colour per demo, owner); `Fractal Lattice` restates its parent `Curve Lattice`'s. `Fractal Cross` maps by
+  // its base's look (`phase`), so it owes no row here.
+  'Fractal Butterfly': 'Pastel',
+  'Fractal Star': 'Warm',
+  'Fractal Lattice': 'Prismatic',
   // 2026-11-06 — v8 Phase 42 (revised to positions × copies at each), the 3-D Symmetry demos: each restates its
   // PARENT's authored palette unchanged (`Curve Morph`, `Curve Spiral Thicket`, `Curve Breathing Thicket`, `Curve Koch
   // Cesaro`, `Curve Hilbert Opening`, `Curve Tilt`) — the demo is about the arrangement. ⚠️ 2026-11-07: three were

@@ -1631,5 +1631,138 @@ chk('at the phase origin a breathing operator resolves to its BASE, bit-exactly'
     + 'that ignores the setters rather than one that honours their identity');
 }
 
+// ═══ §FF — v8 Phase 38, the Fractal Fold ══════════════════════════════════════════════════════════════
+/*
+ * The operator MEASURED (`38.10`). ⚠️ **The ordering metric is REPORTED, never failed on** (correction 4: an
+ * invented tangle threshold condemned the proof of concept's best picture), and a break count is not a look.
+ */
+console.log('\n=== FF. v8 Phase 38 — the Fractal Fold: identities, continuity, compensation, composition ===\n');
+{
+  const FF = await import('../src/core/fractal-fold.ts');
+  const FFSRC = read('../src/core/fractal-fold.ts');
+  const baseFF = run(null);
+  chk('Fractal Fold at 0 iterations is BIT-EXACT (Object.is) against no fold at all — the stage is SKIPPED',
+    objExact(baseFF, run((g) => g.setFractalFold(0, 0.3, 2))), 'iterations is the gate (38.D5)');
+  chk('...and scale 0 is a SECOND exact identity at 3 iterations — the loop is skipped by its own branch',
+    objExact(baseFF, run((g) => g.setFractalFold(3, 0.3, 0))), '`x + 0·k` is exact except at −0, so it is a branch, not a weight');
+  const ffd = run((g) => g.setFractalFold(2, 0.3125, -1.7));
+  seed('§FF the identity clauses are falsifiable — 2 iterations at scale −1.7 MOVES the figure',
+    ffd.some((v, i) => v !== baseFF[i]) ? 1 : 0, 'a fold that never moves anything would pass both identities');
+  chk('...and the scale dead zone snaps in the ENGINE (|s| < FRACTAL_FOLD_SCALE_SNAP reads back 0)', (() => {
+    const g = new LissajousGenerator(); g.init(structuredClone(CFG), SIZE);
+    g.setFractalFold(2, 0.3, FF.FRACTAL_FOLD_SCALE_SNAP * 0.5);
+    return g.getFractalFold().scale === 0;
+  })(), `snap ${FF.FRACTAL_FOLD_SCALE_SNAP}`);
+  const out = [0, 0, 0];
+  const f = (x, y, z, it, L, s) => { FF.fractalFoldPoint(x, y, z, it, L, s, out); return [out[0], out[1], out[2]]; };
+  // CONTINUITY: across the cell wall (|x| = L) and both ball radii (L/2, L) a hair apart in, a hair apart out.
+  let worst = 0;
+  for (const L of [0.25, 0.5, 1]) for (const s of [-2, 1.5]) for (let k = -4000; k <= 4000; k++) {
+    const x = k / 2000, e = 1e-7;
+    const a1 = f(x, 0.3 * x, -0.2 * x, 2, L, s), a2 = f(x + e, 0.3 * (x + e), -0.2 * (x + e), 2, L, s);
+    worst = Math.max(worst, Math.hypot(a1[0] - a2[0], a1[1] - a2[1], a1[2] - a2[2]) / e);
+  }
+  chk('the fold is CONTINUOUS across the cell wall and both ball radii (local gain bounded over a 3-cell sweep)',
+    worst < 1e4, `worst local gain ${worst.toFixed(1)} — a jump would read as ~${(1 / 1e-7).toExponential(0)}`);
+  // Seed: a MODULAR box fold (wraps instead of reflecting) jumps a whole cell at the wall.
+  const wrap = (c, L) => ((((c + L) % (2 * L)) + 2 * L) % (2 * L)) - L;
+  seed('§FF the continuity clause sees a modular fold\'s jump at the wall',
+    Math.abs(wrap(1 + 1e-7, 1) - wrap(1 - 1e-7, 1)) / 2e-7 > 1e4 ? 1 : 0, 'a wrap moves 2L across a hair');
+  // THE ORDERING METRIC, REPORTED: mean adjacent step over the figure's extent, against the unfolded floor.
+  const stepRatio = (a) => {
+    let sum = 0, lo = Infinity, hi = -Infinity;
+    for (let i = 0; i + 1 < a.length / 3; i++) sum += Math.hypot(a[i * 3 + 3] - a[i * 3], a[i * 3 + 4] - a[i * 3 + 1], a[i * 3 + 5] - a[i * 3 + 2]);
+    for (let i = 0; i < a.length; i++) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); }
+    return (sum / (a.length / 3 - 1)) / Math.max(1e-9, hi - lo);
+  };
+  const floorR = stepRatio(baseFF);
+  const rows = [[1, 0.3125, 2], [2, 0.3125, -1.7], [2, 0.25, 2], [3, 0.4, -1.7]].map(([it, L, s]) => {
+    const r = stepRatio(run((g) => g.setFractalFold(it, L, s)));
+    return `i${it} L${L} s${s}: ${(r / floorR).toFixed(2)}x floor`;
+  });
+  chk('REPORT (never fails): mean adjacent step / extent against the unfolded floor', true, `floor ${floorR.toExponential(2)}; ${rows.join('; ')}`);
+  // THE COMPENSATION: table shape, the s = 0 column is exactly 1, nodes interpolate to themselves, the size holds.
+  const G = FF.FRACTAL_FOLD_GROWTH;
+  const iZero = FF.FRACTAL_FOLD_TABLE_SCALES.indexOf(0);
+  chk('the growth table is MAX_ITERATIONS x cells x scales, and its scale-0 column is exactly 1 (the law\'s own identity)',
+    G.length === FF.FRACTAL_FOLD_MAX_ITERATIONS && G.every((pl) => pl.length === FF.FRACTAL_FOLD_TABLE_LIMITS.length
+      && pl.every((row) => row.length === FF.FRACTAL_FOLD_TABLE_SCALES.length && row[iZero] === 1)),
+    `${G.length} x ${FF.FRACTAL_FOLD_TABLE_LIMITS.length} x ${FF.FRACTAL_FOLD_TABLE_SCALES.length}`);
+  chk('...and the interpolation returns the table at its own nodes (saturation aside)',
+    [[1, 2, 5], [2, 4, 17], [3, 7, 0]].every(([it, li, si]) => {
+      const v = G[it - 1][li][si];
+      const c = Math.max(1 / FF.FRACTAL_FOLD_GROWTH_SPAN, Math.min(FF.FRACTAL_FOLD_GROWTH_SPAN, v));
+      return Math.abs(FF.fractalFoldGrowth(it, FF.FRACTAL_FOLD_TABLE_LIMITS[li], FF.FRACTAL_FOLD_TABLE_SCALES[si]) - c) < 1e-12;
+    }), '');
+  // ⚠️ MODEL space (`modelPos`, filled while crystals are on): `getState().positions` are SCREEN coordinates, and the
+  // first version of the calibration measured those — about the screen's corner — which is how it went wrong.
+  const { DEFAULT_CRYSTAL_CONFIG } = await import('../src/crystal/crystal-config.ts');
+  const modelRms = (setup) => {
+    const g = new LissajousGenerator(); g.init(structuredClone(CFG), SIZE);
+    g.setCrystalConfig({ ...DEFAULT_CRYSTAL_CONFIG, enabled: true });
+    if (setup) setup(g);
+    g.update(16.667);
+    const n = g.getState().waveCount, m = g.modelPos;
+    let s = 0; for (let i = 0; i < n; i++) s += m[i * 3] * m[i * 3] + m[i * 3 + 1] * m[i * 3 + 1];   // XY: the fold never touches z
+    return Math.sqrt(s / n);
+  };
+  const r0 = modelRms(null);
+  const sizes = [[1, 0.3125, 2], [2, 0.3125, -1.7], [3, 0.5, 2.5], [2, 1, -2.5]].map(([it, L, s]) => modelRms((g) => g.setFractalFold(it, L, s)) / r0);
+  chk('the compensated figure keeps its XY size within the calibrated body spread (0.35x–1.4x; the 24-body worst case is 0.38–1.32)',
+    sizes.every((r) => r > 0.35 && r < 1.4), sizes.map((r) => r.toFixed(2)).join(' / '));
+  // XY ONLY (owner, 2026-11-10; reverses 38.D2): with the fold on, every z must be BIT-identical to the fold off, in
+  // model space — the measured reason is in `core/fractal-fold.ts`' header (the three-axis form swapped depth).
+  const zOf = (setup) => {
+    const g = new LissajousGenerator(); g.init(structuredClone(CFG), SIZE);
+    g.setCrystalConfig({ ...DEFAULT_CRYSTAL_CONFIG, enabled: true });
+    if (setup) setup(g);
+    g.update(16.667);
+    const n = g.getState().waveCount, m = g.modelPos;
+    return Array.from({ length: n }, (_, i) => m[i * 3 + 2]);
+  };
+  const z0 = zOf(null);
+  const zMoved = [[1, 0.3125, 2], [2, 0.25, -2.5], [3, 1, 1.5]].reduce((acc, [it, L, s]) => {
+    const z1 = zOf((g) => g.setFractalFold(it, L, s));
+    return acc + z1.filter((v, i) => !Object.is(v, z0[i])).length;
+  }, 0);
+  chk('the fold is XY ONLY: every z is BIT-IDENTICAL with the fold on (three settings, model space)', zMoved === 0,
+    `${zMoved} z values moved — depth order must be preserved by construction`);
+  seed('§FF the z clause sees a fold that touched z (the three-axis law, rebuilt here)', (() => {
+    let moved = 0;
+    for (const v of z0) { const L = 0.25; let z = v / 10; if (z > L) z = 2 * L - z; else if (z < -L) z = -2 * L - z; if (!Object.is(z * 10, v)) moved++; }
+    return moved;
+  })(), 'a z fold that leaves every z exact cannot be what the clause above refuses');
+
+  // COMPOSITION (38.D1): with the box fold and the inversion, finite, and distinct from either alone.
+  const all = run((g) => { g.setBoxFold(1, 0.35, 1); g.setInversion(0.5, 1); g.setFractalFold(2, 0.3125, -1.7); });
+  const boxInv = run((g) => { g.setBoxFold(1, 0.35, 1); g.setInversion(0.5, 1); });
+  chk('it COMPOSES with the box fold and the inversion: finite, and distinct from the two without it',
+    all.every(Number.isFinite) && all.some((v, i) => v !== boxInv[i]), '');
+  // BREATHING: depth 0 is exact; a cell breath with a rate changes the figure between two instants.
+  const g1 = new LissajousGenerator(); g1.init(structuredClone({ ...CFG, waveSpeed: 0.05 }), SIZE);
+  g1.setFractalFold(2, 0.5, 2); g1.setFractalFoldBreath(0.3, 10, 0, 0);
+  g1.update(16.667); const t1 = Float64Array.from(g1.getState().positions.subarray(0, 240 * 3));
+  for (let k = 0; k < 40; k++) g1.update(16.667);
+  const t2 = Float64Array.from(g1.getState().positions.subarray(0, 240 * 3));
+  chk('a Cell Breath with a rate MOVES the figure over time (the breathing reaches the law)', t1.some((v, i) => v !== t2[i]), '');
+  // SOURCE-SHAPED (a behaviour-neutral rename breaks these — read the assertion first).
+  const iBox = LISS.indexOf('const bfIter = this.boxFoldIterations;'), iFF = LISS.indexOf('const ffIter = this.fractalFoldIterations;');
+  const iSym = LISS.indexOf('const fold = this.symmetryFold;', iFF);
+  chk('the stage runs AFTER the box fold and BEFORE the 2-D symmetry, as its comment states', iBox > 0 && iFF > iBox && iSym > iFF, `${iBox} < ${iFF} < ${iSym}`);
+  chk('core/fractal-fold.ts IMPORTS NOTHING (bare-Node loadable)', !/^\s*import\s/m.test(FFSRC), '');
+  const INTERP = read('../src/exploration/interpolate.ts');
+  chk('SCALAR_IDENTITIES pins the cell and scale to the readers\' `?? default`',
+    Number((/fractalFoldLimit: ([\d.]+)/.exec(INTERP) ?? [])[1]) === FF.FRACTAL_FOLD_DEFAULT_LIMIT
+    && Number((/fractalFoldScale: ([\d.]+)/.exec(INTERP) ?? [])[1]) === FF.FRACTAL_FOLD_DEFAULT_SCALE, '');
+  const MAIN = read('../src/main.ts'), TILES = read('../src/ui/preview-grid/grid-tile-renderer.ts');
+  // ⚠️ The export helper is used ONCE (the snapshot's plain branch) and is deliberately ABSENT from
+  // `livePreservedOverlay()` (owner, 2026-11-10): `Apply Visual FX` off must neutralise every Visual FX operator.
+  const lpo = (() => { const s = MAIN.indexOf('function livePreservedOverlay(): OverlayState {'); return MAIN.slice(s, MAIN.indexOf('\n  }\n', s)); })();
+  chk('ONE reader adopted on BOTH apply paths, the export helper in the snapshot and NOT in the bypass\'s preserved set, and the tiles forward it',
+    (MAIN.match(/adoptFractalFold\((preset\.overlay|ov)\);/g) ?? []).length === 2
+    && (MAIN.match(/\.\.\.fractalFoldExport\(\),/g) ?? []).length === 1 && lpo.length > 0 && !/fractalFold/.test(lpo)
+    && /generator\.setFractalFold\(/.test(TILES) && /generator\.setFractalFoldBreath\(/.test(TILES), '');
+}
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'}  deformcheck: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

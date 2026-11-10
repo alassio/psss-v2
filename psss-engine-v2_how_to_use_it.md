@@ -32,6 +32,7 @@ pipeline stage by stage, the mathematics, the algorithms — that is a separate 
   - [4.1 Run it in the browser](#41-run-it-in-the-browser)
     - [Useful keys and clicks](#useful-keys-and-clicks)
   - [4.2 Run it as a screensaver](#42-run-it-as-a-screensaver)
+  - [4.3 If it runs slowly](#43-if-it-runs-slowly)
 - [5. UI Basics — the Preview Grid](#5-ui-basics--the-preview-grid)
   - [5.1 The layout](#51-the-layout)
   - [5.2 Finding a preset](#52-finding-a-preset)
@@ -387,12 +388,32 @@ current.
 **Updating it.** If you install a newer build, copy all three files over the installed ones. Nothing
 updates an installed copy automatically, and an old copy will keep running happily on its old library.
 
+### 4.3 If it runs slowly
+
+PSSS looks after the main animation first. On a slower machine the thumbnails in the preview grid animate
+less, or stop animating and just show their picture, so the big view stays as smooth as the machine allows.
+Some presets are much heavier than others: those drawn with **Neon Lines**, those drawn as glowing **material
+splats** (Fire, Ember, Ice, Plasma), and those with very many particles.
+
+**To see what it costs on your machine, add `?perf=1` to the address**, e.g. `index.html?perf=1`. A small
+readout appears in the top-left corner and updates twice a second:
+
+| Line | What it tells you |
+|---|---|
+| **main** | the big view's frames per second, and its typical (p50) and worst-case (p95) frame time |
+| **guard**, **canvas** | how hard PSSS is protecting the big view (0 relaxed, 2 thumbnails frozen), and the drawing size in pixels |
+| **per frame** | for each part of the frame — `figure` (calculating the curve), `particles`, `lines`, `ribbons`, `warp`, `discharge`, `glow`, `grade`, `tiles` — the time it takes on the processor (**cpu**) and on the graphics card (**gpu**). The graphics times appear only on machines whose browser can measure them; otherwise the column says *n/a* |
+| **grid**, **reel**, … | per thumbnail grid: how many thumbnails it holds, how many it draws and shows per second, and **pressure** — 1 means the big view keeps up with the screen, and above about 2.5 the thumbnails stop animating to protect it |
+
+The readout only reads; it changes nothing, so it is safe to leave on while you try presets.
+
 ---
 
 ## 5. UI Basics — the Preview Grid
 
 The first thing you see is the **preview grid**: the whole library as live animated tiles, with the
-currently selected preset shown large.
+currently selected preset shown large. Each time the page opens it starts on a preset chosen at random from the
+library; to start on a particular one, add `?preset=` and its name to the address, e.g. `index.html?preset=Quader`.
 
 ### 5.1 The layout
 
@@ -882,9 +903,27 @@ are functions **of** where a point is, unlike the flow and turbulence controls f
 | **Fold Scale** | Shrinks or grows the figure between one fold and the next, which turns repeated folds into self-similar nesting rather than the same reflection twice. |
 | **Inversion** | **Turns the figure inside out through a sphere**: what was near the centre explodes outward, what was far collapses inward, and straight runs become arcs. Low values are the usable range |
 | **Sphere** | The radius of the sphere it inverts through, as a multiple of the figure's own size. Points exactly on the sphere do not move |
+| **Fractal Fold** | Folds the figure back into itself again and again and pulls every fold back toward where each point started, so a smooth figure turns into nested, self-similar structure — rings within rings, layered shells, a boxy frame. 1 to 3 folds; **Off** changes nothing and hides the rows below. It folds across the screen only: near and far are never swapped, so depth shading stays right. The figure keeps its own size |
+| **Fractal Cell** | The size of the invisible box the figure is folded into, as a share of the figure's own size. It picks the family of shapes: small cells shatter, then come layered sheets, a frame, and at the largest a lobed ring. Small changes morph smoothly |
+| **Fractal Scale** | How strongly each fold stretches the figure. Negative values turn it inside out as well and often give the most striking shapes. At **0** the fold does nothing, and a note under the row says so |
+| **Cell Breath**, **Cell Rate** | Make the cell size swing either side of its setting, and how fast. Off holds it still |
+| **Scale Breath**, **Scale Rate** | The same for the fold strength; a swing through 0 passes through the unfolded figure |
 | **4D Extent** | Treats the figure as a slice of a *four*-dimensional object, using each particle's place along the curve as its fourth coordinate, and sets how far it reaches into that direction. On its own it makes one end of the curve nearer than the other. Off is exact and hides the row below. |
 | **4D Spin** (X-W / Y-W / Z-W) | Rotates the figure *through* the fourth dimension. These are rotations with no three-dimensional equivalent. The ordinary three-axis rotation is **Rotation** near the top of the tab — it is not repeated here. |
 | **4D Winding** | How many times the fourth coordinate reverses as you walk along the curve, 1 to 8. **This is what makes 4D Spin more than a stretch**: at 1 the figure simply leans into the fourth direction, while higher values push successive stretches of it in opposite directions so the strands sweep through one another. Try 3 to 6. |
+
+> **The Fractal Fold works on every figure** — wave figures, self-similar curves and attractors — and keeps
+> the curve continuous, so trails, ribbons and Neon Lines keep working. **Worked examples:** `Fractal Cross`
+> (a ring of loops folded into a glowing cross, as LiquidLight splats), `Fractal Butterfly` (a ring folded into
+> soft lobes, in the Pastel palette), `Fractal Star` (one strong fold into a spiky star whose spikes breathe) and
+> `Fractal Lattice` (the Hilbert 3-D curve folded into a jagged architecture). Load each one's base preset beside
+> it — `Cycloid`, `Quader`, `Curve Lattice` — to see what the fold does.
+
+![The Deformation section with Fractal Fold switched on: Fractal Cell, Fractal Scale and the breathing rows](manual-images/lab-visual-fx-fractalfold.png)
+
+*The **Deformation** section on `Fractal Butterfly`: **Fractal Fold** at 2, and its rows appear below it —
+**Fractal Cell**, **Fractal Scale** at −1.75, **Cell Breath** with its **Cell Rate** (a period that follows the
+figure's speed), and **Scale Breath** and **Scale Rate**, both Off here.*
 
 > **Symmetry divides the particles between the arms** — each arm carries 1/n of the density. After
 > raising it, raise **Particle Number** to compensate, or the figure thins out.
@@ -2069,7 +2108,7 @@ how the running preview is drawn — never the figure, and never the look that g
 
 | Checkbox | Untick it to… |
 |---|---|
-| **Apply Visual FX** | draw the preview with **no Visual FX at all** — no ribbon, lines, attractor, warp, network, fluid or crystals — while keeping the film look and the framing controls. Use it to see the figure under the decoration |
+| **Apply Visual FX** | draw the preview with **no Visual FX at all** — no ribbon, lines, attractor, warp, network, fluid or crystals, and none of the **Deformation** operators (Symmetry, 3-D Symmetry, Twist, Taper, Bend, Fold, Inversion, Fractal Fold, 4D) or the per-particle spreads — while keeping the film look, the framing controls and the Composer's own figure controls. Use it to see the figure under the decoration |
 | **Apply Materials** | draw the preview **without the material**, as plain stars, to see the figure the material is sitting on |
 
 > **Nothing is saved either way.** The full look is still what gets exported, snapshotted and blended by

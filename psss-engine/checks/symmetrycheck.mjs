@@ -156,8 +156,12 @@ console.log('\n=== D. the wiring ===\n');
   const main = strip(read('main.ts'));
   chk('ONE reader, adopted on BOTH preset apply paths (applyPresetChange and Reset)',
     (main.match(/adoptSym3d\((preset\.overlay|ov)\);/g) ?? []).length === 2 && KEYS.every((k) => main.includes(`ov?.${k} ??`)), '');
-  chk('the export is value-GATED on the layout and written at BOTH export sites',
-    (main.match(/\.\.\.sym3dExport\(\),/g) ?? []).length === 2 && /sym3d\.layout !== 'off' \?/.test(main), '');
+  // ⚠️ The export helper is used ONCE (the snapshot's plain branch) and is ABSENT from `livePreservedOverlay()`
+  // (owner, 2026-11-10): `Apply Visual FX` off must switch 3-D Symmetry off with every other Visual FX operator.
+  const lpo = (() => { const s = main.indexOf('function livePreservedOverlay(): OverlayState {'); return main.slice(s, main.indexOf('\n  }\n', s)); })();
+  chk('the export is value-GATED on the layout, written by the snapshot, and NOT in the bypass\'s preserved set',
+    (main.match(/\.\.\.sym3dExport\(\),/g) ?? []).length === 1 && /sym3d\.layout !== 'off' \?/.test(main)
+    && lpo.length > 0 && !/sym3d|symmetryFold/.test(lpo), '');
   const tiles = strip(read('ui/preview-grid/grid-tile-renderer.ts'));
   chk('the preview tiles forward all seven keys (a tile without them shows a different SHAPE — 33.21\'s failure)',
     /generator\.setSymmetry3d\(\{/.test(tiles) && KEYS.every((k) => tiles.includes(`overlay?.${k} ??`)), '');

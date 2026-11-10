@@ -117,6 +117,10 @@ import {
   CHANNEL_MAX, CHANNEL_STEP, CHANNEL_DRIVERS, fmtChannelAmount,
   W_SCALE_MAX, W_STEP, W_WINDING_MAX, fmtWAngle, fmtWScale, fmtWWinding,
 } from '../../../core/deform-limits.ts';
+import {
+  FRACTAL_FOLD_MAX_ITERATIONS, FRACTAL_FOLD_MIN_LIMIT, FRACTAL_FOLD_MAX_LIMIT, FRACTAL_FOLD_LIMIT_STEP,
+  FRACTAL_FOLD_MAX_SCALE, FRACTAL_FOLD_SCALE_STEP, FRACTAL_FOLD_LIMIT_DEPTH_MAX, FRACTAL_FOLD_SCALE_DEPTH_MAX,
+} from '../../../core/fractal-fold.ts';
 
 /**
  * v8 `31.2` (`E112`/`E113`/`E137`) — **the channel drivers' labels, and this record is the half of the
@@ -1136,6 +1140,18 @@ export interface VisualFxControls {
   setBoxFoldLimit(v: number): void;
   setBoxFoldScale(v: number): void;
   /**
+   * v8 Phase 38 — the Fractal Fold. **One getter returning the ENGINE's clamped and snapped values, one patch
+   * setter** (the seven are one operator; `iterations` is the gate the other six hang off).
+   */
+  getFractalFold(): {
+    iterations: number; limit: number; scale: number;
+    limitDepth: number; limitRate: number; scaleDepth: number; scaleRate: number;
+  };
+  setFractalFold(patch: Partial<{
+    iterations: number; limit: number; scale: number;
+    limitDepth: number; limitRate: number; scaleDepth: number; scaleRate: number;
+  }>): void;
+  /**
    * v8 `31.2` (`E112`/`E113`/`E137`) — per-particle appearance: one shared driver, three amounts.
    *
    * ⚠️ **The setter takes a `ChannelDriver`, not a `string`**, so this tab cannot hand the engine a word
@@ -1524,6 +1540,13 @@ interface SliderSpec {
    */
   settleOnRelease?: boolean;
   /**
+   * v8 Phase 38 — after `set`, RE-READ `get()` into BOTH the readout and the thumb. Opt-in, for a control whose
+   * setter CLAMPS or SNAPS (a dead zone): `32.14`'s defect was a triplet that formatted the DRAGGED value and
+   * threw the setter's result away, so the engine sat at the snapped 0 while the panel printed the drag. **A
+   * dead zone nobody can see does not exist.**
+   */
+  rereadAfterSet?: boolean;
+  /**
    * Hover tooltip on the input. Optional, so every existing descriptor is unaffected.
    *
    * `staticSlider` already had a REQUIRED `title` of its own; this is the same idea on the general slider,
@@ -1801,6 +1824,9 @@ export class VisualFxTab implements TabModule {
   private foldScaleRow: HTMLElement | null = null;
   // v8 32.7 — revealed by `Inversion > 0`, the section's threshold convention.
   private invertRadiusRow: HTMLElement | null = null;
+  /** v8 Phase 38 — the Fractal Fold's rows below its gate, and its scale-0 precondition note. */
+  private fractalFoldRows: HTMLElement[] = [];
+  private fractalFoldZeroNote: HTMLElement | null = null;
   // v8 31.1 — the three rows the plate's BLEND gates. The blend row itself is always visible.
   // v8 31.4 — the three 4D angles, gated on the extent. The extent row itself is always visible.
   /*
@@ -2156,6 +2182,12 @@ export class VisualFxTab implements TabModule {
       const v = c.fromPos ? c.fromPos(pos) : pos;
       valueLabel.textContent = sliderFmt(c)(v);
       c.set(v);
+      if (c.rereadAfterSet) {
+        const live = c.get();
+        valueLabel.textContent = sliderFmt(c)(live);
+        const livePos = c.toPos ? c.toPos(live) : live;
+        if (Math.abs(livePos - pos) > 1e-12) input.value = String(livePos);
+      }
     });
     if (c.settleOnRelease && c.toPos && c.fromPos) {
       // `change` is the RELEASE event on a range input — it fires once when the drag ends (and on a keyboard
@@ -2569,6 +2601,12 @@ export class VisualFxTab implements TabModule {
       // v8 32.7 — the inversion's own activation scalar, exactly as `folding` is the fold's.
       const inverting = this.controls.getInversion().amount > 0;
       show(this.invertRadiusRow, inverting);
+      // v8 Phase 38 — the ITERATION COUNT is the gate (in the engine and here); the scale-0 note shows only
+      // while the fold is on AND its scale is the identity, the second early return upstream of it
+      // (invariant 25: the description owns the gate).
+      const ffNow = this.controls.getFractalFold();
+      for (const r of this.fractalFoldRows) show(r, ffNow.iterations > 0);
+      show(this.fractalFoldZeroNote, ffNow.iterations > 0 && ffNow.scale === 0 && ffNow.scaleDepth === 0);
     }
     // v8 31.4 — the three angles are provably inert at extent 0 (the stage is skipped), so the row is
     // hidden there rather than shown dead. ⚠️ `display: none` stops a row being SEEN, not working: the
@@ -2618,6 +2656,7 @@ export class VisualFxTab implements TabModule {
         + on(this.controls.getBend().some(v => v !== 0))
         + on(this.controls.getInversion().amount > 0)
         + on(this.controls.getBoxFold().iterations > 0)
+        + on(this.controls.getFractalFold().iterations > 0)
         + on(this.controls.getDeform4d().wScale > 0)
         + on(this.controls.getSymmetryFold() > 1)
         + on(this.controls.getSym3d().layout !== 'off');
@@ -3327,6 +3366,79 @@ export class VisualFxTab implements TabModule {
       fmt: fmtInvertRadius,
     }));
     tgt.appendChild(this.invertRadiusRow);
+
+    /*
+     * v8 Phase 38 — **the Fractal Fold**, here because it is the third member of the fold family: the box fold and
+     * a ball fold composed with a FEEDBACK term (`core/fractal-fold.ts`). `Fractal Fold` (the iteration count) IS
+     * THE GATE and is always visible; the six rows below hide at 0 (`31.U`: gating HIDES, never defers). ⚠️ The
+     * scale is SIGNED with a dead zone at 0, so its row re-reads the engine after every set (`rereadAfterSet`,
+     * `32.14`). ⚠️ The breathing rows follow `34.4`: a signed depth (0 = off, exact) and the shared rate track.
+     */
+    const ff = () => this.controls.getFractalFold();
+    tgt.appendChild(this.makeRow('Fractal Fold', this.slider({
+      key: 'fractalFoldIterations', min: 0, max: FRACTAL_FOLD_MAX_ITERATIONS, step: 1, decimals: 0,
+      get: () => ff().iterations,
+      set: v => { this.controls.setFractalFold({ iterations: Math.round(v) }); this.syncVisibility(); },
+      fmt: v => (Math.round(v) === 0 ? 'Off' : `${Math.round(v)}\u00d7`),
+    })));
+    const ffRow = (label: string, el: HTMLElement): HTMLElement => {
+      const r = this.makeRow(label, el);
+      this.fractalFoldRows.push(r);
+      tgt.appendChild(r);
+      return r;
+    };
+    ffRow('Fractal Cell', this.slider({
+      key: 'fractalFoldLimit', min: FRACTAL_FOLD_MIN_LIMIT, max: FRACTAL_FOLD_MAX_LIMIT, step: FRACTAL_FOLD_LIMIT_STEP,
+      decimals: 2, rereadAfterSet: true,
+      get: () => ff().limit,
+      set: v => this.controls.setFractalFold({ limit: v }),
+      fmt: v => v.toFixed(2),
+    }));
+    ffRow('Fractal Scale', this.slider({
+      key: 'fractalFoldScale', min: -FRACTAL_FOLD_MAX_SCALE, max: FRACTAL_FOLD_MAX_SCALE, step: FRACTAL_FOLD_SCALE_STEP,
+      decimals: 2, rereadAfterSet: true,
+      get: () => ff().scale,
+      set: v => { this.controls.setFractalFold({ scale: v }); this.syncVisibility(); },
+      fmt: v => (v === 0 ? '0 (no fold)' : (v > 0 ? '+' : '') + v.toFixed(2)),
+    }));
+    {
+      // One literal, set ONCE, `display` toggled (`tipcheck`'s inline-copy scan cannot see a ternary).
+      const note = document.createElement('p');
+      note.className = 'sl-tab-desc';
+      note.textContent = 'At Scale 0 the fold leaves the figure exactly as it is \u2014 move Scale away from the '
+        + 'centre, either way, to fold it.';
+      this.fractalFoldZeroNote = note;
+      tgt.appendChild(note);
+    }
+    ffRow('Cell Breath', this.slider({
+      key: 'fractalFoldLimitDepth', min: -FRACTAL_FOLD_LIMIT_DEPTH_MAX, max: FRACTAL_FOLD_LIMIT_DEPTH_MAX,
+      step: FRACTAL_FOLD_LIMIT_STEP, rereadAfterSet: true,
+      get: () => ff().limitDepth,
+      set: v => this.controls.setFractalFold({ limitDepth: v }),
+      fmt: d => fmtDepth(d, 'cell', ff().limit - Math.abs(d) < FRACTAL_FOLD_MIN_LIMIT
+        || ff().limit + Math.abs(d) > FRACTAL_FOLD_MAX_LIMIT),
+    }));
+    ffRow('Cell Rate', this.slider({
+      key: 'fractalFoldLimitRate', min: 0, max: 1, step: OP_RATE_STEP,
+      get: () => ff().limitRate,
+      set: v => this.controls.setFractalFold({ limitRate: v }),
+      toPos: OP_RATE_TRACK.toPos, fromPos: OP_RATE_TRACK.fromPos, fmt: r => this.fmtOpRate(r),
+      wideLabel: true,
+    }));
+    ffRow('Scale Breath', this.slider({
+      key: 'fractalFoldScaleDepth', min: -FRACTAL_FOLD_SCALE_DEPTH_MAX, max: FRACTAL_FOLD_SCALE_DEPTH_MAX,
+      step: FRACTAL_FOLD_SCALE_STEP, rereadAfterSet: true,
+      get: () => ff().scaleDepth,
+      set: v => { this.controls.setFractalFold({ scaleDepth: v }); this.syncVisibility(); },
+      fmt: d => fmtDepth(d, 'scale', Math.abs(ff().scale) + Math.abs(d) > FRACTAL_FOLD_MAX_SCALE),
+    }));
+    ffRow('Scale Rate', this.slider({
+      key: 'fractalFoldScaleRate', min: 0, max: 1, step: OP_RATE_STEP,
+      get: () => ff().scaleRate,
+      set: v => this.controls.setFractalFold({ scaleRate: v }),
+      toPos: OP_RATE_TRACK.toPos, fromPos: OP_RATE_TRACK.fromPos, fmt: r => this.fmtOpRate(r),
+      wideLabel: true,
+    }));
 
     /*
      * v8 `31.4` (`E132`) — the 4D rotation: one extent row that gates three angle rows.

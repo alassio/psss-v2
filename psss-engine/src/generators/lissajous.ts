@@ -33,6 +33,12 @@ import {
   OFFSET_DEPTH_MAX, OFFSET_DEPTH_SNAP, GROW_DEPTH_MAX, GROW_DEPTH_SNAP,
   OP_RATE_MIN, OP_RATE_MAX,
 } from '../core/deform-limits.ts';
+import {
+  FRACTAL_FOLD_MAX_ITERATIONS, FRACTAL_FOLD_MIN_LIMIT, FRACTAL_FOLD_MAX_LIMIT, FRACTAL_FOLD_DEFAULT_LIMIT,
+  FRACTAL_FOLD_MAX_SCALE, FRACTAL_FOLD_DEFAULT_SCALE, FRACTAL_FOLD_SCALE_SNAP, FRACTAL_FOLD_LIMIT_DEPTH_MAX,
+  FRACTAL_FOLD_SCALE_DEPTH_MAX, FRACTAL_FOLD_LIMIT_DEPTH_SNAP, FRACTAL_FOLD_SCALE_DEPTH_SNAP,
+  fractalFoldPoint, fractalFoldGrowth, fractalFoldUnit, fractalFoldLimit,
+} from '../core/fractal-fold.ts';
 
 /**
  * v8 `34.1` — **the wave law lives in `core/wave-law.ts` and this file is one of its two callers.**
@@ -442,6 +448,21 @@ export class LissajousGenerator implements Generator {
   private boxFoldIterations = 0;
   private boxFoldLimit = BOX_FOLD_DEFAULT_LIMIT;
   private boxFoldScale = 1;
+
+  // --- v8 Phase 38 the Fractal Fold ------------------------------------------------------------------
+  //
+  // ITERATIONS IS THE GATE (`38.D5`): 0 skips the operator entirely and is bit-exact for every preset authored
+  // before Phase 38; `scale === 0` is a SECOND exact identity with its own branch. The cell and the scale
+  // breathe (`38.D4`); the iteration count does not, because there is no figure between one fold and two.
+  private fractalFoldIterations = 0;
+  private fractalFoldLimit = FRACTAL_FOLD_DEFAULT_LIMIT;
+  private fractalFoldScale = FRACTAL_FOLD_DEFAULT_SCALE;
+  private fractalFoldLimitDepth = 0;
+  private fractalFoldLimitRate = 0;
+  private fractalFoldScaleDepth = 0;
+  private fractalFoldScaleRate = 0;
+  /** One point's scratch for `fractalFoldPoint` — a field, not a fresh array per particle (invariant 8). */
+  private readonly ffScratch: number[] = [0, 0, 0];
 
 
   /*
@@ -1788,6 +1809,48 @@ export class LissajousGenerator implements Generator {
   }
 
   /**
+   * v8 Phase 38 — the Fractal Fold's three bases, one setter (they are meaningless apart, as the box fold's are).
+   *
+   * ⚠️ **CLAMPED AND SNAPPED HERE**, because a hand-edited import reaches this setter without passing a slider:
+   * `iterations` is rounded into `0 … FRACTAL_FOLD_MAX_ITERATIONS`, the cell clamped into its range, and the
+   * scale clamped and SNAPPED to exactly 0 inside its dead zone (`38.D9`) — the panel must re-read the result
+   * (`32.14`: a snap nobody can see does not exist).
+   */
+  setFractalFold(iterations: number, limit: number, scale: number): void {
+    const n = Number.isFinite(iterations) ? Math.round(iterations) : 0;
+    this.fractalFoldIterations = Math.max(0, Math.min(FRACTAL_FOLD_MAX_ITERATIONS, n));
+    const l = Number.isFinite(limit) ? limit : FRACTAL_FOLD_DEFAULT_LIMIT;
+    this.fractalFoldLimit = Math.max(FRACTAL_FOLD_MIN_LIMIT, Math.min(FRACTAL_FOLD_MAX_LIMIT, l));
+    const s = Number.isFinite(scale) ? scale : FRACTAL_FOLD_DEFAULT_SCALE;
+    const sc = Math.max(-FRACTAL_FOLD_MAX_SCALE, Math.min(FRACTAL_FOLD_MAX_SCALE, s));
+    this.fractalFoldScale = Math.abs(sc) < FRACTAL_FOLD_SCALE_SNAP ? 0 : sc;
+  }
+
+  /** v8 Phase 38 — the breathing of the cell and the scale (`38.D4`): signed depths with dead zones, shared rates. */
+  setFractalFoldBreath(limitDepth: number, limitRate: number, scaleDepth: number, scaleRate: number): void {
+    const ld = Number.isFinite(limitDepth) ? limitDepth : 0;
+    this.fractalFoldLimitDepth = Math.max(-FRACTAL_FOLD_LIMIT_DEPTH_MAX, Math.min(FRACTAL_FOLD_LIMIT_DEPTH_MAX, ld));
+    if (Math.abs(this.fractalFoldLimitDepth) < FRACTAL_FOLD_LIMIT_DEPTH_SNAP) this.fractalFoldLimitDepth = 0;
+    this.fractalFoldLimitRate = this.clampRate(limitRate);
+    const sd = Number.isFinite(scaleDepth) ? scaleDepth : 0;
+    this.fractalFoldScaleDepth = Math.max(-FRACTAL_FOLD_SCALE_DEPTH_MAX, Math.min(FRACTAL_FOLD_SCALE_DEPTH_MAX, sd));
+    if (Math.abs(this.fractalFoldScaleDepth) < FRACTAL_FOLD_SCALE_DEPTH_SNAP) this.fractalFoldScaleDepth = 0;
+    this.fractalFoldScaleRate = this.clampRate(scaleRate);
+  }
+
+  /** The live Fractal Fold settings, as the ENGINE took them — what the panel re-reads after a set. */
+  getFractalFold(): {
+    iterations: number; limit: number; scale: number;
+    limitDepth: number; limitRate: number; scaleDepth: number; scaleRate: number;
+  } {
+    return {
+      iterations: this.fractalFoldIterations, limit: this.fractalFoldLimit, scale: this.fractalFoldScale,
+      limitDepth: this.fractalFoldLimitDepth, limitRate: this.fractalFoldLimitRate,
+      scaleDepth: this.fractalFoldScaleDepth, scaleRate: this.fractalFoldScaleRate,
+    };
+  }
+
+  /**
    * v8 17.2 — the integration phase, for `?testhook=1` ONLY.
    *
    * ⚠️ **THIS IS THE ONE PIECE OF STATE THAT SEPARATES "THE FIGURE IS EDITED" FROM "THE FIGURE IS RUNNING",
@@ -2803,6 +2866,46 @@ export class LissajousGenerator implements Generator {
         }
         this.positions[idx] = x;
         this.positions[idx + 1] = y;
+      }
+    }
+
+    /*
+     * v8 Phase 38 — **the Fractal Fold**, XY only (`core/fractal-fold.ts` owns the law and the compensation table).
+     *
+     * ⚠️ **ITS POSITION IS A CHOICE, STATED HERE AS ONE**: after the box fold (and so after the inversion, which
+     * runs before it — the plan's "before the inversion" was false against this file), before the 2-D
+     * symmetry and the 3-D replication. The operator's OWN internals are order-free (it re-anchors to `x₀`, the
+     * position ENTERING it); its place in the chain is not, and a load-bearing axis order is a liability
+     * (`32`'s lesson), so moving it is a visible change, not a refactor.
+     *
+     * ⚠️ **TWO IDENTITIES, TWO BRANCHES** (`38.D5`, `33.2`'s rule — branch, never weight): `iterations === 0`
+     * skips the stage; a RESOLVED `scale === 0` skips the loop (the law is then `x = x₀` exactly, and `x + 0·k`
+     * is exact for every finite value except `−0`).
+     */
+    const ffIter = this.fractalFoldIterations;
+    if (ffIter > 0) {
+      const ffL = this.resolveOp(this.fractalFoldLimit, this.fractalFoldLimitDepth, this.fractalFoldLimitRate,
+        scaledTime, FRACTAL_FOLD_MIN_LIMIT, FRACTAL_FOLD_MAX_LIMIT);
+      const ffS = this.resolveOp(this.fractalFoldScale, this.fractalFoldScaleDepth, this.fractalFoldScaleRate,
+        scaledTime, -FRACTAL_FOLD_MAX_SCALE, FRACTAL_FOLD_MAX_SCALE);
+      // The unit is the figure's OWN size (`core/fractal-fold.ts`' header: the design-box unit failed by
+      // measurement); a collapsed figure folds as the identity.
+      const hFF = fractalFoldUnit(this.positions, this.particleCount);
+      if (ffS !== 0 && hFF > 1e-6) {
+        // The MEASURED growth divided out (`38.D3`), then the per-particle soft limiter for the tails.
+        const g = 1 / fractalFoldGrowth(ffIter, ffL, ffS);
+        const inv = 1 / hFF;
+        const out = this.ffScratch;
+        for (let i = 0; i < this.particleCount; i++) {
+          const idx = i * 3;
+          fractalFoldPoint(this.positions[idx]! * inv, this.positions[idx + 1]! * inv, this.positions[idx + 2]! * inv,
+            ffIter, ffL, ffS, out);
+          out[0] = out[0]! * g; out[1] = out[1]! * g;
+          fractalFoldLimit(out);
+          this.positions[idx] = out[0]! * hFF;
+          this.positions[idx + 1] = out[1]! * hFF;
+          // ⚠️ z is NOT written: the fold is XY-only (owner, 2026-11-10), so depth is bit-identical.
+        }
       }
     }
 
