@@ -273,7 +273,7 @@ export function customTile(gen: CustomCurveGenerator): CustomTile | null {
  * exactly the pre-initiator composition, so a generator without one is unchanged.
  */
 function emitCopies(walk: CustomWalk, depth: number, twist: number, at: readonly number[] | null,
-  tops: { A: Affine; rev: boolean }[] | null): Float64Array {
+  tops: { A: Affine; rev: boolean }[] | null, into: Float64Array | null = null): Float64Array {
   const k = walk.copies.length;
   const local: Affine[] = [];
   const rev: boolean[] = [];
@@ -288,14 +288,53 @@ function emitCopies(walk: CustomWalk, depth: number, twist: number, at: readonly
   const n = Math.max(1, Math.floor(depth));
   const topList = tops ?? [{ A: (() => { const t = affine(); t.a[0] = 1; t.a[4] = 1; t.a[8] = 1; return t; })(), rev: false }];
   const leaves = Math.pow(k, n) * topList.length;
-  const xyz = new Float64Array((leaves + (at === null ? 1 : 0)) * 3);
+  const need = (leaves + (at === null ? 1 : 0)) * 3;
+  // `into` is reused only at EXACTLY the right length — the count is read back as `xyz.length / 3`.
+  const xyz = into !== null && into.length === need ? into : new Float64Array(need);
   let m = 0;
   // The start point: (0,0,0) for both — a starting shape's walk begins at the origin, as the unit chord does.
-  if (at === null) m = 1;
+  // ⚠️ Written explicitly: a REUSED array still holds last frame's values there.
+  if (at === null) { m = 1; xyz[0] = 0; xyz[1] = 0; xyz[2] = 0; }
   // One scratch transform per level — the recursion allocates nothing per node (invariant 8; `buildGenerator`).
   const scratch: Affine[] = [];
   for (let d = 0; d <= n; d++) scratch.push(affine());
+  /*
+   * v8 CPU pass (2026-11-10) — **the LAST level writes its points directly.** A leaf's point is `(T∘L_i)(v)`, which
+   * equals `T(L_i(v))`: so each copy's leaf point `q_i = L_i(v)` is computed ONCE per build (two of them in path mode,
+   * one per traversal direction) and a depth-1 node writes `T.o + T.a·q_i` — nine multiplies instead of a full
+   * `compose` (27 + 9) plus the same nine. Measured: the leaf composes were most of a breathing custom curve's
+   * per-frame build (`Chaos to Order` rebuilds two levels every frame because its Twist breathes). ⚠️ Only the
+   * ASSOCIATION of the products changes, so points move at rounding level; `figurecheck` holds the custom path to
+   * the named rules it reproduces.
+   */
+  const qFwd = new Float64Array(k * 3), qRev = new Float64Array(k * 3);
+  for (let i = 0; i < k; i++) {
+    const L = local[i]!;
+    for (let r = 0; r < 2; r++) {
+      const q = r === 0 ? qFwd : qRev;
+      const vx = at === null ? (r === 1 ? 0 : 1) : at[0]!;
+      const vy = at === null ? 0 : at[1]!;
+      const vz = at === null ? 0 : at[2]!;
+      q[i * 3] = L.o[0]! + L.a[0]! * vx + L.a[1]! * vy + L.a[2]! * vz;
+      q[i * 3 + 1] = L.o[1]! + L.a[3]! * vx + L.a[4]! * vy + L.a[5]! * vz;
+      q[i * 3 + 2] = L.o[2]! + L.a[6]! * vx + L.a[7]! * vy + L.a[8]! * vz;
+    }
+  }
   const emit = (T: Affine, d: number, reversed: boolean): void => {
+    if (d === 1) {
+      const a = T.a, o = T.o;
+      for (let s = 0; s < k; s++) {
+        const i = reversed ? k - 1 - s : s;
+        // The leaf's own direction is `rev[i] !== reversed`; a cell leaf ignores it (`at` has no direction).
+        const q = rev[i] !== reversed ? qRev : qFwd;
+        const x = q[i * 3]!, y = q[i * 3 + 1]!, z = q[i * 3 + 2]!;
+        xyz[m * 3] = o[0]! + a[0]! * x + a[1]! * y + a[2]! * z;
+        xyz[m * 3 + 1] = o[1]! + a[3]! * x + a[4]! * y + a[5]! * z;
+        xyz[m * 3 + 2] = o[2]! + a[6]! * x + a[7]! * y + a[8]! * z;
+        m++;
+      }
+      return;
+    }
     if (d === 0) {
       if (at === null) {
         const u = reversed ? 0 : 1;
@@ -353,6 +392,7 @@ export function customInitiatorError(gen: CustomCurveGenerator, yaw: number, pit
 export function buildCustom(
   gen: CustomCurveGenerator, depth: number, yaw: number, pitch: number, twist: number, stretch: number,
   tile: CustomTile | null,
+  into: Float64Array | null = null,
 ): { xyz: Float64Array; count: number } | null {
   const cells = gen.draw === 'cells' && tile !== null;
   const y = cells ? CUSTOM_CELL_YAW : yaw, p = cells ? CUSTOM_CELL_PITCH : pitch;
@@ -360,7 +400,7 @@ export function buildCustom(
   if (walk === null) return null;
   const init = initiatorTops(gen, y, p, stretch, twist);
   if (init.error !== null) return null;
-  const xyz = emitCopies(walk, depth, twist, cells ? CUSTOM_TILE_CENTRE[tile.tile] : null, init.tops);
+  const xyz = emitCopies(walk, depth, twist, cells ? CUSTOM_TILE_CENTRE[tile.tile] : null, init.tops, into);
   const count = xyz.length / 3;
   const B = gen.frame.basis;
   if (B !== undefined && B.length === 9) {

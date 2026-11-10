@@ -182,6 +182,14 @@ export interface LSystemFigureCache {
   customRef: CustomCurveGenerator | null;
   customSig: string;
   customError: string | null;
+  /**
+   * v8 CPU pass (2026-11-10) — **the custom lists' REUSED arrays, one per depth, for a curve that is NOT still.** Such
+   * a list is never memoised (`memoList`'s `keep` is false), so it lives one frame; reusing its array avoids ~0.9 MB of
+   * large-object allocation per frame, which measured as a 2–6 ms Mark-Compact pause every ~70 frames on
+   * `Chaos to Order`. ⚠️ **Never for a memoised list** — the memo keeps its array, and a reused one would be
+   * overwritten under it. Bounded: one array per depth up to the rule's `maxDepth`.
+   */
+  customScratch: Map<number, Float64Array>;
 }
 
 export function createFigureCache(): LSystemFigureCache {
@@ -202,6 +210,7 @@ export function createFigureCache(): LSystemFigureCache {
     customRef: null,
     customSig: '',
     customError: null,
+    customScratch: new Map(),
   };
 }
 
@@ -716,7 +725,10 @@ function resolveCustomFigure(
   const still = pose.anglesAnimated !== true && pose.twistAnimated !== true && pose.stretchAnimated !== true;
   const key = (d: number): string => `c|${d}|${yaw}|${pitch}|${twist}|${stretch}`;
   const build = (d: number): CachedList => {
-    const b = buildCustom(gen, d, yaw, pitch, twist, stretch, cells ? c.tile : null)!;
+    // A list that is not kept reuses its depth's array (`customScratch`); a kept one gets its own.
+    const into = still ? null : (cache.customScratch.get(d) ?? null);
+    const b = buildCustom(gen, d, yaw, pitch, twist, stretch, cells ? c.tile : null, into)!;
+    if (!still) cache.customScratch.set(d, b.xyz);
     return { xyz: b.xyz, count: b.count, transform: captureExtent(b.xyz, b.count) };
   };
   if (validation.ok) {

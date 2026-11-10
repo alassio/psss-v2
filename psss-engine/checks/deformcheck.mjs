@@ -1764,5 +1764,79 @@ console.log('\n=== FF. v8 Phase 38 — the Fractal Fold: identities, continuity,
     && /generator\.setFractalFold\(/.test(TILES) && /generator\.setFractalFoldBreath\(/.test(TILES), '');
 }
 
+// ═══ §CPU — v8 CPU pass (2026-11-10): the bulk wave sum and the bulk colour writer ═════════════════════════
+/*
+ * The two hot paths that replaced per-particle transcendentals. They must agree with their exact owners —
+ * `sumWaveAxes` (the Score's path) and `writeColourAt` (the swatch's) — and each clause is seeded so it can fail.
+ */
+console.log('\n=== CPU. the bulk wave sum and the bulk colour writer agree with their exact owners ===\n');
+{
+  const W = await import('../src/core/wave-law.ts');
+  let rnd = 987654321;
+  const r = () => ((rnd = (rnd * 48271) % 2147483647) / 2147483647);
+  let worst = 0, triWorst = 0, cases = 0;
+  for (let k = 0; k < 40; k++) {
+    const count = 500 + Math.floor(r() * 3000), step = 360 / count;
+    const am = [0, 1, 2].map(() => [0, 1, 2].map(() => (r() < 0.15 ? 0 : (r() - 0.5) * 60)));
+    const fm = [0, 1, 2].map(() => [0, 1, 2].map(() => (r() * 40) / (180 / Math.PI) / 10));
+    const ph = [0, 1, 2].map(() => [0, 1, 2].map(() => r() * 360));
+    const sharp = [0, 1, 2].map(() => (r() < 0.5 ? 0 : (r() < 0.5 ? 1 : r())));
+    const bulk = new Float64Array(count * 3);
+    W.sumWaveAxesBulk(bulk, count, step, am, fm, ph, sharp);
+    const pt = [0, 0, 0];
+    // a second bulk run with every slot TRIANGLE-only isolates the exact branch
+    for (let i = 0; i < count; i++) {
+      W.sumWaveAxes(pt, i * step, am, fm, ph, sharp);
+      for (let q = 0; q < 3; q++) worst = Math.max(worst, Math.abs(pt[q] - bulk[i * 3 + q]));
+    }
+    const allSharp = sharp.map(() => 1);
+    const b2 = new Float64Array(count * 3);
+    W.sumWaveAxesBulk(b2, count, step, am, fm, ph, allSharp);
+    for (let i = 0; i < count; i++) { W.sumWaveAxes(pt, i * step, am, fm, ph, allSharp); for (let q = 0; q < 3; q++) triWorst = Math.max(triWorst, Math.abs(pt[q] - b2[i * 3 + q])); }
+    cases++;
+  }
+  chk('the bulk wave sum matches the exact per-particle sum (40 random figures, amplitudes up to 30 units)',
+    worst < 1e-9, `worst absolute difference ${worst.toExponential(2)} model units — the recurrence is re-anchored every ${W.WAVE_BULK_ANCHOR} particles`);
+  chk('...and a Sharpness slot (the triangle basis) is computed EXACTLY, not by the recurrence', triWorst === 0, `worst ${triWorst}`);
+  // Seed: a recurrence never re-anchored drifts — the bound above must be able to see it.
+  seed('§CPU the wave bound sees an UN-anchored recurrence drift', (() => {
+    const count = 4000, step = 360 / count, F = 3.7, P = 12, A = 25;
+    let s = Math.sin(P * F), c = Math.cos(P * F); const d = step * F, cd = Math.cos(d), sd = Math.sin(d);
+    let w = 0;
+    for (let i = 0; i < count; i++) { if (i > 0) { const s1 = s * cd + c * sd; c = c * cd - s * sd; s = s1 * (1 + 1e-12); } w = Math.max(w, Math.abs(s * A - Math.sin((i * step + P) * F) * A)); }
+    return w >= 1e-9 ? 1 : 0;
+  })(), 'a recurrence with a tiny per-step error must exceed the bound, else the clause measures nothing');
+
+  // The colour writer: bit-identical on the palette path and with no shift, rounding-level otherwise.
+  const mk = (shift) => {
+    const g = new LissajousGenerator();
+    g.init({ ...structuredClone(CFG), particleCount: 2000, colorBase: [120, 90, 200], colorAmp: [100, 120, 50], colorFreq: [1.3, 2.1, 0.4], colorShift: shift }, SIZE);
+    return g;
+  };
+  const cmp = (g, pos) => {
+    const n = 2000, a = new Float32Array(n * 3), b = new Float32Array(n * 3);
+    g.writeAllColours(n, pos, a);
+    for (let i = 0; i < n; i++) g.writeColourAt(i, n, pos, b, i * 3);
+    let d = 0, same = true;
+    for (let i = 0; i < n * 3; i++) { d = Math.max(d, Math.abs(a[i] - b[i])); if (!Object.is(a[i], b[i])) same = false; }
+    return { d, same };
+  };
+  const still = cmp(mk([0, 0, 0]), 37.5), moving = cmp(mk([0.3, 0.1, 0.2]), 37.5);
+  chk('the bulk colour writer is BIT-IDENTICAL to writeColourAt with no colour shift, and within rounding with one',
+    still.same && moving.d < 1e-6, `no shift: ${still.same ? 'identical' : 'DIFFERS ' + still.d}; with shift: worst ${moving.d.toExponential(2)} (one 8-bit step is 3.9e-3)`);
+  const gl = mk([0.2, 0.1, 0.05]);
+  const lut = new Uint8Array(256 * 4).map((_, i) => (i * 37) % 256);
+  gl.indexPalette = { kind: 'lut', lut };
+  const pal = cmp(gl, 12.25);
+  chk('...and on the palette (lut) path it is BIT-IDENTICAL (same arithmetic, same order)', pal.same, pal.same ? 'identical' : `DIFFERS ${pal.d}`);
+  seed('§CPU the colour clause sees a writer that drops the shift', (() => {
+    const g = mk([0.3, 0.1, 0.2]); const n = 2000, a = new Float32Array(n * 3), b = new Float32Array(n * 3);
+    g.writeAllColours(n, 0, a);                       // the defect: phase of pos = 0 instead of 37.5
+    for (let i = 0; i < n; i++) g.writeColourAt(i, n, 37.5, b, i * 3);
+    let d = 0; for (let i = 0; i < n * 3; i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+    return d >= 1e-6 ? 1 : 0;
+  })(), 'a writer ignoring the frame phase must fail the bound');
+}
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'}  deformcheck: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

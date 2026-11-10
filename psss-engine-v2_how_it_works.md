@@ -1620,6 +1620,8 @@ sweep parameter the figure uses:
   flat colour**, not a dim one; that distinction catches people out.
 - **`colorShift`** multiplies `pos`, so it animates the hue over time: a per-channel colour drift.
 - **`hueShift`** is the `Warmth` slider's rotation when a palette is in force (see below).
+- The engine evaluates this per frame through a per-particle `sin`/`cos` table and the angle-sum identity
+  (see *The performance guard*), which is the same value; the swatch and every single-particle reader use the direct form.
 - The clamp is **per channel and at the extremes**, which is why pushing amplitude high gives
   saturated primaries rather than a brighter version of the same hue.
 
@@ -3634,6 +3636,21 @@ waited on, and a window in which the GPU reports a disjoint event is discarded. 
 trail fade, the warp's plain copy, the final present) are in the frame time but in no row. The CPU column of a
 drawing section is small by nature: the GPU does that work later, which is why the GPU column is the one to
 read for drawing.
+
+**The figure computation is the CPU's largest share, and three things keep it lean.** (1) The wave sum is
+computed for the whole figure at once: for one wave slot the angle `(n + phase) · FM` is linear in the particle
+index, so consecutive sines follow from a rotation recurrence (two multiplies and an add) instead of a
+`sin` each, re-anchored with an exact `sin`/`cos` every 32 particles so rounding cannot accumulate — the result
+matches the per-particle law to about 1e-12 model units, and a slot with `Sharpness` ≠ 0 is computed exactly.
+The Score keeps the exact per-particle evaluation. (2) The colour oscillator takes `sin(a + φ)` as
+`sin a · cos φ + cos a · sin φ`, with `sin a` and `cos a` per particle held in a table that changes only with the
+particle count or the colour frequencies, and φ the frame's phase — bit-identical to the direct form when there
+is no colour shift, and on every palette path. (3) A self-similar curve is rebuilt only when one of its inputs
+changes (rule, recursion, the angles after breathing, descend, smoothness, centre, generator); a still curve
+reuses its points. A `Customize` curve whose shape does move (a breathing Twist rebuilds two recursion levels
+every frame) writes its last level directly — each copy's end point is transformed once per build and every leaf
+applies only its parent's transform — and reuses one array per depth instead of allocating new ones, so the
+build causes no periodic garbage-collection pause. `deformcheck` holds the first two to their exact forms.
 
 #### 9.2.2 The three levels, and how the thresholds were derived
 

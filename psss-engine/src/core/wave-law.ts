@@ -296,3 +296,69 @@ export function applyTravel(
   if (tvY) out[1] = out[1]! + travel[1]! * s;
   if (tvZ) out[2] = out[2]! + travel[2]! * s;
 }
+
+/**
+ * v8 CPU pass (owner, 2026-11-10) — **`sumWaveAxes` for a whole figure at once, with the sines from a ROTATION
+ * RECURRENCE.** Measured: the wave sum was 47 % of a wave figure's update, nine `Math.sin` per particle. For one slot
+ * the angle is `(i·step + phase)·fm`, LINEAR in the particle index, so consecutive sines satisfy
+ * `sin(a+δ) = sin a·cos δ + cos a·sin δ` — two multiplies and an add instead of a transcendental.
+ *
+ * ⚠️ **NOT BIT-EXACT, BY DESIGN AND BOUNDED:** the sine is RE-ANCHORED with an exact `Math.sin`/`Math.cos` every
+ * `WAVE_BULK_ANCHOR` particles, so the recurrence's rounding cannot accumulate past a few dozen steps (measured worst
+ * absolute position difference against `sumWaveAxes` is reported by `deformcheck` §CPU). The per-particle summation
+ * ORDER is unchanged (levels ascending, per axis), so only the sine VALUES differ, at rounding level.
+ * ⚠️ **The Score and every other caller keep the exact per-particle `sumWaveAxes`** — this is the generator's hot
+ * path only. ⚠️ A slot with Sharpness ≠ 0 keeps the exact basis (the triangle is not a sine).
+ *
+ * Writes `count` xyz triples into `out` (length ≥ count·3).
+ */
+export const WAVE_BULK_ANCHOR = 32;
+export function sumWaveAxesBulk(
+  out: Float64Array,
+  count: number,
+  step: number,
+  am: readonly (readonly number[])[],
+  fm: readonly (readonly number[])[],
+  ph: readonly (readonly number[])[],
+  sharp: readonly number[],
+): void {
+  out.fill(0, 0, count * 3);
+  for (let t = 0; t < am.length; t++) {
+    const amT = am[t]!, fmT = fm[t]!, phT = ph[t]!;
+    const sharpT = sharp[t] ?? 0;
+    for (let q = 0; q < 3; q++) {
+      const A = amT[q]!, F = fmT[q]!, P = phT[q]!;
+      if (sharpT !== 0) {
+        // The exact per-particle basis — identical arithmetic to `sumWaveAxes`.
+        for (let i = 0; i < count; i++) {
+          const a = (i * step + P) * F;
+          const u = a * INV_TAU + 0.25;
+          const tri = 1 - 4 * Math.abs(u - Math.floor(u) - 0.5);
+          let basis: number;
+          if (sharpT === 1) basis = tri;
+          else { const sv = Math.sin(a); basis = sv + sharpT * (tri - sv); }
+          out[i * 3 + q] = out[i * 3 + q]! + basis * A;
+        }
+        continue;
+      }
+      if (A === 0) {
+        // `x + sin·0` is `x` for every finite x except −0, and the buffer starts at +0 — so a silent slot adds nothing.
+        continue;
+      }
+      const d = step * F;
+      const cd = Math.cos(d), sd = Math.sin(d);
+      let s = 0, c = 1;
+      for (let i = 0; i < count; i++) {
+        if (i % WAVE_BULK_ANCHOR === 0) {
+          const a = (i * step + P) * F;
+          s = Math.sin(a); c = Math.cos(a);
+        } else {
+          const s1 = s * cd + c * sd;
+          c = c * cd - s * sd;
+          s = s1;
+        }
+        out[i * 3 + q] = out[i * 3 + q]! + s * A;
+      }
+    }
+  }
+}

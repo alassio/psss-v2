@@ -90,14 +90,16 @@ function sinkPush(s: PointSink, x: number, y: number, z: number): void {
 function rotateInto(v: Float64Array, a: Float64Array, cos: number, sin: number): void {
   const x = v[0]!, y = v[1]!, z = v[2]!;
   const u = a[0]!, w = a[1]!, q = a[2]!;
-  const dd = u * x + w * y + q * z;
-  v[0] = x * cos + (w * z - q * y) * sin + u * dd * (1 - cos);
-  v[1] = y * cos + (q * x - u * z) * sin + w * dd * (1 - cos);
-  v[2] = z * cos + (u * y - w * x) * sin + q * dd * (1 - cos);
+  const dd = (u * x + w * y + q * z) * (1 - cos);
+  v[0] = x * cos + (w * z - q * y) * sin + u * dd;
+  v[1] = y * cos + (q * x - u * z) * sin + w * dd;
+  v[2] = z * cos + (u * y - w * x) * sin + q * dd;
 }
 
 function normalise(v: Float64Array): void {
-  const m = Math.hypot(v[0]!, v[1]!, v[2]!) || 1;
+  // v8 CPU pass (B): `Math.sqrt` of the squares, not `Math.hypot` — several times faster in the turtle's hot loop and
+  // within an ulp of it (hypot only guards an overflow these unit-scale vectors cannot reach).
+  const m = Math.sqrt(v[0]! * v[0]! + v[1]! * v[1]! + v[2]! * v[2]!) || 1;
   v[0] = v[0]! / m;
   v[1] = v[1]! / m;
   v[2] = v[2]! / m;

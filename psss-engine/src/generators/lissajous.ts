@@ -50,7 +50,7 @@ import {
  * source-shaped: it checks that **this file holds no triangle arithmetic and no second sine blend of its
  * own.** `INV_TAU` moved with them — it is `wave-law.ts`'s constant now.
  */
-import { sumWaveAxes, applyTravel, applyGrow, applyOffset } from '../core/wave-law.ts';
+import { sumWaveAxesBulk, applyTravel, applyGrow, applyOffset } from '../core/wave-law.ts';
 import type { PhysarumProcessor } from './physarum.ts';
 import { MaterialProcessor } from './material.ts';
 import { FireProcessor } from './fire-processor.ts';
@@ -260,6 +260,16 @@ export class LissajousGenerator implements Generator {
   private indexPalette: IndexPaletteSource | null = null;
   /** v8 26.4 — turns; applied ONLY when `indexPalette` is non-null. */
   private indexHueShift = 0;
+  /**
+   * v8 CPU pass — the colour law's per-particle sine/cosine table (`writeAllColours`), keyed by the count and the three
+   * colour frequencies; and the wave buffer the bulk wave sum writes into. Both are scratch, sized up, never shrunk.
+   */
+  private colourTab: Float64Array = new Float64Array(0);
+  private colourTabKey = '';
+  private waveBuf: Float64Array = new Float64Array(0);
+  /** v8 CPU pass (B) — the curve's last resolved inputs, so an unchanged curve is not rebuilt (see the call site). */
+  private lsysLastKey = '';
+  private lsysLastGen: unknown = null;
 
   private canvasWidth = 800;
   private canvasHeight = 600;
@@ -1019,6 +1029,68 @@ export class LissajousGenerator implements Generator {
       out[off + c] = val / 255;
     }
   }
+  /**
+   * v8 CPU pass (A) — **`writeColourAt` for every particle at once**, the generator's per-frame path. Measured: colour
+   * was 17–23 % of a figure update. ⚠️ **The SAME law as `writeColourAt` — that function stays its one owner and the
+   * swatch's** — with two cost changes and no change of meaning:
+   *   - the palette (`lut`) branch is the same arithmetic in the same order, with the per-frame term hoisted, so it is
+   *     BIT-IDENTICAL;
+   *   - the sine branch takes `sin(a + φ) = sin a·cos φ + cos a·sin φ`, with `sin a`/`cos a` per particle from a table
+   *     cached by count and frequencies, and φ = the frame's phase. At φ = 0 (no colour shift) that is exactly `sin a`,
+   *     so static colours are bit-identical too; with a shift the value differs at rounding level (colour only).
+   */
+  private writeAllColours(count: number, pos: number, out: Float32Array): void {
+    const ip = this.indexPalette;
+    if (ip !== null && ip.kind === 'lut' && ip.lut) {
+      const lut = ip.lut;
+      const f0 = this.colorFreq[0]!, f1 = this.colorFreq[1]!, f2 = this.colorFreq[2]!;
+      const k0 = (pos * this.colorShift[0]!) / (Math.PI * 2);
+      const k1 = (pos * this.colorShift[1]!) / (Math.PI * 2);
+      const k2 = (pos * this.colorShift[2]!) / (Math.PI * 2);
+      const hue = this.indexHueShift;
+      for (let i = 0; i < count; i++) {
+        const tt = count > 1 ? i / count : 0;
+        const off = i * 3;
+        let u = tt * f0 + k0; u += hue; u -= Math.floor(u); out[off] = lut[Math.round(u * 255) * 4]! / 255;
+        u = tt * f1 + k1; u += hue; u -= Math.floor(u); out[off + 1] = lut[Math.round(u * 255) * 4 + 1]! / 255;
+        u = tt * f2 + k2; u += hue; u -= Math.floor(u); out[off + 2] = lut[Math.round(u * 255) * 4 + 2]! / 255;
+      }
+      return;
+    }
+    const cBase = (ip !== null && ip.kind === 'ab' && ip.base) ? ip.base : this.colorBase;
+    const cAmp = (ip !== null && ip.kind === 'ab' && ip.amp) ? ip.amp : this.colorAmp;
+    const hueRad = (ip !== null && ip.kind === 'ab') ? this.indexHueShift * Math.PI * 2 : 0;
+    const key = `${count}|${this.colorFreq[0]}|${this.colorFreq[1]}|${this.colorFreq[2]}`;
+    if (key !== this.colourTabKey || this.colourTab.length < count * 6) {
+      if (this.colourTab.length < count * 6) this.colourTab = new Float64Array(count * 6);
+      const tab = this.colourTab;
+      for (let i = 0; i < count; i++) {
+        const n = i * (360 / count);
+        for (let c = 0; c < 3; c++) {
+          const a = (n * this.colorFreq[c]!) / DEG;
+          tab[i * 6 + c * 2] = Math.sin(a);
+          tab[i * 6 + c * 2 + 1] = Math.cos(a);
+        }
+      }
+      this.colourTabKey = key;
+    }
+    const tab = this.colourTab;
+    for (let c = 0; c < 3; c++) {
+      const phi = pos * this.colorShift[c]! + hueRad;
+      const sp = Math.sin(phi), cp = Math.cos(phi);
+      const base = cBase[c]!, amp = cAmp[c]!;
+      const exact = phi === 0;
+      for (let i = 0; i < count; i++) {
+        const sA = tab[i * 6 + c * 2]!;
+        const sv = exact ? sA : sA * cp + tab[i * 6 + c * 2 + 1]! * sp;
+        let val = base + sv * amp;
+        if (val < 0) val = 0;
+        if (val > 255) val = 255;
+        out[i * 3 + c] = val / 255;
+      }
+    }
+  }
+
 
   /**
    * v8 Step 21.4f — `n` colours evenly spaced along the particle index, at `pos`, as 0–1 floats packed RGB.
@@ -2163,7 +2235,7 @@ export class LissajousGenerator implements Generator {
         scaledTime, pitchRange[0], pitchRange[1]);
       const roll = this.resolveOp(cfg.roll.base, cfg.roll.amplitude, cfg.roll.frequency,
         scaledTime, rule.angleRange[0], rule.angleRange[1]);
-      resolveFigure(this.lsysCache, {
+      const lsysPose = {
         rule, recursion, yaw, pitch, roll,
         // ⚠️ `multiAxis` selects the bracket width and the two differ by 5x on `Hilbert 3D`, so it must
         // read whether pitch or roll is BREATHING -- not whether the rule uses those axes.
@@ -2182,11 +2254,34 @@ export class LissajousGenerator implements Generator {
          */
         ...this.resolveGeneratorAxes(cfg, rule.key as RuleKey, scaledTime, resolved),
         custom: custom !== null ? { gen: custom.gen, tile: custom.tile, maxDepth: custom.maxDepth } : null,
-      }, this.lsysPoints, this.particleCount);
+      };
+      /*
+       * v8 CPU pass (B) — **an UNCHANGED curve is not rebuilt.** The figure is a pure function of these resolved inputs
+       * (the rule, the four angles and the recursion after breathing, the descend, the smoothness, the centre, the
+       * generator axes, and the custom generator BY IDENTITY — `resolveCustomRule` memoises by identity), so equal
+       * inputs give the points already in `lsysPoints`. A still curve skips the whole build; a breathing one builds as
+       * before. The key is compared by VALUE (numbers print exactly), the custom generator by reference.
+       */
+      const { rule: _r, custom: _c, ...scalars } = lsysPose;
+      const lsysKey = `${this.particleCount}|${rule.key}|${JSON.stringify(scalars)}`;
+      const lsysGen = custom !== null ? custom.gen : null;
+      if (lsysKey !== this.lsysLastKey || lsysGen !== this.lsysLastGen) {
+        resolveFigure(this.lsysCache, lsysPose, this.lsysPoints, this.particleCount);
+        this.lsysLastKey = lsysKey;
+        this.lsysLastGen = lsysGen;
+      }
       lsysPts = this.lsysPoints;
       lsysFit = LSYSTEM_DESIGN_FRACTION * Math.min(this.designW, this.designH);
     }
 
+    // v8 CPU pass (C) — the wave sum for the WHOLE figure at once (`sumWaveAxesBulk`: a rotation recurrence instead of
+    // nine `Math.sin` per particle, re-anchored every 32). The Score keeps the exact per-particle `sumWaveAxes`.
+    let waveBuf: Float64Array | null = null;
+    if (lsysPts === null) {
+      if (this.waveBuf.length < this.particleCount * 3) this.waveBuf = new Float64Array(this.particleCount * 3);
+      waveBuf = this.waveBuf;
+      sumWaveAxesBulk(waveBuf, this.particleCount, cStep, am, fm, ph, sharp);
+    }
     for (let i = 0; i < this.particleCount; i++) {
       const tau = i * invCount;
       if (lsysPts !== null) {
@@ -2195,8 +2290,10 @@ export class LissajousGenerator implements Generator {
         pt[1] = lsysPts[b + 1]! * lsysFit;
         pt[2] = lsysPts[b + 2]! * lsysFit;
       } else {
-        const n = i * cStep;
-        sumWaveAxes(pt, n, am, fm, ph, sharp);
+        const b = i * 3;
+        pt[0] = waveBuf![b]!;
+        pt[1] = waveBuf![b + 1]!;
+        pt[2] = waveBuf![b + 2]!;
       }
       /*
        * v8 `34.3` — **STAGE A: `Grow`, and it MUST be here, on the wave sum ALONE.** Downstream of either
@@ -3081,9 +3178,7 @@ export class LissajousGenerator implements Generator {
     // Colors — the legacy law, whose single owner is `writeColourAt()` below. See its header for the
     // algebra, for why the `index` mapping is a substitution rather than a second law, and for why the two
     // callers must never be allowed to diverge.
-    for (let i = 0; i < this.particleCount; i++) {
-      this.writeColourAt(i, this.particleCount, this.pos, this.colors, i * 3);
-    }
+    this.writeAllColours(this.particleCount, this.pos, this.colors);
 
     // Compute per-particle velocity normalized to [0,1]
     // Use adaptive reference: EMA of 95th-percentile velocity, with a hard

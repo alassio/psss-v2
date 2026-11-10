@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.3.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.8.3](https://github.com/alassio/psss-v2/releases/tag/v1.8.3)** — **New since v1.7.0: the Fractal Fold, smoother running on slower machines, and a performance readout.** Fold any figure into nested, self-similar structure; the main view now stays smooth while the preview grid animates only as much as the machine allows; and `?perf=1` shows what each part of the picture costs on your own machine. Four new demo presets show the fold.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.3)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.4.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.4](https://github.com/alassio/psss-v2/releases/tag/v1.8.4)** — **Faster figure calculation, and no more periodic stutter on moving curves.** The processor work behind every frame is roughly halved on most presets, so the main view runs smoother and the preview grid gets more time to animate. Moving self-similar curves no longer pause every second or so. Nothing looks different: every preset draws the same picture it drew before.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.4)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
