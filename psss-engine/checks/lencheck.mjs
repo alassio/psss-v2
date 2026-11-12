@@ -60,12 +60,23 @@ const SAFE = [
    * **This entry records that the clause below is what makes it safe.**
    */
   /^this\.resolveChannels\(state\)$/,
+  /*
+   * M7 (2026-11-12) — `fitTo(a, len)` is `a.length > len ? a.subarray(0, len) : a`: it NEVER returns fewer elements
+   * than `a` had up to `len`, so an upload that was count-safe as `state.X` stays count-safe as `fitTo(state.X, …)`
+   * (and stops uploading the grow-only scratch's stale tail). ⚠️ The regex above stops at the first comma, so these
+   * see `fitTo(state.X`; the clause after the loop asserts `fitTo`'s definition, so this entry is DERIVED, not trusted.
+   */
+  /^fitTo\(state\.(depths|velocities|colors|temperatures|velocityDirs)$/,
 ];
 for (const u of uploads) {
   const ok = SAFE.some(re => re.test(u));
   chk(`upload "${u}" is sized to state.count`, ok,
     ok ? '' : 'VERIFY: could this be shorter than state.count?');
 }
+// The derivation the `fitTo` allowlist entry rests on: it only ever TRIMS (M7).
+chk('fitTo only trims: `a.length > len ? a.subarray(0, len) : a` (so a fitTo upload is never shorter than its source)',
+  /function fitTo\(a: Float32Array, len: number\): Float32Array \{\s*return a\.length > len \? a\.subarray\(0, len\) : a;\s*\}/.test(hdr),
+  'a fitTo that could return fewer than min(a.length, len) elements would make every upload it wraps short — ANGLE then drops the draw');
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -108,9 +119,15 @@ console.log('\n=== v8 31.2: the packed channel buffer is sized AND neutral on ev
   // ⚠️ INVARIANT 6 IN ITS EXACT WORDING: two passes sharing a VAO must BOTH upload every per-instance
   // buffer. The crystal pass shares `splatVao`, so it is the third upload site and the easiest to forget.
   const crystalBody = bodyOf('renderCrystalPass');
+  // ⚠️ M7 (2026-11-12): the POINT pass uploads `channels` (= `resolveChannels(state)`, which still runs every frame)
+  // and SKIPS the upload only while the GPU copy is already the all-ones pad at >= state.count — guarded by
+  // `pointChannelOnesLen < state.count`. Its VAO is shared only with the liquid accumulation, which draws <= that
+  // count right after, so the buffer is correct for every draw either way.
   chk('all THREE passes upload the channel buffer (point, splat, crystal)',
-    /this\.channelsBuffer\);\s*\n\s*gl\.bufferData\(gl\.ARRAY_BUFFER, this\.resolveChannels\(state\)/.test(hdr)
-    && /this\.splatChannelsBuffer\);\s*\n\s*gl\.bufferData\(gl\.ARRAY_BUFFER, this\.resolveChannels\(state\)/.test(hdr)
+    /const channels = this\.resolveChannels\(state\);/.test(hdr)
+    && (hdr.match(/this\.channelsBuffer\);\s*\r?\n\s*gl\.bufferData\(gl\.ARRAY_BUFFER, channels, gl\.DYNAMIC_DRAW\)/g) ?? []).length === 2
+    && /this\.pointChannelOnesLen < state\.count/.test(hdr)
+    &&/this\.splatChannelsBuffer\);\s*\n\s*gl\.bufferData\(gl\.ARRAY_BUFFER, this\.resolveChannels\(state\)/.test(hdr)
     && /this\.splatChannelsBuffer\);\s*\n\s*gl\.bufferData\(gl\.ARRAY_BUFFER, this\.channelPad\.subarray\(0, n \* 3\)/.test(crystalBody),
     'the crystal pass SHARES splatVao, so every enabled attribute in that VAO is read by its draw too — '
     + 'and it draws `n` crystals rather than state.count, so it needs its OWN shorter upload. Leaving '

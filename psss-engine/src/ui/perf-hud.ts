@@ -36,6 +36,20 @@ export interface PerfHudSources {
   main: () => { guardLevel: number; canvasW: number; canvasH: number };
 }
 
+/**
+ * One CAPTURE window (`startCapture` → `stopCapture`): every frame interval, and the CPU / GPU milliseconds per section
+ * summed over the window. ⚠️ GPU results arrive frames later, so a capture's GPU sums are the queries that COMPLETED
+ * inside the window — the same lag-by-a-few-frames the live rows carry; over a five-second window it is immaterial.
+ */
+export interface PerfCapture {
+  frames: number;
+  dts: number[];
+  cpuMs: Record<string, number>;
+  gpuMs: Record<string, number>;
+  gpuTiming: boolean;
+  disjoint: boolean;
+}
+
 /** The WebGL2 timer-query extension's constants, typed locally (lib.dom has no type for it). */
 interface TimerExt { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
 
@@ -57,6 +71,7 @@ export class PerfHud {
   private readonly pending: { name: string; q: WebGLQuery }[] = [];
   private readonly pool: WebGLQuery[] = [];
   private disjoint = false;
+  private capture: PerfCapture | null = null;
 
   constructor(private readonly gl: WebGL2RenderingContext, private readonly src: PerfHudSources) {
     this.ext = (gl.getExtension('EXT_disjoint_timer_query_webgl2') as TimerExt | null) ?? null;
@@ -86,7 +101,12 @@ export class PerfHud {
   /** End the section `begin` opened. */
   end(name: string): void {
     const s = this.cpuStart.get(name);
-    if (s !== undefined) { this.cpuMs.set(name, (this.cpuMs.get(name) ?? 0) + performance.now() - s); this.cpuStart.delete(name); }
+    if (s !== undefined) {
+      const ms = performance.now() - s;
+      this.cpuMs.set(name, (this.cpuMs.get(name) ?? 0) + ms);
+      if (this.capture) this.capture.cpuMs[name] = (this.capture.cpuMs[name] ?? 0) + ms;
+      this.cpuStart.delete(name);
+    }
     if (this.active && this.active.name === name) this.closeQuery();
   }
 
@@ -101,12 +121,13 @@ export class PerfHud {
   private pollQueries(): void {
     if (!this.ext) return;
     const gl = this.gl;
-    if (gl.getParameter(this.ext.GPU_DISJOINT_EXT)) this.disjoint = true;
+    if (gl.getParameter(this.ext.GPU_DISJOINT_EXT)) { this.disjoint = true; if (this.capture) this.capture.disjoint = true; }
     while (this.pending.length > 0) {
       const head = this.pending[0]!;
       if (!gl.getQueryParameter(head.q, gl.QUERY_RESULT_AVAILABLE)) break;
       const ns = gl.getQueryParameter(head.q, gl.QUERY_RESULT) as number;
       this.gpuMs.set(head.name, (this.gpuMs.get(head.name) ?? 0) + ns / 1e6);
+      if (this.capture) this.capture.gpuMs[head.name] = (this.capture.gpuMs[head.name] ?? 0) + ns / 1e6;
       this.pool.push(head.q);
       this.pending.shift();
     }
@@ -115,7 +136,10 @@ export class PerfHud {
   /** Called once per main-loop frame with its interval in ms. */
   frame(dt: number): void {
     const now = performance.now();
-    if (Number.isFinite(dt) && dt > 0) { this.dts.push(dt); this.recent.push([now, dt]); }
+    if (Number.isFinite(dt) && dt > 0) {
+      this.dts.push(dt); this.recent.push([now, dt]);
+      if (this.capture) { this.capture.dts.push(dt); this.capture.frames++; }
+    }
     while (this.recent.length > 0 && now - this.recent[0]![0] > 10_000) this.recent.shift();
     this.frames++;
     this.pollQueries();
@@ -150,6 +174,24 @@ export class PerfHud {
         + `shown ${per('delivered')}/s  readback ${lat} ms  pressure ${stats.pressure.toFixed(2)}`);
     }
     this.el.textContent = lines.join('\n');
+  }
+
+  /** Begin a capture window (see `PerfCapture`); a capture already open is discarded. */
+  startCapture(): void {
+    this.capture = { frames: 0, dts: [], cpuMs: {}, gpuMs: {}, gpuTiming: this.ext !== null, disjoint: false };
+  }
+
+  /** End the capture window and return it (null if none was open). */
+  stopCapture(): PerfCapture | null {
+    const c = this.capture;
+    this.capture = null;
+    return c;
+  }
+
+  /** The renderer string the browser reports (unmasked where it allows), for a log's machine line. */
+  gpuName(): string {
+    const dbg = this.gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;
+    return String(this.gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : this.gl.RENDERER) ?? 'unknown');
   }
 
   dispose(): void {

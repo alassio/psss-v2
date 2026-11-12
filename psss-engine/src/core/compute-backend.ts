@@ -152,12 +152,29 @@ export async function detectBackend(canvas: HTMLCanvasElement): Promise<ComputeB
     }
   }
 
-  // WebGL2 fallback
+  /*
+   * WebGL2.
+   *
+   * ⚠️ **`powerPreference: 'high-performance'`** (owner, 2026-11-12, review Q12): on a machine with two GPUs the browser
+   * may otherwise run this on the integrated one. A hint, free elsewhere; the cost is battery on laptops, accepted for
+   * a full-screen visualiser. The screensaver's WebView2 honours it too.
+   *
+   * ⚠️ **`preserveDrawingBuffer` ONLY FOR A HARNESS** (2026-11-12, review G4a). Kept, the browser copies the drawing
+   * buffer every frame instead of swapping it — one full-screen copy per frame, ~2 Mpx in full screen. Nothing the
+   * engine SHIPS reads the canvas after presentation; the harness does: `democheck`, `composer-fixture.ts` and specs
+   * 01/02 `readPixels` the default framebuffer from outside a frame, and spec 01 deliberately boots WITHOUT
+   * `?testhook=1` — so the gate is `navigator.webdriver` (every Playwright run, the same signal the boot preset uses),
+   * plus `?testhook=1` and `?gldiag=1` (whose diagnostics read the screen). ⚠️ A NEW reader of the presented canvas in
+   * shipped code would read black for every real user — read from an FBO instead.
+   */
+  const harness = (typeof navigator !== 'undefined' && navigator.webdriver === true)
+    || (typeof location !== 'undefined' && /[?&](testhook|gldiag)=1\b/.test(location.search));
   const gl = canvas.getContext('webgl2', {
     alpha: false,
     premultipliedAlpha: false,
-    preserveDrawingBuffer: true,
+    preserveDrawingBuffer: harness,
     antialias: false,
+    powerPreference: 'high-performance',
   });
 
   if (!gl) {

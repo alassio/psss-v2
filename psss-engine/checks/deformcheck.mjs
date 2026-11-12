@@ -1838,5 +1838,98 @@ console.log('\n=== CPU. the bulk wave sum and the bulk colour writer agree with 
   })(), 'a writer ignoring the frame phase must fail the bound');
 }
 
+// ═══ §CURL — the analytic-gradient curl noise (2026-11-12, review E-CURL) ══════════════════════════════════════
+/*
+ * `curlNoise3DInto` replaced `curlNoise3D` (12 noise calls by central difference + an array per particle) on the
+ * generator's path. These clauses hold the new form to the old one's FIELD and to the noise's own value, and each is
+ * seeded. ⚠️ The gradient clause is a PERCENTILE, not 100 %: the Gustavson 4-D kernel (0.6) steps across some simplex
+ * boundaries, so a finite difference straddling a step disagrees there by construction — demanding 100 % would fail
+ * on correct code or be loosened until it tested nothing.
+ */
+console.log('\n=== CURL. the analytic-gradient curl: same noise value, the same field, divergence-free, on the hot path ===\n');
+{
+  const C = await import('../src/core/curl-noise.ts');
+  let rnd = 424242;
+  const r = () => ((rnd = (rnd * 48271) % 2147483647) / 2147483647);
+  const pts = [];
+  for (let k = 0; k < 10000; k++) pts.push([(r() - 0.5) * 20, (r() - 0.5) * 20, (r() - 0.5) * 20, r() * 50]);
+  const g = new Float64Array(3);
+
+  // 1. The value is BIT-identical to simplex4D.
+  let same = 0;
+  for (const [x, y, z, w] of pts) if (Object.is(C.simplex4DGrad(x, y, z, w, g, 0), C.simplex4D(x, y, z, w))) same++;
+  chk('simplex4DGrad returns EXACTLY simplex4D\'s value (Object.is, 10 000 random 4-D points)', same === pts.length,
+    `${same} / ${pts.length} identical — the same arithmetic in the same order`);
+
+  // 2. The gradient agrees with a fine central difference on >= 99.9 % of points.
+  const e = 1e-6;
+  const gradAgree = (grad) => {
+    let ok = 0;
+    for (const [x, y, z, w] of pts) {
+      grad(x, y, z, w, g);
+      const fd = [
+        (C.simplex4D(x + e, y, z, w) - C.simplex4D(x - e, y, z, w)) / (2 * e),
+        (C.simplex4D(x, y + e, z, w) - C.simplex4D(x, y - e, z, w)) / (2 * e),
+        (C.simplex4D(x, y, z + e, w) - C.simplex4D(x, y, z - e, w)) / (2 * e),
+      ];
+      if (Math.max(Math.abs(g[0] - fd[0]), Math.abs(g[1] - fd[1]), Math.abs(g[2] - fd[2])) < 1e-5) ok++;
+    }
+    return ok / pts.length;
+  };
+  const agree = gradAgree((x, y, z, w, out) => C.simplex4DGrad(x, y, z, w, out, 0));
+  chk('...its gradient agrees with a central difference (e = 1e-6) within 1e-5 on >= 99.9 % of points', agree >= 0.999,
+    `${(100 * agree).toFixed(3)} % — the rest straddle the 0.6 kernel's steps at simplex boundaries`);
+  seed('§CURL the gradient clause sees a gradient with x and y swapped', gradAgree((x, y, z, w, out) => {
+    C.simplex4DGrad(x, y, z, w, out, 0); const t0 = out[0]; out[0] = out[1]; out[1] = t0;
+  }) < 0.999 ? 1 : 0, 'a plausible-looking wrong gradient must fail the percentile');
+
+  // 3. The field is divergence-free (numerically, at the 99th percentile).
+  const curlAt = (px, py, pz, t, out, swap) => {
+    C.curlNoise3DInto(px, py, pz, t, 0.0029, out, 0);
+    if (swap) { const t0 = out[0]; out[0] = out[1]; out[1] = t0; }
+  };
+  const divStats = (swap) => {
+    const h = 1e-2, a = new Float64Array(3), b = new Float64Array(3), divs = [], mags = [];
+    for (let k = 0; k < 4000; k++) {
+      const px = (r() - 0.5) * 900, py = (r() - 0.5) * 900, pz = (r() - 0.5) * 300, t = r() * 20;
+      curlAt(px + h, py, pz, t, a, swap); curlAt(px - h, py, pz, t, b, swap); let div = (a[0] - b[0]) / (2 * h);
+      curlAt(px, py + h, pz, t, a, swap); curlAt(px, py - h, pz, t, b, swap); div += (a[1] - b[1]) / (2 * h);
+      curlAt(px, py, pz + h, t, a, swap); curlAt(px, py, pz - h, t, b, swap); div += (a[2] - b[2]) / (2 * h);
+      curlAt(px, py, pz, t, a, swap); mags.push(Math.hypot(a[0], a[1], a[2]) * 0.0029); divs.push(Math.abs(div));
+    }
+    divs.sort((x, y) => x - y); mags.sort((x, y) => x - y);
+    return { p99div: divs[Math.floor(0.99 * (divs.length - 1))], p50curl: mags[Math.floor(0.5 * (mags.length - 1))] };
+  };
+  const dv = divStats(false);
+  chk('the curl field is divergence-free: p99 |div| < 1e-3 x p50 |curl| (per pixel, at Video Tape Error\'s scale)',
+    dv.p99div < 1e-3 * dv.p50curl, `p99 |div| ${dv.p99div.toExponential(2)} against ${(1e-3 * dv.p50curl).toExponential(2)}`);
+  const dvBad = divStats(true);
+  seed('§CURL the divergence clause sees two curl components swapped', dvBad.p99div < 1e-3 * dvBad.p50curl ? 0 : 1,
+    'swapping two components keeps the magnitudes and destroys the divergence-free property');
+
+  // 4. The same field as the finite-difference form it replaced (the spikes excepted).
+  const o = new Float64Array(3), diffs = [];
+  for (let k = 0; k < 10000; k++) {
+    const px = (r() - 0.5) * 900, py = (r() - 0.5) * 900, pz = (r() - 0.5) * 300, t = r() * 20;
+    C.curlNoise3DInto(px, py, pz, t, 0.0029, o, 0);
+    const [x0, y0, z0] = C.curlNoise3D(px, py, pz, t, 0.0029);
+    diffs.push(Math.max(Math.abs(o[0] - x0), Math.abs(o[1] - y0), Math.abs(o[2] - z0)));
+  }
+  diffs.sort((x, y) => x - y);
+  const p99 = diffs[Math.floor(0.99 * (diffs.length - 1))], spikes = diffs.filter((x) => x > 1e-3).length;
+  chk('...and it is the same field as curlNoise3D: p99 |delta| < 1e-5, and at most 0.5 % of points beyond 1e-3 (its spikes)',
+    p99 < 1e-5 && spikes <= 50, `p99 ${p99.toExponential(2)}; ${spikes} / 10 000 beyond 1e-3 — the finite difference's one-frame spikes, removed (owner, 2026-11-12)`);
+
+  // 5. The generator's curl loop uses the allocation-free form.
+  const lsrc = read('../src/generators/lissajous.ts');
+  // ⚠️ The end marker is searched AFTER the start: `// Physarum steering` also occurs earlier in the file, and a slice
+  // ending before it starts is EMPTY — which passed the negative tests vacuously on its first run. An empty block FAILS.
+  const c0 = lsrc.indexOf('// Curl noise perturbation');
+  const blk = c0 < 0 ? '' : lsrc.slice(c0, lsrc.indexOf('// Physarum steering', c0));
+  chk('the generator\'s curl loop calls curlNoise3DInto, never curlNoise3D, and builds no array per particle',
+    blk.length > 200 && /curlNoise3DInto\(/.test(blk) && !/curlNoise3D\(/.test(blk) && !/const \[/.test(blk),
+    `block of ${blk.length} chars — twelve calls and an array per particle per frame were the cost this replaced`);
+}
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'}  deformcheck: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

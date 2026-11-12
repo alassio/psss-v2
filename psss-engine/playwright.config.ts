@@ -43,7 +43,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const SWIFTSHADER_ARGS = [
   '--enable-unsafe-swiftshader',
-  // ⚠️ **NOT a performance flag.** The engine's own context asks for `preserveDrawingBuffer: true`
+  // ⚠️ **NOT a performance flag.** The engine's own context asks for `preserveDrawingBuffer: true` UNDER AUTOMATION
+  // ONLY (`navigator.webdriver`, which every run here sets — `core/compute-backend.ts`; off for real users since
+  // 2026-11-12)
   // (`core/compute-backend.ts`), which is what makes a screenshot of the GL canvas meaningful at all; these
   // two keep the compositor from second-guessing that on a headless surface.
   '--disable-lcd-text',

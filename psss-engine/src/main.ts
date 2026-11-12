@@ -58,6 +58,7 @@ import {
 import { computePresetStatistics } from './exploration/preset-stats.ts';
 import { PerfGuard } from './exploration/perf-guard.ts';
 import { PerfHud } from './ui/perf-hud.ts';
+import { PerfRun, perfTestReel } from './ui/perf-run.ts';
 import { stripDeploymentAssignment } from './presets/deployment-format.ts';
 import { PreviewGridPanel } from './ui/preview-grid/panel.ts';
 import { GridTileRenderer } from './ui/preview-grid/grid-tile-renderer.ts';
@@ -1065,17 +1066,17 @@ async function init() {
   // Extra FBO for post-processing output (bloom writes here)
   let postFBO = createPostFBO(gl, canvas.width, canvas.height);
 
-  // Fade quad (decay pass)
-  const fadeProgram = createFadeProgram(gl);
-  const fadeVao = createFadeQuad(gl, fadeProgram);
+  // The decay pass — ONE program per variant (plain / blurred) that copies the trail AND applies the decay
+  // (M6, 2026-11-12; it used to be a copy pass followed by a blended fade quad — two full-screen passes).
+  const decayProgram = createDecayProgram(gl, false);
+  const decayVao = createQuadVAO(gl, decayProgram, 'aPos');
+  const decayBlurProgram = createDecayProgram(gl, true);
+  const decayBlurVao = createQuadVAO(gl, decayBlurProgram, 'aPos');
 
   // Blit program (copy FBO to screen)
   const blitProgram = createBlitProgram(gl);
   const blitVao = createBlitQuad(gl, blitProgram);
 
-  // Blur blit program (3x3 gaussian, used when SmoothFilter is active)
-  const blurBlitProgram = createBlurBlitProgram(gl);
-  const blurBlitVao = createQuadVAO(gl, blurBlitProgram, 'aPos');
 
   // Uniform locations for the three fixed full-screen programs above, resolved once (triage H6).
   // The render loop queried these by name on every frame — up to five per frame across the decay,
@@ -1083,10 +1084,12 @@ async function init() {
   // and all three programs are `const`: created here, never disposed, never re-linked. So unlike the
   // renderer and post-processor objects (which are rebuilt by dispose+init on a film-look change)
   // there is no invalidation case to reason about here at all.
-  const uFadeAlpha = gl.getUniformLocation(fadeProgram, 'uAlpha');
+  const uDecayTex = gl.getUniformLocation(decayProgram, 'uTex');
+  const uDecayFade = gl.getUniformLocation(decayProgram, 'uFade');
+  const uDecayBlurTex = gl.getUniformLocation(decayBlurProgram, 'uTex');
+  const uDecayBlurFade = gl.getUniformLocation(decayBlurProgram, 'uFade');
+  const uDecayBlurTexelSize = gl.getUniformLocation(decayBlurProgram, 'uTexelSize');
   const uBlitTex = gl.getUniformLocation(blitProgram, 'uTex');
-  const uBlurBlitTex = gl.getUniformLocation(blurBlitProgram, 'uTex');
-  const uBlurBlitTexelSize = gl.getUniformLocation(blurBlitProgram, 'uTexelSize');
 
   // Opt-in GL error drain — `?gldiag=1`. Read once at init; see `reportGlErrors()` for why it is not
   // always-on and why a URL parameter rather than a build flag.
@@ -1101,7 +1104,7 @@ async function init() {
     // re-linked, so a uniform set here holds for the session. TransMap's two copies of the guard cannot use
     // this treatment — its programs are rebuilt on a chain or resize change — so they are armed per pass
     // instead, via `setDiagSentinel()` below.
-    for (const p of [blitProgram, blurBlitProgram]) {
+    for (const p of [blitProgram, decayProgram, decayBlurProgram]) {
       gl.useProgram(p);
       gl.uniform1f(gl.getUniformLocation(p, 'uDiagSentinel'), DIAG_SENTINEL);
     }
@@ -2398,6 +2401,8 @@ async function init() {
   let perfGuard: PerfGuard;
   /** v8 performance pass — the `?perf=1` overlay, or null (the default: it costs nothing when off). */
   let perfHud: PerfHud | null = null;
+  /** `?reel=2` — the performance test reel's recorder (`ui/perf-run.ts`); null otherwise. */
+  let perfRun: PerfRun | null = null;
 
   /**
    * How much of the TransMap effect survives the active attractor blend — `1.0` = full, `0.0` = off.
@@ -3280,69 +3285,46 @@ async function init() {
      */
     reelTick(time);
 
-    // Step 1: Decay pass — read FBO-A, write to FBO-B (with optional blur)
+    // Step 1: Decay pass — read FBO-A, write the DECAYED trail to FBO-B (with optional blur), in ONE pass.
+    //
+    // ⚠️ **M6 (2026-11-12): this was two full-screen passes** — a copy of FBO-A into FBO-B, then a black quad at
+    // alpha `a = 1 − decayFactor` blended `SRC_ALPHA, ONE_MINUS_SRC_ALPHA` over it. The decay program writes the
+    // result of that blend directly (`createDecayProgram`):
+    //
+    //     rgb' = rgb · (1 − a)          a' = a·a + alpha · (1 − a)
+    //
+    // so one full-resolution write and blend is saved per frame, on every preset. The only difference is that the
+    // copy is no longer rounded to the trail's format before the fade is applied (rounding level).
+    //
+    // ⚠️ **BLENDING MUST BE OFF FOR THIS DRAW** — it writes the whole result; under ANY enabled blend function it
+    // would combine with FBO-B's previous contents. And the old pass's history still applies to what FOLLOWS: it
+    // used to leave `SRC_ALPHA, ONE_MINUS_SRC_ALPHA` enabled, a later draw has been found relying on inherited
+    // state before (`Miracle Frost`'s crystal flood, when the fade inherited an additive function), so that exact
+    // state is RESTORED after the draw — Step 2 receives the GL state it always received. `blendcheck` holds both.
     perfHud?.begin('trail');
     gl.bindFramebuffer(gl.FRAMEBUFFER, fboState.fboB);
     gl.viewport(0, 0, fboState.width, fboState.height);
     gl.disable(gl.BLEND);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fboState.texA);
     if (blurEnabled) {
-      gl.useProgram(blurBlitProgram);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, fboState.texA);
-      gl.uniform1i(uBlurBlitTex, 0);
-      gl.uniform2f(uBlurBlitTexelSize, 1.0 / fboState.width, 1.0 / fboState.height);
-      gl.bindVertexArray(blurBlitVao);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.bindVertexArray(null);
+      gl.useProgram(decayBlurProgram);
+      gl.uniform1i(uDecayBlurTex, 0);
+      gl.uniform1f(uDecayBlurFade, 1.0 - trailDecay);
+      gl.uniform2f(uDecayBlurTexelSize, 1.0 / fboState.width, 1.0 / fboState.height);
+      gl.bindVertexArray(decayBlurVao);
     } else {
-      gl.useProgram(blitProgram);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, fboState.texA);
-      gl.uniform1i(uBlitTex, 0);
-      gl.bindVertexArray(blitVao);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.bindVertexArray(null);
+      gl.useProgram(decayProgram);
+      gl.uniform1i(uDecayTex, 0);
+      gl.uniform1f(uDecayFade, 1.0 - trailDecay);
+      gl.bindVertexArray(decayVao);
     }
-
-    // Apply decay on top of FBO-B.
-    //
-    // ⚠️ THIS PASS IS FRAGILE AND MUST SET ITS OWN BLEND STATE EVERY FRAME.
-    //
-    // The fade draws BLACK at alpha = 1 - decayFactor, and relies ENTIRELY on
-    // `SRC_ALPHA, ONE_MINUS_SRC_ALPHA` to work:
-    //
-    //     dst' = black*a + dst*(1-a) = dst * decayFactor      <- the trail fades
-    //
-    // Under any additive function it silently becomes a NO-OP:
-    //
-    //     dst' = black + dst = dst                            <- the trail NEVER fades
-    //
-    // and every lit pixel then integrates without bound, saturating to white in ~50 frames.
-    //
-    // It used to be written once here and inherited, which made it hostage to whatever blend function
-    // the PREVIOUS frame's last draw happened to leave set. Reported as: enabling crystals on
-    // `Miracle Frost` flooded whole areas with flat white — and, decisively, it still flooded with
-    // `poolSize` at its minimum of 50 (at most ~33 crystals, which cannot possibly cover the screen),
-    // which is what ruled out crystal coverage as the cause.
-    //
-    // The three observations all follow from the leak:
-    //   - `slowFraction: 0` is fine because NO crystals exist, so the crystal pass never runs.
-    //   - `slowFraction: 0.03` breaks it because the pass now runs and leaves
-    //     `ONE, ONE_MINUS_SRC_ALPHA` set (premultiplied crystal compositing).
-    //   - An ADDITIVE material breaks it identically, because `renderSplat` leaves `ONE, ONE` set.
-    //   - An ALPHA material with no neon looked FINE purely by luck: it leaves
-    //     `SRC_ALPHA, ONE_MINUS_SRC_ALPHA`, which is exactly what this pass needs.
-    //
-    // Re-asserting it here is one call per frame and removes the whole class of bug. Do NOT "optimise"
-    // it back out by hoisting it.
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindVertexArray(null);
+    // The state the two-pass form left behind (see above) — re-asserted, never inherited.
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.useProgram(fadeProgram);
-    gl.uniform1f(uFadeAlpha, 1.0 - trailDecay);
-    gl.bindVertexArray(fadeVao);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindVertexArray(null);
     perfHud?.end('trail');
 
     // Step 2: Render new particles into FBO-B
@@ -4028,6 +4010,7 @@ async function init() {
       previewGrid.tick(dt, tileThrottle);
       perfHud?.end('tiles');
       perfHud?.frame(rawFrameMs);
+      perfRun?.frame(time, rawFrameMs);
     }
     // ⚠️ NO `requestAnimationFrame` here. The re-arm lives in `drawFrame`'s `finally` — see the note there.
     // Re-adding one here would double the frame rate AND restore the "one throw kills the canvas" failure for
@@ -8011,7 +7994,9 @@ async function init() {
   labPanel.hideInPanel();
 
   perfGuard = new PerfGuard();
-  if (new URLSearchParams(window.location.search).get('perf') === '1') {
+  // `?reel=2` (the performance test reel) needs the overlay's capture window, so it implies `?perf=1`.
+  const perfTestRun = new URLSearchParams(window.location.search).get('reel') === '2';
+  if (new URLSearchParams(window.location.search).get('perf') === '1' || perfTestRun) {
     perfHud = new PerfHud(gl, {
       tiles: () => [
         { label: 'grid', stats: previewGrid.getTileStats() },
@@ -8021,6 +8006,14 @@ async function init() {
       ],
       main: () => ({ guardLevel: perfGuard.level(), canvasW: canvas.width, canvasH: canvas.height }),
     });
+    if (perfTestRun) {
+      perfRun = new PerfRun(perfHud, {
+        presetName: () => lastAppliedPresetName,
+        canvas: () => ({ w: canvas.width, h: canvas.height }),
+        guardLevel: () => perfGuard.level(),
+        onDone: () => reelStop(),
+      });
+    }
   }
 
   installTestHook();
@@ -8309,7 +8302,12 @@ async function init() {
      * below is unchanged and is still reached by the screensaver and by `?reel=1`; nothing was deleted.
      */
     const autostart = reelParam === '1' ? true : reelParam === '0' ? false : screensaver;
-    if (autostart) {
+    // `?reel=2` — the PERFORMANCE TEST REEL (`ui/perf-run.ts`): the same presentation path as `?reel=1`, with the
+    // fixed measurement set instead of the main reel; `perfRun` (created with the overlay above) records it.
+    if (reelParam === '2') {
+      reelStart(perfTestReel(), false);
+      if (reelIsPlaying()) startPresentation();
+    } else if (autostart) {
       const main = reelStore.mainReel();
       if (main) {
         reelStart(main, false);
@@ -8764,17 +8762,6 @@ function destroyPostFBO(gl: WebGL2RenderingContext, state: PostFBO): void {
   gl.deleteTexture(state.tex);
 }
 
-function createFadeProgram(gl: WebGL2RenderingContext): WebGLProgram {
-  const vert = `#version 300 es
-    in vec2 aPos;
-    void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
-  const frag = `#version 300 es
-    precision lowp float;
-    uniform float uAlpha;
-    out vec4 fragColor;
-    void main() { fragColor = vec4(0.0, 0.0, 0.0, uAlpha); }`;
-  return compileProgram(gl, vert, frag, 'Main fade');
-}
 
 /*
  * WHY THE TRAIL NEEDS A FINITENESS GUARD AT ALL — the derivation. The guard itself is
@@ -8799,7 +8786,13 @@ function createFadeProgram(gl: WebGL2RenderingContext): WebGLProgram {
  * see. Both writers are guarded as of 2026-08-22.
  */
 
-function createBlurBlitProgram(gl: WebGL2RenderingContext): WebGLProgram {
+/**
+ * The decay pass's program (M6): the trail copy and the decay in ONE fragment — `blur` adds the 3x3 gaussian that
+ * `SmoothFilter` asks for. `uFade` is `1 − decayFactor`; the output is exactly what the retired two-pass form's blend
+ * produced (`rgb·(1−a)`, `a·a + alpha·(1−a)`). highp, as before: the finiteness guard's 1e30 bound is not
+ * representable in mediump.
+ */
+function createDecayProgram(gl: WebGL2RenderingContext, blur: boolean): WebGLProgram {
   const vert = `#version 300 es
     in vec2 aPos;
     out vec2 vUv;
@@ -8807,34 +8800,35 @@ function createBlurBlitProgram(gl: WebGL2RenderingContext): WebGLProgram {
       vUv = aPos * 0.5 + 0.5;
       gl_Position = vec4(aPos, 0.0, 1.0);
     }`;
-  // highp, not mediump: the finiteness guard below compares against 1e30, which is not representable in
-  // mediump (commonly fp16, max 65504) and would itself become Inf. See the guard's own note.
+  // sampleTrail, not texture: this is the trail feedback loop's one break point, so it is also where a diagnostic
+  // sentinel must be scrubbed before it can be multiplied forever (core/gl-program.ts). No backticks in a GLSL
+  // comment (invariant 18).
+  const sample = blur ? `
+      vec4 c = vec4(0.0);
+      c += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, -uTexelSize.y)) * 0.0625;
+      c += sampleTrail(uTex, vUv + vec2(0.0, -uTexelSize.y)) * 0.125;
+      c += sampleTrail(uTex, vUv + vec2(uTexelSize.x, -uTexelSize.y)) * 0.0625;
+      c += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, 0.0)) * 0.125;
+      c += sampleTrail(uTex, vUv) * 0.25;
+      c += sampleTrail(uTex, vUv + vec2(uTexelSize.x, 0.0)) * 0.125;
+      c += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, uTexelSize.y)) * 0.0625;
+      c += sampleTrail(uTex, vUv + vec2(0.0, uTexelSize.y)) * 0.125;
+      c += sampleTrail(uTex, vUv + vec2(uTexelSize.x, uTexelSize.y)) * 0.0625;
+      c = sanitiseTrail(c);` : `
+      vec4 c = sanitiseTrail(sampleTrail(uTex, vUv));`;
   const frag = `#version 300 es
     precision highp float;
     uniform sampler2D uTex;
-    uniform vec2 uTexelSize;
+    uniform float uFade;
+    ${blur ? 'uniform vec2 uTexelSize;' : ''}
     in vec2 vUv;
     out vec4 fragColor;
     ${TRAIL_SANITISE_GLSL}
-    void main() {
-      // sampleTrail, not texture — this is the trail feedback loop's one break point, so it is also the one
-      // place a diagnostic sentinel must be scrubbed before it can be multiplied forever. Identical to
-      // texture() on the shipped path; see the note on sampleTrail in core/gl-program.ts.
-      // (⚠️ No BACKTICKS in a GLSL comment — invariant 18: one terminates this template literal, and tsc
-      // then reports the error dozens of lines away from the cause.)
-      vec4 sum = vec4(0.0);
-      sum += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, -uTexelSize.y)) * 0.0625;
-      sum += sampleTrail(uTex, vUv + vec2(0.0, -uTexelSize.y)) * 0.125;
-      sum += sampleTrail(uTex, vUv + vec2(uTexelSize.x, -uTexelSize.y)) * 0.0625;
-      sum += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, 0.0)) * 0.125;
-      sum += sampleTrail(uTex, vUv) * 0.25;
-      sum += sampleTrail(uTex, vUv + vec2(uTexelSize.x, 0.0)) * 0.125;
-      sum += sampleTrail(uTex, vUv + vec2(-uTexelSize.x, uTexelSize.y)) * 0.0625;
-      sum += sampleTrail(uTex, vUv + vec2(0.0, uTexelSize.y)) * 0.125;
-      sum += sampleTrail(uTex, vUv + vec2(uTexelSize.x, uTexelSize.y)) * 0.0625;
-      fragColor = sanitiseTrail(sum);
+    void main() {${sample}
+      // The retired fade quad, blended SRC_ALPHA, ONE_MINUS_SRC_ALPHA over the copy, written directly.
+      fragColor = vec4(c.rgb * (1.0 - uFade), uFade * uFade + c.a * (1.0 - uFade));
     }`;
-  return compileProgram(gl, vert, frag, 'Main blur blit');
+  return compileProgram(gl, vert, frag, blur ? 'Main decay (blur)' : 'Main decay');
 }
 
 function createBlitProgram(gl: WebGL2RenderingContext): WebGLProgram {
@@ -8857,10 +8851,6 @@ function createBlitProgram(gl: WebGL2RenderingContext): WebGLProgram {
     // (No backticks here — invariant 18, as above.)
     void main() { fragColor = sanitiseTrail(sampleTrail(uTex, vUv)); }`;
   return compileProgram(gl, vert, frag, 'Main blit');
-}
-
-function createFadeQuad(gl: WebGL2RenderingContext, program: WebGLProgram): WebGLVertexArrayObject {
-  return createQuadVAO(gl, program, 'aPos');
 }
 
 function createBlitQuad(gl: WebGL2RenderingContext, program: WebGLProgram): WebGLVertexArrayObject {

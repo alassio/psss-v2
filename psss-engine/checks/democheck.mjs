@@ -132,6 +132,8 @@ await page.waitForTimeout(3000);
  */
 const fingerprint = () => page.evaluate(() => {
   const c = document.querySelector('canvas');
+  // Returns the engine's EXISTING context (the attributes here are ignored); it preserves its drawing buffer because
+  // this runs under automation (`navigator.webdriver`, `core/compute-backend.ts`) — the readback below depends on it.
   const g = c.getContext('webgl2', { preserveDrawingBuffer: true });
   const px = new Uint8Array(c.width * c.height * 4);
   g.readPixels(0, 0, c.width, c.height, g.RGBA, g.UNSIGNED_BYTE, px);

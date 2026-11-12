@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.5.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.8.5](https://github.com/alassio/psss-v2/releases/tag/v1.8.5)** — **Faster liquid presets, a preview grid that no longer animates thumbnails you cannot see, and a fix for presets with a Translation Map force in full screen.** The heaviest liquid presets draw a quarter of the pixels they did; the preview grid gives way to the main view sooner and stops animating off-screen thumbnails; and the performance readout now shows the brief freezes it used to hide.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.5)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.7.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.7](https://github.com/alassio/psss-v2/releases/tag/v1.8.7)** — **Less work per frame on every machine, and a built-in performance test.** Curl-noise presets compute their swirl two to four times faster, every frame is one full-screen pass lighter, the particle upload to the graphics card sends only what is drawn, and the page asks for the faster graphics card on machines that have two. Add `?reel=2` to the address to measure any machine the same way and get a log file.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.7)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
@@ -159,6 +159,7 @@ Some URL parameters are useful while developing:
 | Parameter | What it does |
 |---|---|
 | `?reel=1` | Start the main reel immediately, full screen, with the UI hidden. `?reel=0` forces it off. |
+| `?reel=2` | Run the **performance test reel**: 18 presets covering every kind of cost, each measured for 5 s in full screen after a 10 s settle, then a log is downloaded and shown. Click once to go full screen. Implies `?perf=1`. |
 | `?screensaver=1` | Behave like the Windows screensaver: play, and quit on the first key press, click or mouse move. |
 | `?preset=<name>` | Start on a named preset instead of a random one, e.g. `?preset=Quader`. |
 | `?tab=<name>` | Open the Lab on a named tab, e.g. `?tab=reel`, `?tab=visual-fx`. |

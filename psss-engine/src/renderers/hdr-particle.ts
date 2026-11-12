@@ -1294,6 +1294,11 @@ const CRYSTAL_INDEX_BASE = 1048576; // 2^20, bounds the particle index — ~19x 
 const LIQUID_HALF_RES_ON = 32;
 const LIQUID_HALF_RES_OFF = 28;
 
+/** M7 — `a` up to `len` elements (a view, no copy), or `a` itself when it is not longer. */
+function fitTo(a: Float32Array, len: number): Float32Array {
+  return a.length > len ? a.subarray(0, len) : a;
+}
+
 export class HDRParticleRenderer implements Renderer {
   readonly id = 'hdr-particle';
 
@@ -1521,6 +1526,25 @@ export class HDRParticleRenderer implements Renderer {
   private channelsBuffer: WebGLBuffer | null = null;
   private splatChannelsBuffer: WebGLBuffer | null = null;
   private channelPad: Float32Array = new Float32Array(0);
+  /**
+   * v8 performance pass (M7, 2026-11-12) — **redundant per-frame uploads skipped.** Measured on a CPU-bound weaker
+   * machine: the `particles` CPU row (the uploads) 4–6 ms a frame, as large as the figure. Three rules, none of which
+   * can change a drawn pixel:
+   *   1. every per-slot array is uploaded only up to the DRAW count (`fitTo`) — with sparks, a liquid pool or crystals
+   *      the generator publishes GROW-ONLY scratch (invariant 7), so the full-length upload carried slots no draw reads;
+   *   2. a CONSTANT buffer (the zero temperatures without a material, the all-ones channels without the feature) is
+   *      uploaded only when the GPU copy is not already that constant at a sufficient length — these record that
+   *      length (0 = the buffer holds something else). ⚠️ Each is valid only because the point path is its ONE
+   *      writer; a second writer must zero the record, or a stale buffer is drawn;
+   *   3. the splat path's `frozen` / `growth` (zeros / ones without crystals) likewise, invalidated by the crystal
+   *      pass — which writes those same buffers — through `splatAuxValidLen = 0`.
+   * ⚠️ The length guard is load-bearing: a vertex buffer SHORTER than its draw makes ANGLE drop the whole draw.
+   */
+  private pointTempZerosLen = 0;
+  private pointChannelOnesLen = 0;
+  private splatAuxValidLen = 0;
+  private splatTempZeros: Float32Array = new Float32Array(0);
+  private splatVelDirZeros: Float32Array = new Float32Array(0);
   /**
    * v8 `31.2` — the SMALLEST per-particle size multiplier in the last resolved frame. 1 when the feature
    * is off. Read only by `estimateParticlePixels()`; see there for why it is the minimum and not the mean.
@@ -1818,6 +1842,7 @@ export class HDRParticleRenderer implements Renderer {
     // attribute with no bound data reads undefined values, which on some drivers is stale GPU memory
     // rather than zero.
     this.pointTempBuffer = gl.createBuffer();
+    this.pointTempZerosLen = 0;   // M7: a NEW buffer holds nothing — the skip record must not survive it
     const aPointTemp = gl.getAttribLocation(this.program, 'aPointTemp');
     gl.bindBuffer(gl.ARRAY_BUFFER, this.pointTempBuffer);
     gl.enableVertexAttribArray(aPointTemp);
@@ -1841,6 +1866,7 @@ export class HDRParticleRenderer implements Renderer {
      * frame whether the feature is on or off.
      */
     this.channelsBuffer = gl.createBuffer();
+    this.pointChannelOnesLen = 0; // M7: as above
     const aChannels = gl.getAttribLocation(this.program, 'aChannels');
     gl.bindBuffer(gl.ARRAY_BUFFER, this.channelsBuffer);
     gl.enableVertexAttribArray(aChannels);
@@ -2056,6 +2082,7 @@ export class HDRParticleRenderer implements Renderer {
     this.splatAgeBuffer = splatAgeBuffer;
     this.splatFrozenBuffer = frozenBuffer;
     this.splatGrowthBuffer = growthBuffer;
+    this.splatAuxValidLen = 0;    // M7: new buffers hold nothing
     this.splatChannelsBuffer = splatChannelsBuffer;   // v8 31.2 — and in dispose()'s release list
 
     // Colour ramp texture
@@ -2269,6 +2296,8 @@ export class HDRParticleRenderer implements Renderer {
     gl.bufferData(gl.ARRAY_BUFFER, frz, gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatGrowthBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, gro, gl.DYNAMIC_DRAW);
+    // M7: these two buffers no longer hold the splat path's zeros / ones — it must re-upload them.
+    this.splatAuxValidLen = 0;
     // Temperature is unused by the crystal branch but the attribute must be fed.
     // Shares `crystalZeros1` with the two palette attributes below — all four want the same n zeros,
     // and nothing in this pass ever writes into it, so one buffer serves them all.
@@ -3841,25 +3870,31 @@ void main() {
     // The remaining per-slot buffers are uploaded at full length — a buffer longer than the draw
     // count is harmless, and this keeps the common (no-crystal) path a straight bufferData of the
     // generator's own arrays with no copy.
+    // M7 rule 1: up to the draw count only (`fitTo`) — the generator's tail scratch is grow-only.
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.colors, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.colors, state.count * 3), gl.DYNAMIC_DRAW);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.depthBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.depths, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.depths, state.count), gl.DYNAMIC_DRAW);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.velocityBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.velocities, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.velocities, state.count), gl.DYNAMIC_DRAW);
 
     // B14: temperatures, or zeros when no material is running. The zero buffer is cached and only
     // reallocated when the count changes, so a preset with no material allocates once rather than
     // every frame.
-    let temps = state.temperatures;
-    if (!temps) {
+    // M7 rule 2: the zeros are uploaded only when the GPU copy is not already zeros of at least this length.
+    const temps = state.temperatures;
+    if (temps) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.pointTempBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, fitTo(temps, state.count), gl.DYNAMIC_DRAW);
+      this.pointTempZerosLen = 0;
+    } else if (this.pointTempZerosLen < state.count) {
       if (this.pointTempZeros.length !== state.count) this.pointTempZeros = new Float32Array(state.count);
-      temps = this.pointTempZeros;
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.pointTempBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, this.pointTempZeros, gl.DYNAMIC_DRAW);
+      this.pointTempZerosLen = state.count;
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.pointTempBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, temps, gl.DYNAMIC_DRAW);
 
     // Ages. Prefer the material's real lifetimes; otherwise synthesise a staggered phase so mapping 5 works
     // WITHOUT a material — unlike temperature, age needs no material to mean something.
@@ -3884,9 +3919,18 @@ void main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.pointAgeBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, ages, gl.DYNAMIC_DRAW);
 
-    // v8 31.2 — the packed channels, EVERY FRAME whether the feature is on or not. See `resolveChannels`.
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.channelsBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.resolveChannels(state), gl.DYNAMIC_DRAW);
+    // v8 31.2 — the packed channels. ⚠️ `resolveChannels` still runs EVERY frame (it also publishes the readout's
+    // minimum); M7 rule 2 skips only the UPLOAD of the all-ones pad when the GPU copy is already that at this length.
+    const channels = this.resolveChannels(state);
+    if (state.channels) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.channelsBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, channels, gl.DYNAMIC_DRAW);
+      this.pointChannelOnesLen = 0;
+    } else if (this.pointChannelOnesLen < state.count) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.channelsBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, channels, gl.DYNAMIC_DRAW);
+      this.pointChannelOnesLen = state.count;
+    }
 
     gl.useProgram(this.program);
     gl.uniform2f(this.uResolution, this.width, this.height);
@@ -4060,7 +4104,9 @@ void main() {
 
     const pos2d = this.packSplatPos2d(state);
 
-    const temperatures = state.temperatures ?? new Float32Array(state.count);
+    // M7: the fallback zeros are CACHED (they were a new array every frame — invariant 8's allocation rate).
+    if (!state.temperatures && this.splatTempZeros.length !== state.count) this.splatTempZeros = new Float32Array(state.count);
+    const temperatures = state.temperatures ? fitTo(state.temperatures, state.count) : this.splatTempZeros;
 
     gl.useProgram(this.splatProgram);
     gl.bindVertexArray(this.splatVao);
@@ -4075,20 +4121,22 @@ void main() {
 
     // Upload per-instance depth data
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatDepthBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.depths, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.depths, state.count), gl.DYNAMIC_DRAW);
 
-    // Upload per-instance velocity direction data
+    // Upload per-instance velocity direction data (M7: cached zeros when absent; uploaded every frame regardless,
+    // because the crystal pass writes this buffer too).
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVelDirBuffer);
-    const velDirs = state.velocityDirs ?? new Float32Array(state.count * 2);
+    if (!state.velocityDirs && this.splatVelDirZeros.length !== state.count * 2) this.splatVelDirZeros = new Float32Array(state.count * 2);
+    const velDirs = state.velocityDirs ? fitTo(state.velocityDirs, state.count * 2) : this.splatVelDirZeros;
     gl.bufferData(gl.ARRAY_BUFFER, velDirs, gl.DYNAMIC_DRAW);
 
     // B14 follow-up: speed and preset colour, for palette mappings 2 and 1 respectively. Always uploaded —
     // an enabled attribute with no bound data reads undefined values, which on some drivers is stale GPU
     // memory rather than zero.
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVelBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.velocities, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.velocities, state.count), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatColBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, state.colors, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, fitTo(state.colors, state.count * 3), gl.DYNAMIC_DRAW);
     // Ages: the material's real lifetimes if present.
     //
     // ⚠️ MUST be padded to `state.count`. `state.lifetimes` comes straight from `MaterialProcessor` and is
@@ -4113,27 +4161,37 @@ void main() {
     // v8 Phase 8a: feed the frozen flag so the shader can discard frozen particles here — they
     // belong to the crystal pass. The buffer must be written every frame regardless, otherwise
     // it retains whatever the crystal pass last uploaded (a shorter, all-ones array).
-    if (this.frozenAttrBuf.length !== state.count) this.frozenAttrBuf = new Float32Array(state.count);
+    // ⚠️ M7 rule 3: with no live crystals the content is zeros (frozen) and ones (growth, below) — constant — so the
+    // pair is re-uploaded only when the crystal pass has written these buffers since (`splatAuxValidLen = 0`) or the
+    // length grew. With crystals it is data and goes up every frame, exactly as before.
     const srcFrozen = state.frozen;
-    if (srcFrozen && this.crystalConfig?.enabled) {
-      for (let i = 0; i < state.count; i++) this.frozenAttrBuf[i] = srcFrozen[i] === 1 ? 1 : 0;
-    } else {
-      this.frozenAttrBuf.fill(0);
+    const liveFrozen = !!(srcFrozen && this.crystalConfig?.enabled);
+    const auxConstant = !liveFrozen && this.splatAuxValidLen >= state.count;
+    if (!auxConstant) {
+      if (this.frozenAttrBuf.length !== state.count) this.frozenAttrBuf = new Float32Array(state.count);
+      if (liveFrozen) {
+        for (let i = 0; i < state.count; i++) this.frozenAttrBuf[i] = srcFrozen![i] === 1 ? 1 : 0;
+      } else {
+        this.frozenAttrBuf.fill(0);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.splatFrozenBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, this.frozenAttrBuf, gl.DYNAMIC_DRAW);
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.splatFrozenBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.frozenAttrBuf, gl.DYNAMIC_DRAW);
 
     // v8 Phase 8a-2 (T021): the same every-frame rule applies to aGrowth. The crystal pass leaves
     // behind a shorter array sized to the frozen count, so instances past that point would read
     // stale or out-of-range data and flicker. Live particles are never scaled by growth (the
     // vertex shader only applies it under aFrozen > 0.5), so all-ones is the correct content —
     // this pass just has to own the buffer's length.
-    if (this.growthAttrBuf.length !== state.count) {
-      this.growthAttrBuf = new Float32Array(state.count);
-      this.growthAttrBuf.fill(1);
+    if (!auxConstant) {
+      if (this.growthAttrBuf.length !== state.count) {
+        this.growthAttrBuf = new Float32Array(state.count);
+        this.growthAttrBuf.fill(1);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.splatGrowthBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, this.growthAttrBuf, gl.DYNAMIC_DRAW);
+      this.splatAuxValidLen = liveFrozen ? 0 : state.count;
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.splatGrowthBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.growthAttrBuf, gl.DYNAMIC_DRAW);
 
     // v8 31.2 — the second of the two per-pass uploads invariant 6 requires. ⚠️ **Both passes, at the
     // correct size, or ANGLE drops the whole draw** — the defect that turned the preview black when
@@ -4678,6 +4736,8 @@ void main() {
     this.splatPosBuffer = null; this.splatDepthBuffer = null; this.splatQuadBuffer = null;
     this.splatVelDirBuffer = null; this.splatVelBuffer = null; this.splatColBuffer = null;
     this.splatAgeBuffer = null; this.splatFrozenBuffer = null; this.splatGrowthBuffer = null;
+    // M7 — invariant 1's rule for the skip records: they describe buffers that no longer exist.
+    this.pointTempZerosLen = 0; this.pointChannelOnesLen = 0; this.splatAuxValidLen = 0;
     this.splatChannelsBuffer = null;   // v8 31.2 — invariant 1: null every deleted handle
     if (this.temperatureBuffer) gl.deleteBuffer(this.temperatureBuffer);
     if (this.rampTexture) gl.deleteTexture(this.rampTexture);

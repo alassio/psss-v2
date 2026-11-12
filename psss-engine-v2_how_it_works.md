@@ -1347,22 +1347,25 @@ very different, and they are worth understanding together because of one shared 
 
 ### 2.1 Curl noise
 
-A **divergence-free** turbulent flow. Taking the 2D curl of a scalar noise field gives a velocity field
-with zero divergence, which means particles swirl without piling up or thinning out:
+A **divergence-free** turbulent flow. The curl of a vector field has zero divergence, which means particles
+swirl without piling up or thinning out. The field is the curl of a three-component **potential**, each
+component a 4-D simplex noise `N` of the three spatial coordinates and time, offset in time so the three are
+uncorrelated:
 
 ```
-  curl(n)(x, y) = ( ∂n/∂y , −∂n/∂x )
+  Ψ(s, t) = ( N(s, t), N(s, t + 1.3), N(s, t + 3.7) )        s = p · Scale · 0.001
+
+  curl Ψ  = ( ∂Ψ₃/∂y − ∂Ψ₂/∂z ,  ∂Ψ₁/∂z − ∂Ψ₃/∂x ,  ∂Ψ₂/∂x − ∂Ψ₁/∂y )
 ```
 
-evaluated by central differences on a 3D simplex-noise field — the third dimension is time, so the flow
-evolves:
+The partial derivatives are **analytic**: each simplex corner contributes `27·t⁴·(g·d)` with
+`t = 0.6 − |d|²`, whose derivative is `27·(−8t³(g·d)·dₓ + t⁴·gₓ)`, so each component's gradient comes with its
+value from one evaluation — three noise evaluations per particle per frame. The value is computed with exactly
+the arithmetic of the plain noise function. (The 0.6 kernel reaches slightly past the simplex that selects it, so
+the noise itself has tiny steps across some cell boundaries; an analytic gradient follows the smooth part and
+shows no spike there.)
 
-```
-  ∂n/∂x ≈ [ n(x+ε, y, t) − n(x−ε, y, t) ] / 2ε       ε = 0.5
-  ∂n/∂y ≈ [ n(x, y+ε, t) − n(x, y−ε, t) ] / 2ε
-```
-
-The offset applied is `Turbulence · curl(n)(p/Scale, t · EvolSpeed)`. So **Scale** sets the spatial
+The offset applied is `Turbulence · curl Ψ · (W + H) · 0.05` per frame, with the time advancing by `EvolSpeed`. So **Scale** sets the spatial
 size of the eddies (small = fine jitter, large = whole-figure drift), **Turbulence** the magnitude, and
 **Evol. Speed** how fast the field itself changes — at 0 the field is frozen and particles follow fixed
 streamlines, holding a distorted shape rather than boiling.
@@ -3659,6 +3662,33 @@ animation clamps a long frame to 100 ms for its speed, the readout does not — 
 single frame of the last ten seconds, the reading for a lone hitch such as a reel's preset switch, which a
 half-second p95 cannot show.
 
+**`?reel=2` makes the measurement repeatable.** It plays a fixed test reel — a measurement set of 18 presets, one or
+more per cost class (wave, curve and attractor figures; star, splat, two-pass smoke, liquid and Neon Lines drawing;
+curl noise; the physarum and fluid-advection fields, whose readbacks are synchronous) — through the ordinary reel
+presentation, held 16 s each, with a `fade` transition. For each preset it records the switch freeze (the longest
+frame in the first 3 s), then opens the readout's capture window after a 10 s settle and closes it 5 s later:
+frame rate, p50, p95 and worst frame, and the CPU and GPU milliseconds per section averaged over the window. Only
+full-screen frames are captured. The test reel is handed to the reel player directly and never enters the reel
+library. When every preset has a row the reel stops and the log is downloaded, printed to the console and kept in
+`localStorage` under `psss-perf-run-last`. The list is fixed so that logs from different machines and versions stay
+comparable; a new preset is added at the end.
+
+**The rendering context asks for the high-performance GPU** (`powerPreference: 'high-performance'`), so a machine
+with two graphics processors runs it on the faster one, and it does **not** preserve its drawing buffer: the
+browser swaps the frame instead of copying it, one full-screen copy saved per frame. The buffer is preserved only
+under automation and with `?testhook=1` or `?gldiag=1`, the cases that read the screen back after it is shown.
+
+**The trail decay is one full-screen pass.** Each frame the previous trail is copied into the other buffer and
+faded by the decay factor; both happen in one draw that writes `rgb · decay` (and the matching alpha) directly,
+with blending off, after which the blend state the following draws expect is set explicitly. With `SmoothFilter`
+the same pass also applies its 3 × 3 blur.
+
+**The particle upload sends only what a draw reads.** Every per-particle array goes to the GPU up to the draw count
+only, and a buffer whose content is constant — the zero temperatures of a preset without a material, the neutral
+per-particle channels, the splat path's frozen and growth flags without crystals — is uploaded only when the GPU copy
+is not already that constant at a sufficient length. The crystal pass, which writes some of the same buffers, marks
+them for re-upload.
+
 **The figure computation is the CPU's largest share, and three things keep it lean.** (1) The wave sum is
 computed for the whole figure at once: for one wave slot the angle `(n + phase) · FM` is linear in the particle
 index, so consecutive sines follow from a rotation recurrence (two multiplies and an add) instead of a
@@ -4907,7 +4937,7 @@ Four properties of the material system that are easy to get wrong:
 
 | System | Mathematics | Output |
 |---|---|---|
-| Curl noise | curl of 3D simplex noise, central differences | positional offset |
+| Curl noise | curl of a 4-D simplex vector potential, analytic gradient | positional offset |
 | Cohesion | local centre of mass over a spatial hash grid | positional offset |
 | Liquid field | advected free-particle pool with a decaying velocity field | positional offset (and extra particles) |
 | Dye field | advected scalar colour field with decay | **colour**, visible only through Liquid + `Tint Source = Dye` |

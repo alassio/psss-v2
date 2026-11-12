@@ -18,7 +18,8 @@
  * at state ordering.
  *
  * Two assertions:
- *   1. The fade pass sets `blendFunc` within a few lines of its own draw.
+ *   1. The trail decay pass (since 2026-11-12 ONE fused pass) draws with blending disabled and restores the old
+ *      fade's exit state after itself.
  *   2. Any method that sets a NON-default blend function and then draws also leaves `activeTexture`
  *      on unit 0 if it changed it — the sibling global-state leak, guarded here for the same reason.
  */
@@ -35,28 +36,38 @@ const pass = m => console.log(`  PASS  ${m}`);
 
 console.log('=== blendcheck: passes must set the blend state they depend on ===');
 
-// ---- 1. the trail fade pass -----------------------------------------------------------------
+// ---- 1. the trail decay pass -----------------------------------------------------------------
+// ⚠️ M6 (2026-11-12): the copy and the fade are ONE pass (`decayProgram` / `decayBlurProgram`), which writes the
+// complete decayed trail. Its two state rules are the inverse of the old fade quad's and BOTH are silent when wrong:
+//   (a) BLENDING DISABLED for its draw — under any enabled function the result combines with FBO-B's previous
+//       contents (an additive leftover would integrate the trail to white, exactly the old defect's look);
+//   (b) the old pass's EXIT state (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`, enabled, FUNC_ADD) RESTORED after it, because a
+//       later draw has been found relying on inherited state before.
 const main = rd('src/main.ts');
-const fadeIdx = main.indexOf('gl.useProgram(fadeProgram)');
-if (fadeIdx < 0) {
-  fail('could not locate the fade pass (gl.useProgram(fadeProgram)) in main.ts');
+const s0 = main.indexOf('// Step 1: Decay pass');
+const s1 = s0 < 0 ? -1 : main.indexOf("perfHud?.end('trail')", s0);
+if (s0 < 0 || s1 < 0) {
+  fail('could not locate the decay pass (Step 1 … perfHud end) in main.ts');
 } else {
-  // Look back a short window for the blendFunc that governs this draw.
-  const before = main.slice(Math.max(0, fadeIdx - 1200), fadeIdx);
-  const m = [...before.matchAll(/gl\.blendFunc\(([^)]*)\)/g)].pop();
-  if (!m) {
-    fail('the fade pass does not set blendFunc immediately before its draw — it would INHERIT '
-       + 'whatever the previous pass left, and under an additive function the fade is a NO-OP');
-  } else if (!/SRC_ALPHA\s*,\s*gl\.ONE_MINUS_SRC_ALPHA/.test(m[1])) {
-    fail(`the fade pass sets blendFunc(${m[1].trim()}) — it REQUIRES SRC_ALPHA, ONE_MINUS_SRC_ALPHA, `
-       + 'because dst\' = dst * decayFactor only holds for destination-scaling');
+  const step = main.slice(s0, s1);
+  const drawAt = step.indexOf('gl.drawArrays(');
+  const before = step.slice(0, drawAt), after = step.slice(drawAt);
+  const usesDecay = /gl\.useProgram\(decayProgram\)/.test(step) && /gl\.useProgram\(decayBlurProgram\)/.test(step);
+  const lastDisable = before.lastIndexOf('gl.disable(gl.BLEND)'), lastEnable = before.lastIndexOf('gl.enable(gl.BLEND)');
+  if (!usesDecay || drawAt < 0) {
+    fail('the decay pass does not draw through decayProgram / decayBlurProgram');
+  } else if (lastDisable < 0 || lastEnable > lastDisable) {
+    fail('the decay pass does not DISABLE blending before its draw — it writes the whole result, and under an '
+       + 'inherited blend it would combine with FBO-B\'s previous contents');
   } else {
-    pass('the fade pass sets SRC_ALPHA, ONE_MINUS_SRC_ALPHA itself');
+    pass('the decay pass draws with blending disabled (it writes the complete decayed trail)');
   }
-  if (/gl\.blendEquation\(/.test(before)) {
-    pass('and asserts blendEquation too (a leaked FUNC_REVERSE_SUBTRACT would also break it)');
+  if (/gl\.enable\(gl\.BLEND\)/.test(after) && /gl\.blendEquation\(gl\.FUNC_ADD\)/.test(after)
+      && /gl\.blendFunc\(gl\.SRC_ALPHA,\s*gl\.ONE_MINUS_SRC_ALPHA\)/.test(after)) {
+    pass('and RESTORES the old exit state (SRC_ALPHA, ONE_MINUS_SRC_ALPHA, FUNC_ADD, enabled) for the passes after it');
   } else {
-    console.log('  WARN  fade pass does not assert blendEquation; only relevant if some pass changes it');
+    fail('the decay pass does not restore SRC_ALPHA, ONE_MINUS_SRC_ALPHA / FUNC_ADD / enabled after its draw — the '
+       + 'passes after it received that state from the retired fade quad and may depend on it');
   }
 }
 

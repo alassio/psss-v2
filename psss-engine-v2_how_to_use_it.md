@@ -407,6 +407,16 @@ readout appears in the top-left corner and updates twice a second:
 
 The readout only reads; it changes nothing, so it is safe to leave on while you try presets.
 
+**To measure a machine the same way every time, add `?reel=2`** instead, e.g. `index.html?reel=2`. It plays a
+fixed **performance test reel** of 18 presets chosen to cover every kind of cost — light and heavy figures, glowing
+splats, smoke, liquid, Neon Lines, curl noise and the field effects. **Click once** to go full screen; measuring
+starts only in full screen, and a preset that passed before the click is measured on the next round. Each preset is
+held 16 seconds: the readout records the brief freeze as it appears, lets it settle for 10 seconds and measures it
+for 5. After the last one the reel stops, a text file named `psss-perf-…txt` is **downloaded**, and the same log is
+shown on screen with a **Copy** button. It takes about six minutes; the line in the bottom-left corner says how far
+it has got. The log starts with the machine's graphics card, processor threads, screen size and refresh rate, so a
+log can be read without knowing where it came from.
+
 ---
 
 ## 5. UI Basics — the Preview Grid

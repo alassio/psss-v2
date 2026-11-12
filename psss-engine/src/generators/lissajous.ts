@@ -11,7 +11,7 @@ import { resolveSym3d, type Sym3dConfig, type Sym3dOperator } from '../core/symm
 import { createAttractorState, initAttractorState, iterateAttractor, type AttractorState } from './attractors.ts';
 import type { CurlNoiseConfig, PhysarumConfig, MaterialConfig, BuoyancyConfig, SparkConfig, CrystalRenderConfig, CohesionConfig, LiquidFieldConfig } from '../presets/types.ts';
 import { CrystalPool } from '../crystal/crystal-pool.ts';
-import { curlNoise3D } from '../core/curl-noise.ts';
+import { curlNoise3DInto } from '../core/curl-noise.ts';
 import { CULL_SENTINEL } from '../core/projection.ts';
 import { hasEscapeField } from './attractors.ts';
 import { ROT_MAX_DPS } from '../core/rotation-track.ts';
@@ -155,6 +155,9 @@ function buildWaveTable(unifiedWaves: readonly WaveConfig[]): LegacyWaveAxis[][]
   }
   return table;
 }
+
+/** The curl stage's one 3-slot result buffer (see the curl block in `update()`). */
+const CURL_SCRATCH = new Float64Array(3);
 
 export class LissajousGenerator implements Generator {
   readonly id = 'lissajous';
@@ -2415,15 +2418,18 @@ export class LissajousGenerator implements Generator {
       const scale = this.curlConfig.scale * 0.001; // convert pixel space to noise space
       const t = this.curlTime;
       const dispScale = (this.canvasWidth + this.canvasHeight) * 0.05 * gamma;
+      // v8 2026-11-12: the analytic-gradient curl (`curlNoise3DInto`) into one reused 3-slot scratch — three noise
+      // evaluations per particle instead of twelve, and no array per particle (`deformcheck` §CURL).
+      const c = CURL_SCRATCH;
       for (let i = 0; i < this.particleCount; i++) {
         const idx = i * 3;
         const px = this.positions[idx]!;
         const py = this.positions[idx + 1]!;
         const pz = this.positions[idx + 2]!;
-        const [dx, dy, dz] = curlNoise3D(px, py, pz, t, scale);
-        this.positions[idx]     = px + dx * dispScale;
-        this.positions[idx + 1] = py + dy * dispScale;
-        this.positions[idx + 2] = pz + dz * dispScale;
+        curlNoise3DInto(px, py, pz, t, scale, c, 0);
+        this.positions[idx]     = px + c[0]! * dispScale;
+        this.positions[idx + 1] = py + c[1]! * dispScale;
+        this.positions[idx + 2] = pz + c[2]! * dispScale;
       }
       this.curlTime += dt * 0.001 * this.curlConfig.evolutionSpeed;
     }
