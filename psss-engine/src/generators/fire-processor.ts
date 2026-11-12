@@ -1,5 +1,8 @@
 import type { BuoyancyConfig } from '../presets/types.ts';
-import { curl2D } from './simplex-noise.ts';
+import { curl2DInto } from './simplex-noise.ts';
+
+/** One reused result slot per octave — the three `curl2D` calls used to return a new array each, per hot particle. */
+const C1 = new Float64Array(2), C2 = new Float64Array(2), C3 = new Float64Array(2);
 
 export class FireProcessor {
   private fireOffsetX: Float32Array;
@@ -65,12 +68,12 @@ export class FireProcessor {
           const normalizedAge = Math.min(age * 0.5, 1.0); // saturates at ~2 seconds
           const turbulenceResponse = (0.3 + 0.9 * normalizedAge) * (0.5 + 0.5 * temp);
 
-          // Octave 1 (large): slow bending of entire flame body
-          const [cx1, cy1] = curl2D(px * 0.003, py * 0.003, this.time * 0.25);
-          // Octave 2 (medium): rolling tongues and lobes
-          const [cx2, cy2] = curl2D(px * 0.012, py * 0.012, this.time * 0.8);
-          // Octave 3 (fine): edge flicker and tip breakup
-          const [cx3, cy3] = curl2D(px * 0.04, py * 0.04, this.time * 2.5);
+          // Octave 1 (large): slow bending of entire flame body; 2 (medium): rolling tongues and lobes;
+          // 3 (fine): edge flicker and tip breakup.
+          curl2DInto(px * 0.003, py * 0.003, this.time * 0.25, C1);
+          curl2DInto(px * 0.012, py * 0.012, this.time * 0.8, C2);
+          curl2DInto(px * 0.04, py * 0.04, this.time * 2.5, C3);
+          const cx1 = C1[0]!, cy1 = C1[1]!, cx2 = C2[0]!, cy2 = C2[1]!, cx3 = C3[0]!, cy3 = C3[1]!;
 
           // Weighted sum (60% large, 30% medium, 10% fine)
           const curlX = cx1 * 0.6 + cx2 * 0.3 + cx3 * 0.1;

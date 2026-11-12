@@ -112,10 +112,41 @@ export class BloomProcessor {
     this.rebuildMips();
   }
 
+  /** The glow pyramid and its composite into `outputFBO` — the path used when no grade follows (or under `?gldiag`). */
   apply(sceneTex: WebGLTexture, outputFBO: WebGLFramebuffer | null): void {
     const gl = this.gl;
-    if (!gl || !this.enabled || this.mipTextures.length === 0) return;
+    if (!gl || !this.buildPyramid(sceneTex)) return;
 
+    // Step 4: Composite — scene + bloom * intensity → output
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO);
+    gl.viewport(0, 0, this.width, this.height);
+    gl.useProgram(this.compositeProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+    gl.uniform1i(this.uCompScene, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.mipTextures[0]!);
+    gl.uniform1i(this.uCompBloom, 1);
+    gl.uniform1f(this.uCompIntensity, this.intensity);
+    this.drawQuad();
+
+    // Restore unit 0 — `activeTexture` is global GL state and this method leaves it on unit 1.
+    // Defensive, not a fix: every current consumer downstream (`toneMap.apply`, and both blit paths in
+    // `main.ts`) selects its own unit before binding, so nothing reads the leak today. It is the same
+    // rule `blendcheck` enforces on `hdr-particle.ts`, and the reason it exists there is that the
+    // obligation is invisible at the call site — a future pass that binds without selecting a unit
+    // would write into unit 1 and sample black, with no GL error.
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  /**
+   * G5 (2026-11-12) — the bright pass, downsample and upsample only: the glow is left in `glowTexture()` for the grade to
+   * add (`ToneMap.apply`'s `bloomTex`, the composite's own formula), which saves the composite's full-resolution write
+   * and the grade's read of it. Returns false when bloom is off or has no pyramid. Leaves unit 0 active.
+   */
+  buildPyramid(sceneTex: WebGLTexture): boolean {
+    const gl = this.gl;
+    if (!gl || !this.enabled || this.mipTextures.length === 0) return false;
     // Step 1: Bright pass — extract luminance > threshold into mip[0]
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mipFBOs[0]!);
     gl.viewport(0, 0, this.mipWidths[0]!, this.mipHeights[0]!);
@@ -153,27 +184,17 @@ export class BloomProcessor {
       this.drawQuad();
     }
     gl.disable(gl.BLEND);
-
-    // Step 4: Composite — scene + bloom * intensity → output
-    gl.bindFramebuffer(gl.FRAMEBUFFER, outputFBO);
-    gl.viewport(0, 0, this.width, this.height);
-    gl.useProgram(this.compositeProgram);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
-    gl.uniform1i(this.uCompScene, 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.mipTextures[0]!);
-    gl.uniform1i(this.uCompBloom, 1);
-    gl.uniform1f(this.uCompIntensity, this.intensity);
-    this.drawQuad();
+    return true;
+  }
 
-    // Restore unit 0 — `activeTexture` is global GL state and this method leaves it on unit 1.
-    // Defensive, not a fix: every current consumer downstream (`toneMap.apply`, and both blit paths in
-    // `main.ts`) selects its own unit before binding, so nothing reads the leak today. It is the same
-    // rule `blendcheck` enforces on `hdr-particle.ts`, and the reason it exists there is that the
-    // obligation is invisible at the call site — a future pass that binds without selecting a unit
-    // would write into unit 1 and sample black, with no GL error.
-    gl.activeTexture(gl.TEXTURE0);
+  /** The finished glow (mip 0 after the upsample chain) and its intensity — read after `buildPyramid`. */
+  glowTexture(): WebGLTexture | null {
+    return this.mipTextures[0] ?? null;
+  }
+
+  glowIntensity(): number {
+    return this.intensity;
   }
 
   isEnabled(): boolean {

@@ -3945,7 +3945,16 @@ async function init() {
     if (bloom.isEnabled() || toneMap.isEnabled()) {
       let srcTex = presentSource;
 
-      if (bloom.isEnabled()) {
+      // ⚠️ G5 (2026-11-12): with bloom AND the grade on, the glow is added INSIDE the grade (`ToneMap.apply`'s
+      // `bloomTex`, bloom's own composite formula) — the composite's full-resolution half-float write into `postFBO`
+      // and the grade's read of it are skipped. Under `?gldiag=1` the old path stays: its probe scans `postFBO`.
+      const fuseGlow = bloom.isEnabled() && toneMap.isEnabled() && !glDiagEnabled;
+      let glowTex: WebGLTexture | null = null;
+      if (fuseGlow) {
+        perfHud?.begin('glow');
+        if (bloom.buildPyramid(srcTex)) glowTex = bloom.glowTexture();
+        perfHud?.end('glow');
+      } else if (bloom.isEnabled()) {
         // Bloom composites scene + bloom → postFBO
         perfHud?.begin('glow');
         bloom.apply(srcTex, postFBO.fbo);
@@ -3954,9 +3963,9 @@ async function init() {
       }
 
       if (toneMap.isEnabled()) {
-        // Tone map to screen
+        // Tone map to screen (adding the glow itself when fused)
         perfHud?.begin('grade');
-        toneMap.apply(srcTex, null);
+        toneMap.apply(srcTex, null, glowTex, glowTex ? bloom.glowIntensity() : 0);
         perfHud?.end('grade');
       } else {
         // Blit post-processed to screen

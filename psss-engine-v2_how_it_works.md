@@ -3688,6 +3688,26 @@ quarter of the canvas resolution in each direction: a small GPU pass first avera
 displacement field, so a read moves a sixteenth of the data (about 2 MB instead of 32 MB at 1788 × 1118), and the
 particles sample that smooth field bilinearly.
 
+**The smoke and flame turbulence** — buoyancy's three octaves of `curl2D`, four 3-D simplex evaluations each, per hot
+particle — reads flat gradient and permutation tables and writes into reused slots, the same arithmetic in the same
+order. Its central difference spans half a noise cell on purpose: that smoothing is part of the look, and an analytic
+gradient (about three times cheaper) gives visibly rougher smoke and flame edges.
+
+**The escape-time flow takes at most one step per particle per frame.** Its step count used to follow the frame
+time, and its cost followed the step count, so a Julia or Mandelbrot flow preset was bistable: started at full speed
+it held its frame rate, but after one slow frame it took several steps per particle, stayed slow and could stick at
+half the frame rate. With the cap nothing changes at 60 fps and above; below that, the contours drift more slowly in
+real time instead of the frame rate collapsing.
+
+**The glow is added inside the grade.** With bloom and the grade both on, the bloom pyramid is built as before
+and the grade adds `glow · intensity` to its input itself — the formula bloom's own composite used — so the
+composite's full-resolution write and the grade's read of it are saved. Without a grade, bloom composites as before.
+
+**Round splats are drawn as octagons.** When a material has no flame stretch, its splat kernel is the circle
+`r ≤ 1`, so the quad's corners were shaded and then discarded; those splats are drawn as the octagon around the unit
+circle (17 % less area), and a fragment outside the circle is discarded before the kernels are evaluated. Stretched
+flame splats keep the quad: their tapered shape can reach the corners.
+
 **The trail decay is one full-screen pass.** Each frame the previous trail is copied into the other buffer and
 faded by the decay factor; both happen in one draw that writes `rgb · decay` (and the matching alpha) directly,
 with blending off, after which the blend state the following draws expect is set explicitly. With `SmoothFilter`

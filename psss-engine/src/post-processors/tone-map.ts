@@ -33,6 +33,10 @@ export class ToneMapProcessor {
   // uploaded from, never the program, so it does not invalidate them — and a `toneMapEnabled`/
   // `toneMapCurve` change goes through dispose+init (see `applyCustomParam`), which re-resolves them.
   private uInput: WebGLUniformLocation | null = null;
+  /** G5 (2026-11-12) — the glow, added here instead of by bloom's composite pass. See `apply`. */
+  private uBloom: WebGLUniformLocation | null = null;
+  private uBloomIntensity: WebGLUniformLocation | null = null;
+  private uBloomOn: WebGLUniformLocation | null = null;
   private uCurve: WebGLUniformLocation | null = null;
   private uExposure: WebGLUniformLocation | null = null;
   private uLift: WebGLUniformLocation | null = null;
@@ -59,6 +63,9 @@ export class ToneMapProcessor {
     this.quadVao = this.createQuad(gl);
 
     this.uInput = gl.getUniformLocation(this.program, 'uInput');
+    this.uBloom = gl.getUniformLocation(this.program, 'uBloom');
+    this.uBloomIntensity = gl.getUniformLocation(this.program, 'uBloomIntensity');
+    this.uBloomOn = gl.getUniformLocation(this.program, 'uBloomOn');
     this.uCurve = gl.getUniformLocation(this.program, 'uCurve');
     this.uExposure = gl.getUniformLocation(this.program, 'uExposure');
     this.uLift = gl.getUniformLocation(this.program, 'uLift');
@@ -74,7 +81,13 @@ export class ToneMapProcessor {
     this.height = height;
   }
 
-  apply(inputTex: WebGLTexture, outputFBO: WebGLFramebuffer | null): void {
+  /**
+   * ⚠️ **G5 (2026-11-12): `bloomTex` given ⇒ the glow is ADDED HERE**, `scene + bloom · intensity` — exactly bloom's
+   * composite formula — so the composite's full-resolution half-float write and this pass's read of it are saved, one
+   * full-screen round trip per frame. Without it the input is read as before. Invariant 4: the glow sampler is
+   * assigned unit 1 and bound EVERY call — to the input itself when there is no glow — and unit 0 is restored.
+   */
+  apply(inputTex: WebGLTexture, outputFBO: WebGLFramebuffer | null, bloomTex: WebGLTexture | null = null, bloomIntensity = 0): void {
     const gl = this.gl;
     if (!gl || !this.enabled || !this.program) return;
 
@@ -83,6 +96,11 @@ export class ToneMapProcessor {
     gl.disable(gl.BLEND);
     gl.useProgram(this.program);
 
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, bloomTex ?? inputTex);
+    gl.uniform1i(this.uBloom, 1);
+    gl.uniform1f(this.uBloomIntensity, bloomIntensity);
+    gl.uniform1i(this.uBloomOn, bloomTex ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
     gl.uniform1i(this.uInput, 0);
@@ -148,6 +166,9 @@ const TONEMAP_FRAG = `#version 300 es
 precision highp float;
 
 uniform sampler2D uInput;
+uniform sampler2D uBloom;
+uniform float uBloomIntensity;
+uniform int uBloomOn;
 uniform int uCurve;
 uniform float uExposure;
 uniform vec3 uLift;
@@ -273,6 +294,8 @@ vec3 liftGammaGain(vec3 c, vec3 lift, vec3 gamma, vec3 gain) {
 
 void main() {
   vec3 hdr = texture(uInput, vUv).rgb;
+  // G5: the glow, with the composite pass's own formula (it was scene + bloom * intensity into a half-float target).
+  if (uBloomOn == 1) hdr = hdr + texture(uBloom, vUv).rgb * uBloomIntensity;
 
   // Exposure
   hdr *= uExposure;

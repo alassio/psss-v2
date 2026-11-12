@@ -1533,6 +1533,9 @@ function pickRespawn(grid: EscapeGrid, out: [number, number]): void {
  * carried by taking `floor` plus a probabilistic extra step, so speed 0.3 genuinely runs at 0.3× rather
  * than rounding to a stop or to full speed.
  */
+/** See `advanceEscapeFlow`: the most flow steps a particle takes in one frame. */
+const FLOW_MAX_STEPS = 1;
+
 function advanceEscapeFlow(
   s: AttractorState, count: number, grid: EscapeGrid, dtScale: number,
   ray: boolean, outEscape: Float32Array | undefined,
@@ -1542,7 +1545,17 @@ function advanceEscapeFlow(
   const respawn: [number, number] = [0, 0];
 
   for (let i = 0; i < count; i++) {
-    const steps = whole + (pseudoRandom() < frac ? 1 : 0);
+    /*
+     * ⚠️ **AT MOST `FLOW_MAX_STEPS` (1) STEP PER PARTICLE PER FRAME** (owner, 2026-11-12). The step count followed the
+     * frame time (`dtScale = dt / 16.667`), and the cost follows the step count — so these presets were BISTABLE: started
+     * fast they held 60 fps (`Mandelbrot River Glow`: one step, `figure` 14.7 ms on the owner's fast machine); after one
+     * slow frame (a preset switch) they took two or more steps, ~29–35 ms, and the next frame was slow again — stuck at
+     * 26–32 fps. A cap of 2 does NOT break that (two steps fill a 33 ms frame); 1 does. ⚠️ At 60 fps and above
+     * (`dtScale ≤ 1`) nothing changes — the same draw, the same steps, bit-identical; below 60 fps the contours drift
+     * more slowly in real time instead of the frame rate collapsing. The `pseudoRandom` draw is still taken, so the
+     * respawn sequence is unchanged.
+     */
+    const steps = Math.min(FLOW_MAX_STEPS, whole + (pseudoRandom() < frac ? 1 : 0));
     let x = s.x[i]!;
     let y = s.y[i]!;
     for (let n = 0; n < steps; n++) {

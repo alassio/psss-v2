@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.9.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.8.9](https://github.com/alassio/psss-v2/releases/tag/v1.8.9)** — **Lava Flow and the other flow-force presets run smoothly.** The Translation Map force is now read back from the graphics card at a quarter of the resolution, so each read moves a sixteenth of the data; on the test machine **Lava Flow** went from 55 to 98 fps and its worst frames from 92 ms to 25 ms.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.9)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.11.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.11](https://github.com/alassio/psss-v2/releases/tag/v1.8.11)** — **Faster fire, smoke and glow, and the Julia and Mandelbrot flow presets no longer get stuck at half speed.** The smoke and flame turbulence costs less on every fire preset, the glow is one full-screen pass cheaper on almost every preset, and the escape-time flow presets reach their full frame rate reliably. Nothing looks different at normal frame rates.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.11)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)

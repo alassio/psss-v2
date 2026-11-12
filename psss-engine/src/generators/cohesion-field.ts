@@ -301,7 +301,9 @@ export class CohesionField {
           const cx = (sX[a]! * w00 + sX[b]! * w10 + sX[c]! * w01 + sX[d]! * w11) / mLocal;
           const cy = (sY[a]! * w00 + sY[b]! * w10 + sY[c]! * w01 + sY[d]! * w11) / mLocal;
           const dx = cx - x, dy = cy - y;
-          const dist = Math.hypot(dx, dy);
+          // `sqrt` of the squares, not `Math.hypot` (2026-11-12): −12 % of this update, measured; values move at rounding
+          // level only — `hypot` merely guards an overflow these pixel-scale distances cannot reach.
+          const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 1e-6) {
             // The deadband ramp: full push outside `band`, tapering linearly to 0 at the centroid itself.
             const ramp = dist < band ? dist / band : 1;
@@ -316,7 +318,7 @@ export class CohesionField {
       // random one: a non-finite value here can only have come from a non-finite `positions` upstream, and
       // holding a NaN offset would take the particle out of the figure for the rest of the session.
       if (!Number.isFinite(nx) || !Number.isFinite(ny)) { nx = 0; ny = 0; }
-      const len = Math.hypot(nx, ny);
+      const len = Math.sqrt(nx * nx + ny * ny);
       if (len > cap) { const k = cap / len; nx *= k; ny *= k; }
       ox[i] = nx; oy[i] = ny;
     }

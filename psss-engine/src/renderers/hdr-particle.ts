@@ -991,6 +991,9 @@ void main() {
 
   // Circular shape (core + halo, respects user parameters)
   float r = length(vLocalUV);
+  // G2 (2026-11-12): with no flame blend the shape below is circularShape * step(r, 1.0), i.e. 0 past the circle,
+  // which the shape < 0.01 test discards after BOTH kernels have run — so discard it here, before them. Same fragments.
+  if (blend == 0.0 && r > 1.0) discard;
   float coreZone = smoothstep(0.3, 0.25, r);
   // Effective falloff = material exponent scaled by the film look's glow (see uGlow above).
   float gSplat = (uGlow > 0.0) ? uGlow : 4.0;
@@ -1298,6 +1301,14 @@ const LIQUID_HALF_RES_OFF = 28;
 function fitTo(a: Float32Array, len: number): Float32Array {
   return a.length > len ? a.subarray(0, len) : a;
 }
+
+/**
+ * G2 (2026-11-12) — the splat octagon: the regular octagon CIRCUMSCRIBING the unit circle, i.e. the [-1, 1] square
+ * with its corners cut at `tan(22.5°)`. Its edges are tangent to the circle, so it contains every point with r ≤ 1
+ * and drops only points with r > 1 — what the circular kernel discards. Eight vertices in order, for a TRIANGLE_FAN.
+ */
+const OCT_K = Math.tan(Math.PI / 8);
+const SPLAT_OCTAGON = [1, -OCT_K, 1, OCT_K, OCT_K, 1, -OCT_K, 1, -1, OCT_K, -1, -OCT_K, -OCT_K, -1, OCT_K, -1];
 
 export class HDRParticleRenderer implements Renderer {
   readonly id = 'hdr-particle';
@@ -1970,9 +1981,10 @@ export class HDRParticleRenderer implements Renderer {
     this.splatVao = gl.createVertexArray();
     gl.bindVertexArray(this.splatVao);
 
-    // Static quad template (TRIANGLE_STRIP: BL, BR, TL, TR)
+    // Static quad template (TRIANGLE_STRIP: BL, BR, TL, TR), then — G2 (2026-11-12) — the OCTAGON circumscribing the
+    // unit circle (TRIANGLE_FAN, vertices 4…11): the square with its corners cut, 17 % less area. See `SPLAT_OCTAGON`.
     const quadBuffer = gl.createBuffer()!;
-    const quadData = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const quadData = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1, ...SPLAT_OCTAGON]);
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, quadData, gl.STATIC_DRAW);
     const aQuadPos = gl.getAttribLocation(this.splatProgram, 'aQuadPos');
@@ -4243,6 +4255,14 @@ void main() {
 
     // uFlameParams: vec4(expansion, velocityStretch, taperStrength, 0)
     const velocityStretch = config.velocityStretch ?? 0;
+    /*
+     * ⚠️ G2 (2026-11-12) — **the OCTAGON only when the kernel is the CIRCLE**: the shader's `blend` is
+     * `clamp(velocityStretch, 0, 1)`, and at 0 the shape is `circularShape * step(r, 1)`, so every pixel the octagon
+     * drops (all with r > 1) was discarded anyway — the same fragments survive, 17 % fewer are shaded. A flame kernel
+     * (`blend` > 0) is taller and tapered and can reach the corners, so it keeps the quad. The crystal pass shares
+     * this VAO and always draws the quad (vertices 0…3).
+     */
+    const octagon = velocityStretch <= 0;
     const taperStrength = Math.min(velocityStretch, 1.0) * 0.7;
     gl.uniform4f(this.splatUFlameExpansion, this.flameExpansion, velocityStretch, taperStrength, 0);
 
@@ -4332,7 +4352,8 @@ void main() {
       gl.uniform1i(uRenderPass, 0);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, state.count);
+      if (octagon) gl.drawArraysInstanced(gl.TRIANGLE_FAN, 4, 8, state.count);
+      else gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, state.count);
     }
 
     {
@@ -4346,7 +4367,8 @@ void main() {
       } else {
         gl.blendFunc(gl.ONE, gl.ONE);
       }
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, state.count);
+      if (octagon) gl.drawArraysInstanced(gl.TRIANGLE_FAN, 4, 8, state.count);
+      else gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, state.count);
       gl.bindVertexArray(null);
     }
   }
