@@ -162,6 +162,9 @@ export class PhysarumProcessor {
   private fboB: WebGLFramebuffer | null = null;
   // RGBA+FLOAT readback — gl.RED+gl.FLOAT is not guaranteed by WebGL2 spec, use RGBA
   private readbackBuf: Float32Array = new Float32Array(TRAIL_SIZE * TRAIL_SIZE * 4);
+  /** G4b (2026-11-12) — the ASYNC trail readback's PIXEL_PACK buffer and fence. See `readbackTrail`. */
+  private packBuffer: WebGLBuffer | null = null;
+  private packSync: WebGLSync | null = null;
   private readbackFrame = 0;
   // Per-particle persistent headings (angle in radians) — survive across frames
   private headings: Float32Array = new Float32Array(0);
@@ -366,6 +369,10 @@ export class PhysarumProcessor {
   dispose(): void {
     const gl = this.gl;
     if (!gl) return;
+    // G4b — invariant 1: the async readback's buffer and fence.
+    if (this.packBuffer) gl.deleteBuffer(this.packBuffer);
+    if (this.packSync) gl.deleteSync(this.packSync);
+    this.packBuffer = null; this.packSync = null;
     if (this.depositProg) gl.deleteProgram(this.depositProg);
     if (this.depositVAO) gl.deleteVertexArray(this.depositVAO);
     if (this.depositVBO) gl.deleteBuffer(this.depositVBO);
@@ -469,23 +476,52 @@ export class PhysarumProcessor {
     // rather than in a post-processing chain, so the set of things that follow it is wide.
     gl.activeTexture(gl.TEXTURE0);
 
-    // T005: readback every 4 frames
+    // T005: readback every 4 frames — G4b: a finished read is collected every frame (a poll, never a wait).
+    this.collectTrail(gl);
     this.readbackFrame++;
     if (this.readbackFrame % 4 === 0) {
       this.readbackTrail(gl);
     }
   }
 
-  // T005: read trail texture back to CPU
+  /*
+   * T005: read trail texture back to CPU.
+   *
+   * ⚠️ **ASYNCHRONOUS since 2026-11-12 (G4b).** The synchronous `readPixels` ran INSIDE `generator.update()` every 4th
+   * frame and waited for every queued GPU command — it is why `Physarum Flower`'s `figure` row carried GPU time
+   * (2.8 ms on the owner's integrated-GPU machine). Now the read lands in a PIXEL_PACK buffer behind a fence and
+   * `collectTrail` copies it into `readbackBuf` (the one array `sampleTrail` reads) once the fence has signalled.
+   */
   private readbackTrail(gl: WebGL2RenderingContext): void {
+    if (this.packSync) return;
     const savedFBO = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboA);
+    if (!this.packBuffer) {
+      this.packBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, this.readbackBuf.byteLength, gl.STREAM_READ);
+    } else {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+    }
     // WebGL2 only guarantees RGBA+FLOAT readback from float FBOs, not RED+FLOAT
-    gl.readPixels(0, 0, TRAIL_SIZE, TRAIL_SIZE, gl.RGBA, gl.FLOAT, this.readbackBuf);
+    gl.readPixels(0, 0, TRAIL_SIZE, TRAIL_SIZE, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.packSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, savedFBO);
     // A debug block used to live here, walking the entire 1 M-float readback buffer every 240th
     // readback purely to `console.log` one maximum. Removed 2026-08-12 (triage H3) — see the matching
     // note in `fluid-advection.ts`.
+  }
+
+  /** G4b — copy a finished trail read into `readbackBuf`; a poll of the fence, never a wait. */
+  private collectTrail(gl: WebGL2RenderingContext): void {
+    if (!this.packSync || !this.packBuffer) return;
+    if (gl.getSyncParameter(this.packSync, gl.SYNC_STATUS) !== gl.SIGNALED) return;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.readbackBuf);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.deleteSync(this.packSync);
+    this.packSync = null;
   }
 
   // T005: sample readback buffer bilinearly (stride 4 — RGBA readback, red channel only)

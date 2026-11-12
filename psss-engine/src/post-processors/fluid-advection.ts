@@ -221,6 +221,9 @@ export class FluidAdvectionProcessor {
 
   // Velocity readback — RGBA16F readback requires Uint16Array (half-float on CPU)
   private velReadbackBuf: Uint16Array = new Uint16Array(FLUID_SIZE * FLUID_SIZE * 4);
+  /** G4b (2026-11-12) — the ASYNC velocity readback's PIXEL_PACK buffer and fence. See `readbackVelocity`. */
+  private velPackBuffer: WebGLBuffer | null = null;
+  private velPackSync: WebGLSync | null = null;
   private readbackFrame = 0;
 
   private config: FluidAdvectionConfig = { blend: 0, returnForce: 2.0 };
@@ -419,6 +422,10 @@ export class FluidAdvectionProcessor {
     if (this.splatVAO) gl.deleteVertexArray(this.splatVAO);
     if (this.splatVBO) gl.deleteBuffer(this.splatVBO);
     if (this.splatVelVBO) gl.deleteBuffer(this.splatVelVBO);
+    // G4b — invariant 1: the async readback's buffer and fence.
+    if (this.velPackBuffer) gl.deleteBuffer(this.velPackBuffer);
+    if (this.velPackSync) gl.deleteSync(this.velPackSync);
+    this.velPackBuffer = null; this.velPackSync = null;
     [this.fboVelA, this.fboVelB, this.fboVelC, this.fboP0, this.fboP1, this.fboDiv]
       .forEach(f => { if (f) gl.deleteFramebuffer(f); });
     [this.velTexA, this.velTexB, this.velTexC, this.presTex0, this.presTex1, this.divTex]
@@ -492,22 +499,53 @@ export class FluidAdvectionProcessor {
     // the wave figure through its own wake. Omitting it here is the failure mode that costs nothing visible:
     // the field simulates, the pool renders, and every sample reads the zeros `velReadbackBuf` is born with,
     // so a completely still pool is the ONLY symptom (invariant 13 behind a second gate).
+    // G4b: a finished read is collected EVERY frame (a poll, never a wait), and a new one issued on the 2nd frame.
+    this.collectVelocity(gl);
     if (this.readbackFrame % 2 === 0 && (this.config.blend > 0 || this.poolActive)) {
       this.readbackVelocity(gl);
     }
   }
 
-  // T009: read velocity back to CPU
+  /*
+   * T009: read velocity back to CPU.
+   *
+   * ⚠️ **ASYNCHRONOUS since 2026-11-12 (G4b).** The synchronous `readPixels` waited for every queued GPU command every
+   * 2nd frame — on the owner's integrated-GPU machine `The Real Super Man` (fluid advection) ran at 32 fps with
+   * p95 67 ms. Now the read lands in a PIXEL_PACK buffer behind a fence and `collectVelocity` copies it into
+   * `velReadbackBuf` (the one array `sampleVelocity` reads) once the fence has signalled — one or two frames later.
+   * A new read is issued only when the previous one has been collected.
+   */
   private readbackVelocity(gl: WebGL2RenderingContext): void {
+    if (this.velPackSync) return;
     const savedFBO = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboVelA);
-    gl.readPixels(0, 0, FLUID_SIZE, FLUID_SIZE, gl.RGBA, gl.HALF_FLOAT, this.velReadbackBuf);
+    if (!this.velPackBuffer) {
+      this.velPackBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.velPackBuffer);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, this.velReadbackBuf.byteLength, gl.STREAM_READ);
+    } else {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.velPackBuffer);
+    }
+    gl.readPixels(0, 0, FLUID_SIZE, FLUID_SIZE, gl.RGBA, gl.HALF_FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.velPackSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, savedFBO);
     // A debug block used to live here, walking all 262 144 texels and hand-decoding two half-float
     // channels each (~500 000 `halfToFloat` calls) every 240th readback, purely to `console.log` one
     // maximum. Removed 2026-08-12 (triage H3) — a guaranteed frame hitch on a fixed schedule, in
     // shipped code, for a number nobody reads. If it is needed again, gate it behind a debug flag and
     // sample a stride rather than every texel.
+  }
+
+  /** G4b — copy a finished velocity read into `velReadbackBuf`; a poll of the fence, never a wait. */
+  private collectVelocity(gl: WebGL2RenderingContext): void {
+    if (!this.velPackSync || !this.velPackBuffer) return;
+    if (gl.getSyncParameter(this.velPackSync, gl.SYNC_STATUS) !== gl.SIGNALED) return;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.velPackBuffer);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.velReadbackBuf);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.deleteSync(this.velPackSync);
+    this.velPackSync = null;
   }
 
   // T009: scatter particle velocities into the fluid field as initial seed

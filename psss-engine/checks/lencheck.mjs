@@ -240,5 +240,41 @@ chk('the sampler unit is assigned every render and activeTexture is restored to 
   /gl\.uniform1i\(this\.uHist, HIST_UNIT\);/.test(neon) && /gl\.activeTexture\(gl\.TEXTURE0\);/.test(neon),
   'a sampler left on unit 0, or a unit left active, is the multi-sampler black frame');
 
+/*
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════════
+ * G4b (2026-11-12) — NO SYNCHRONOUS readPixels ON THE PER-FRAME PATH
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * A `readPixels` into a CPU array waits for every queued GPU command; three of them (TransMap force, fluid
+ * advection, physarum) made `Lava Flow` stall to 67–200 ms on the owner's machines. Every one now reads into a
+ * PIXEL_PACK buffer (the last argument is the byte offset `0`) behind a fence. The ONLY exemptions are the opt-in
+ * `?gldiag=1` diagnostics in `main.ts`, which flush by design. A text scan over every `src` file, comments stripped.
+ */
+{
+  const { readdirSync, statSync } = await import('node:fs');
+  const files = [];
+  const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.ts')) files.push(p); } };
+  walk(SRC);
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  const sync = [];
+  for (const f of files) {
+    const body = strip(readFileSync(f, 'utf8'));
+    for (const m of body.matchAll(/gl\.readPixels\(([^;]*?)\);/g)) {
+      const last = m[1].split(',').pop().trim();
+      if (last === '0') continue;                                   // into a PIXEL_PACK buffer — asynchronous
+      const rel = f.slice(SRC.length).replace(/\\/g, '/');
+      if (rel === 'main.ts' && /glDiagBuf/.test(last)) continue;      // ?gldiag=1 diagnostics, flush by design
+      sync.push(`${rel}: readPixels(…, ${last})`);
+    }
+  }
+  chk('no synchronous readPixels outside the ?gldiag=1 diagnostics — every per-frame read goes to a PIXEL_PACK buffer',
+    sync.length === 0, sync.length ? sync.join(' | ') : `${files.length} src files scanned`);
+  // Seed: the scan must SEE a synchronous read — the force field's pre-G4b line, fed through the same test.
+  const seeded = 'gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, this.rgbaBuffer);';
+  const hit = [...seeded.matchAll(/gl\.readPixels\(([^;]*?)\);/g)].some((m) => m[1].split(',').pop().trim() !== '0');
+  chk('CALIBRATION: the scan flags a synchronous readPixels (the force field\'s pre-G4b line)', hit,
+    'a scan that cannot see the defect it guards passes vacuously');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

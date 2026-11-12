@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.7.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.8.7](https://github.com/alassio/psss-v2/releases/tag/v1.8.7)** — **Less work per frame on every machine, and a built-in performance test.** Curl-noise presets compute their swirl two to four times faster, every frame is one full-screen pass lighter, the particle upload to the graphics card sends only what is drawn, and the page asks for the faster graphics card on machines that have two. Add `?reel=2` to the address to measure any machine the same way and get a log file.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.7)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.8.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.8](https://github.com/alassio/psss-v2/releases/tag/v1.8.8)** — **No more periodic stalls on the presets that read data back from the graphics card.** Presets with a Translation Map force (such as **Lava Flow**), with fluid advection (such as **The Real Super Man**) or with physarum (such as **Physarum Flower**) no longer pause every few frames while the graphics card catches up; and the performance test log now reports the screen's refresh rate correctly.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.8)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)

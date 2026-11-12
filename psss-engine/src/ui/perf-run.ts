@@ -75,7 +75,6 @@ export class PerfRun {
   private capStart = 0;
   private captured = false;
   private done = false;
-  private minDt = Infinity;
   private readonly status: HTMLDivElement;
   private readonly started = new Date();
   /** Preset switches seen in full screen — the backstop that ends the run after `MAX_ROUNDS` rounds of the reel. */
@@ -95,7 +94,6 @@ export class PerfRun {
   /** Once per main-loop frame, with the UNCLAMPED frame interval. */
   frame(now: number, dt: number): void {
     if (this.done) return;
-    if (Number.isFinite(dt) && dt > 0 && dt < this.minDt) this.minDt = dt;
     const name = this.src.presetName();
     if (name !== this.cur) {
       if (this.capturing) { this.hud.stopCapture(); this.capturing = false; }   // a switch mid-capture: discard
@@ -148,7 +146,9 @@ export class PerfRun {
       `PSSS performance test reel — ${this.started.toISOString()}`,
       `machine: ${navigator.userAgent}`,
       `gpu: ${this.hud.gpuName()} | gpu timing: ${anyGpu ? 'yes' : 'n/a'} | cpu threads: ${navigator.hardwareConcurrency ?? '?'}`
-        + ` | screen ${screen.width}x${screen.height} @ ${window.devicePixelRatio}x | refresh ~${Number.isFinite(this.minDt) ? (1000 / this.minDt).toFixed(0) : '?'} Hz`,
+        // ⚠️ The refresh is the FASTEST preset's typical (p50) frame — at vsync that IS the refresh interval. The single
+        // shortest frame read 294 Hz on a 120 Hz screen (one early frame); a log line that wrong misleads every reading.
+        + ` | screen ${screen.width}x${screen.height} @ ${window.devicePixelRatio}x | refresh ~${this.refreshHz()} Hz`,
       `per preset: switch freeze = longest frame in the first ${SWITCH_WINDOW_MS / 1000} s; then ${SETTLE_MS / 1000} s settle, ${MEASURE_MS / 1000} s measured, full screen only`,
       '',
       ['preset'.padEnd(24), 'canvas'.padEnd(10), 'fps'.padStart(6), 'p50'.padStart(6), 'p95'.padStart(6), 'worst'.padStart(6),
@@ -163,6 +163,11 @@ export class PerfRun {
     }
     lines.push('', 'JSON:', JSON.stringify({ started: this.started.toISOString(), rows: [...this.rows.values()] }));
     return lines.join('\n');
+  }
+
+  private refreshHz(): string {
+    const p50s = [...this.rows.values()].map((r) => r.p50).filter((v) => v > 0);
+    return p50s.length ? (1000 / Math.min(...p50s)).toFixed(0) : '?';
   }
 
   private finish(): void {

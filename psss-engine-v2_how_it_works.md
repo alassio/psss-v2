@@ -3678,6 +3678,13 @@ with two graphics processors runs it on the faster one, and it does **not** pres
 browser swaps the frame instead of copying it, one full-screen copy saved per frame. The buffer is preserved only
 under automation and with `?testhook=1` or `?gldiag=1`, the cases that read the screen back after it is shown.
 
+**No reading back from the graphics card waits for it.** Three effects read GPU data back for the processor: the
+Translation Map force (the whole displacement field, every 4th frame), fluid advection (its velocity field, every
+2nd frame) and physarum (its trail, every 4th frame). Each read goes into a GPU-side pixel buffer behind a fence;
+every frame the fence is checked without waiting, and once it has signalled the data is copied to the array the
+effect samples. The data is therefore one or two frames older than the read — the force field was already up to
+four frames old by design — and the frame never stalls on the graphics card.
+
 **The trail decay is one full-screen pass.** Each frame the previous trail is copied into the other buffer and
 faded by the decay factor; both happen in one draw that writes `rgb · decay` (and the matching alpha) directly,
 with blending off, after which the blend state the following draws expect is set explicitly. With `SmoothFilter`

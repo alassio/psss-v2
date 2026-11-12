@@ -65,6 +65,16 @@ export class TransMapForceField {
   /** Reused readback FBO, and the texture currently attached to it. See `readback()`. */
   private readbackFBO: WebGLFramebuffer | null = null;
   private attachedTexture: WebGLTexture | null = null;
+  /**
+   * v8 performance pass (G4b, 2026-11-12) — the ASYNC readback: a PIXEL_PACK buffer the read lands in, the fence that
+   * says it has, and the size it was issued at (a read that predates a resize is dropped, never copied — its rows
+   * would be the wrong length). See `readback()`.
+   */
+  private packBuffer: WebGLBuffer | null = null;
+  private packBytes = 0;
+  private packSync: WebGLSync | null = null;
+  private packW = 0;
+  private packH = 0;
 
   // Persistent per-particle offsets
   private offsetX: Float32Array | null = null;
@@ -96,6 +106,10 @@ export class TransMapForceField {
     if (this.gl && this.readbackFBO) this.gl.deleteFramebuffer(this.readbackFBO);
     this.readbackFBO = null;
     this.attachedTexture = null;
+    // G4b: likewise the async readback's buffer and fence (they belong to the previous context).
+    if (this.gl && this.packBuffer) this.gl.deleteBuffer(this.packBuffer);
+    if (this.gl && this.packSync) this.gl.deleteSync(this.packSync);
+    this.packBuffer = null; this.packSync = null; this.packBytes = 0; this.packW = 0; this.packH = 0;
     this.gl = gl;
     this.width = width;
     this.height = height;
@@ -190,8 +204,29 @@ export class TransMapForceField {
     // covered it, but the ordering is load-bearing enough to say so.
     if (!gl || !this.currentTexture || !this.rgbaBuffer) return;
 
+    /*
+     * ⚠️ **ASYNCHRONOUS since 2026-11-12 (G4b).** A synchronous `readPixels` of the whole canvas as float waited for
+     * every queued GPU command; on the owner's three machines `Lava Flow` (one of the 9 force presets) ran at
+     * p50 = the refresh but p95 50–183 ms and worst 67–200 ms — the 4th-frame stall. Now the read goes into a
+     * PIXEL_PACK buffer with a fence and returns at once; each frame the fence is POLLED (never waited on) and, once
+     * it has signalled, the data is copied into `rgbaBuffer` — the one array `sampleForce` reads. The field arrives
+     * one or two frames later than before; it was already up to four frames old by design.
+     */
+    if (this.packSync) {
+      const status = gl.getSyncParameter(this.packSync, gl.SYNC_STATUS);
+      if (status === gl.SIGNALED) {
+        if (this.packW === this.width && this.packH === this.height && this.packBuffer) {
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+          gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rgbaBuffer);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        }
+        gl.deleteSync(this.packSync);
+        this.packSync = null;
+      }
+    }
+
     this.frameCounter++;
-    if (this.frameCounter % 4 !== 0) return;
+    if (this.frameCounter % 4 !== 0 || this.packSync) return;
 
     // One FBO for the life of the object, re-attached only when the source texture actually changes.
     //
@@ -208,9 +243,21 @@ export class TransMapForceField {
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.currentTexture, 0);
       this.attachedTexture = this.currentTexture;
     }
-    gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, this.rgbaBuffer);
+    const bytes = this.width * this.height * 16;
+    if (!this.packBuffer) this.packBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
+    if (this.packBytes !== bytes) {
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+      this.packBytes = bytes;
+    }
+    gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.packSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    this.packW = this.width;
+    this.packH = this.height;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
+
 
   /**
    * The field at a pixel, in PIXELS — the sum of whatever sources are live.
@@ -587,6 +634,10 @@ export class TransMapForceField {
     // Delete BEFORE nulling `gl` — the handle is unreachable afterwards and would leak.
     if (this.gl && this.readbackFBO) this.gl.deleteFramebuffer(this.readbackFBO);
     this.readbackFBO = null;
+    // G4b — invariant 1: the async readback's buffer and fence die with the object, and their records with them.
+    if (this.gl && this.packBuffer) this.gl.deleteBuffer(this.packBuffer);
+    if (this.gl && this.packSync) this.gl.deleteSync(this.packSync);
+    this.packBuffer = null; this.packSync = null; this.packBytes = 0; this.packW = 0; this.packH = 0;
     this.attachedTexture = null;
     this.gl = null;
     this.rgbaBuffer = null;
