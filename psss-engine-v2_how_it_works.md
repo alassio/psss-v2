@@ -1935,6 +1935,17 @@ So **Edge Softness** feathers the boundary as a *fraction of the threshold* (0 g
 edge, high values a misty falloff), and **thickness** — how far past the threshold the density goes —
 drives the volumetric shading: absorption through the body, refraction, and the rim.
 
+**The density field is accumulated at half resolution when the particles' discs are large.** Building the
+field draws every particle as a disc into two floating-point targets, so its cost is the particle count times
+the disc area — at 50 000 discs of 90 px, hundreds of millions of pixels per frame. Once the disc is at least
+32 px across (returning below 28 px, so a value resting on the threshold cannot flip it), the field targets
+are half the canvas size in each direction and each disc half as wide: a quarter of the pixels. The kernel
+is a function of the position *within* the disc, so a texel holds the same density value at either scale and
+the threshold, the reference and the disc-size clamp are unchanged. The surface pass stays at full resolution
+and reads the field with bilinear filtering; its normal takes the gradient one *field* texel apart and divides
+by that step, so the shading keeps its scale. Smaller discs keep the full-resolution field, where a coarser
+one would start to close the gaps between neighbours.
+
 | Control | Role in the shading |
 |---|---|
 | **Kernel Width** | how far each particle's density contribution reaches; with `IsoLevel` it sets how close two drops must come to merge |
@@ -3612,11 +3623,19 @@ rotating cursor**, so it loses frame rate rather than stopping. That rotation is
 shared instead of always starving the same tail.
 
 **The steady slice also scales with the main view's headroom.** Each tile renderer estimates the display's
-frame interval as its best recent frame and tracks the main loop's *pressure* — frame time over that interval,
-1 when every frame is on time. The steady budget is full at pressure ≤ 1.25 and falls linearly to **zero at
-2.5** (on a 60 Hz screen: full above about 48 fps, none below 24), so the main view is served first and the tiles
-animate with whatever is left. **Warm-up is never zeroed**: under pressure it advances one render per tick, so
-every tile still reaches its first image.
+frame interval as its best recent frame and tracks the main loop's *pressure* — frame time over a target
+interval, 1 when every frame is on time. The target is the display's interval **or a 60 fps frame, whichever is
+longer**: on a 120 or 144 Hz screen a main view holding 60 fps is smooth, and the tiles do not give way to chase
+the panel's maximum. Pressure is roughly 1 plus the share of main frames that miss the target, so the window is
+narrow: the steady budget is full at pressure ≤ **1.05** and falls linearly to **zero at 1.4**, and the main view
+is served first while the tiles animate with whatever is left. **Warm-up is never zeroed**: under pressure it
+advances one render per tick, so every tile still reaches its first image.
+
+**A tile holds a slot only while it is on screen or within 100 px of it.** The `IntersectionObserver` reports
+entering and leaving tiles in batches, and when the grid jumps past a tile (the scroll to the current preset's
+tile, a search, a reorder) one batch can carry both an entering and a leaving record for it. The records are
+applied in order and a slot is acquired only for a tile still intersecting after the whole batch — so the live
+set is exactly what is on screen plus the margin row.
 
 **The picture comes back asynchronously, in one batch.** A tile used to end in its own synchronous
 `readPixels`, and because the tiles share one WebGL context with the main view, each of those waited for all
@@ -3629,13 +3648,16 @@ Measured on the same machine: no time left in `readPixels`, and the main view's 
 30–50 % to 7–16 %.
 
 **`?perf=1` measures all of this on the machine it runs on.** It brackets each section of the main frame —
-the figure computation, the particle or splat draw, Neon Lines, ribbons, the Translation Map warp, Electric
-Discharge, bloom, the grade and the tiles — and reports CPU milliseconds per frame always, and GPU milliseconds
-where the browser offers `EXT_disjoint_timer_query_webgl2`. The GPU queries are collected frames later, never
-waited on, and a window in which the GPU reports a disjoint event is discarded. Sections not bracketed (the
-trail fade, the warp's plain copy, the final present) are in the frame time but in no row. The CPU column of a
-drawing section is small by nature: the GPU does that work later, which is why the GPU column is the one to
-read for drawing.
+the trail's decay pass, the figure computation, the particle or splat draw, Neon Lines, ribbons, the
+Translation Map warp, Electric Discharge, bloom, the grade (or, without one, the plain present blit) and the
+tiles — and reports CPU milliseconds per frame always, and GPU milliseconds where the browser offers
+`EXT_disjoint_timer_query_webgl2`. The GPU queries are collected frames later, never waited on, and a window in
+which the GPU reports a disjoint event is discarded. Only the warp's plain copy is in the frame time but in no
+row. The CPU column of a drawing section is small by nature: the GPU does that work later, which is why the GPU
+column is the one to read for drawing. The frame times it reports are the **unclamped** intervals — the
+animation clamps a long frame to 100 ms for its speed, the readout does not — and `worst 10 s` is the longest
+single frame of the last ten seconds, the reading for a lone hitch such as a reel's preset switch, which a
+half-second p95 cannot show.
 
 **The figure computation is the CPU's largest share, and three things keep it lean.** (1) The wave sum is
 computed for the whole figure at once: for one wave slot the angle `(n + phase) · FM` is linear in the particle

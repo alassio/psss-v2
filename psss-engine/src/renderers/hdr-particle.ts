@@ -1286,6 +1286,14 @@ void main() {
 const CRYSTAL_DEPTH_QUANT = 4294967295; // 2^32 - 1, the depth field's full range
 const CRYSTAL_INDEX_BASE = 1048576; // 2^20, bounds the particle index — ~19x MAX_PARTICLE_COUNT + tails
 
+/**
+ * v8 performance pass — the disc diameter (full-resolution px, after the clamp) at which the liquid field drops to half
+ * resolution, and the lower one at which it returns (hysteresis). Below ~30 px a half-resolution field starts to lose
+ * the gaps between neighbouring discs; above it the field is smooth across several texels at either scale.
+ */
+const LIQUID_HALF_RES_ON = 32;
+const LIQUID_HALF_RES_OFF = 28;
+
 export class HDRParticleRenderer implements Renderer {
   readonly id = 'hdr-particle';
 
@@ -1648,6 +1656,19 @@ export class HDRParticleRenderer implements Renderer {
   private uLiquidSurfThickness: WebGLUniformLocation | null = null;
   private uLiquidSurfEdgeBright: WebGLUniformLocation | null = null;
   private uLiquidSurfRadius: WebGLUniformLocation | null = null;
+  /**
+   * v8 performance pass (owner, 2026-11-10) — **the liquid FIELD's resolution scale: 1, or 0.5 when the discs are large.**
+   * The accumulation draws every particle as a disc into two float targets, so its cost is particles × disc AREA:
+   * `Boiling Milk` (50 000 discs of 92 px) drew 334 million fragments a frame, 18 ms of GPU time on a fast card. The
+   * field is a smooth sum of discs far wider than a texel, so it is accumulated at HALF resolution once the disc is at
+   * least `LIQUID_HALF_RES_ON` px across (a quarter of the fragments) and the full-resolution SURFACE pass reads it
+   * bilinearly. ⚠️ **The density VALUES do not change with the scale:** the Wyvill kernel is a function of the
+   * normalised disc coordinate, so a half-size disc in a half-size target writes the same `Σw` at the corresponding
+   * point — the threshold, the reference and the clamp are all unchanged and still computed in full-resolution pixels.
+   * ⚠️ At scale 1 every line of the path is the previous code (`uFieldStep` = 1 is the identity).
+   */
+  private liquidFieldScale = 1;
+  private uLiquidSurfFieldStep: WebGLUniformLocation | null = null;
   /**
    * The live config. ⚠️ **Never null and never partially populated** — `main.ts` merges
    * `DEFAULT_LIQUID_CONFIG` first (invariant 14), and this field is seeded with the defaults so a renderer
@@ -2541,8 +2562,10 @@ export class HDRParticleRenderer implements Renderer {
         || !this.liquidTex || !this.liquidColorTex) return;
 
     const cfg = this.liquidConfig;
+    this.updateLiquidFieldScale();
     const diameter = this.liquidPointDiameter();
     const radius = diameter * 0.5;
+    const [fieldW, fieldH] = this.liquidFieldSize();
     // ⚠️ Resolved ONCE into a local and read twice. `isoRef` moves with Iso Level; `thickRef` deliberately
     // does not, so dividing `isoRef` back down by `isoLevel` to recover the reference would be a second
     // expression for one quantity — exactly the drift `liquidPointDiameter()` exists to prevent.
@@ -2565,7 +2588,9 @@ export class HDRParticleRenderer implements Renderer {
     // than once at init because draw-buffer state is per-FRAMEBUFFER and this FBO is not the only one the
     // frame touches — `gldiag`'s probe and any future pass that rebinds it would otherwise inherit it.
     gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
-    gl.viewport(0, 0, this.width, this.height);
+    // The FIELD's size — the positions stay in full-resolution pixels (`uResolution` below), so the viewport alone
+    // maps them onto the smaller target.
+    gl.viewport(0, 0, fieldW, fieldH);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -2574,7 +2599,8 @@ export class HDRParticleRenderer implements Renderer {
     // read off the main program so they cannot disagree with the VAO.
     gl.useProgram(this.liquidAccumProgram);
     gl.uniform2f(this.uLiquidAccResolution, this.width, this.height);
-    gl.uniform1f(this.uLiquidAccSize, diameter);
+    // The disc shrinks with the target, so it covers the same part of the figure (the CLAMPED diameter, scaled).
+    gl.uniform1f(this.uLiquidAccSize, diameter * this.liquidFieldScale);
     gl.uniform1f(this.uLiquidAccMaxPointSize, this.maxPointSize);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE);
@@ -2612,6 +2638,7 @@ export class HDRParticleRenderer implements Renderer {
     // never drew — 1.576× too far at 3840×2160, kw 3, which is `liquidPointDiameter()`'s whole reason to be a
     // single owner. A fourth transcription of that arithmetic is exactly what desyncs the two.
     gl.uniform1f(this.uLiquidSurfRadius, radius);
+    gl.uniform1f(this.uLiquidSurfFieldStep, 1 / this.liquidFieldScale);
 
     // 'preset' resolves to the figure's own mean colour. A fullscreen pass cannot read per-particle
     // colour, and the alternatives are worse than a mean: index 0 of `state.colors` is one arbitrary
@@ -2954,6 +2981,9 @@ export class HDRParticleRenderer implements Renderer {
 
     this.liquidTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.liquidTex);
+    // Allocated at full resolution here; `updateLiquidFieldScale()` re-specifies both targets on the first draw if
+    // the disc size calls for half resolution (it is decided there, where the live size and kernel are known).
+    this.liquidFieldScale = 1;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.width, this.height, 0, gl.RED, gl.FLOAT, null);
     // ⚠️ **LINEAR, unlike the retired log-density target's NEAREST, and load-bearing rather than cosmetic.** The
     // surface pass takes a 4-tap GRADIENT of this field for the normal; with NEAREST the taps land on
@@ -3177,6 +3207,9 @@ uniform float uSpecular;
 uniform float uThickness;
 uniform float uEdgeBright;
 uniform float uRadius;
+// v8 performance pass — screen pixels per FIELD texel (1 at full resolution, 2 at half). The normal's gradient steps by
+// one field texel and divides by it, so its scale is unchanged; at 1 the expressions are the previous ones exactly.
+uniform float uFieldStep;
 in vec2 vUv;
 out vec4 fragColor;
 
@@ -3268,13 +3301,14 @@ void main() {
   // 4-tap central difference in TEXEL units, giving the surface normal. Spent here for a cheap diffuse
   // term; step 15.3 spends the same normal on refraction and specular.
   vec2 texel = 1.0 / max(uResolution, vec2(1.0));
-  float dxp = texture(uDensity, vUv + vec2(texel.x, 0.0)).r;
-  float dxm = texture(uDensity, vUv - vec2(texel.x, 0.0)).r;
-  float dyp = texture(uDensity, vUv + vec2(0.0, texel.y)).r;
-  float dym = texture(uDensity, vUv - vec2(0.0, texel.y)).r;
+  vec2 ftexel = texel * uFieldStep;
+  float dxp = texture(uDensity, vUv + vec2(ftexel.x, 0.0)).r;
+  float dxm = texture(uDensity, vUv - vec2(ftexel.x, 0.0)).r;
+  float dyp = texture(uDensity, vUv + vec2(0.0, ftexel.y)).r;
+  float dym = texture(uDensity, vUv - vec2(0.0, ftexel.y)).r;
   // Gradient points INTO the blob (density rises inward), so negate for an outward normal. Scaled by the
   // threshold so the normal's magnitude is a ratio and does not depend on the particle count.
-  vec3 n = normalize(vec3(-(dxp - dxm), -(dyp - dym), max(uThickRef, 1e-6) * 0.5));
+  vec3 n = normalize(vec3(-(dxp - dxm) / uFieldStep, -(dyp - dym) / uFieldStep, max(uThickRef, 1e-6) * 0.5));
 
   // The ramp/thickness coordinate: the rim is thin, the interior thick. Offset by the threshold (only
   // surviving texels are shaded) but divided by uThickRef, a FIXED multiple of the density reference that
@@ -3593,6 +3627,7 @@ void main() {
     this.uLiquidSurfThickness = gl.getUniformLocation(this.liquidSurfaceProgram, 'uThickness');
     this.uLiquidSurfEdgeBright = gl.getUniformLocation(this.liquidSurfaceProgram, 'uEdgeBright');
     this.uLiquidSurfRadius = gl.getUniformLocation(this.liquidSurfaceProgram, 'uRadius');
+    this.uLiquidSurfFieldStep = gl.getUniformLocation(this.liquidSurfaceProgram, 'uFieldStep');
 
     // Seeded from the LIVE config, not from a hardcoded name — the same RF-02 fix `initSplat` carries for
     // the crystal ramp. `dispose()` nulls this texture but deliberately leaves `liquidConfig` populated, so
@@ -3645,6 +3680,51 @@ void main() {
    * second copy of the clamp is how the frame-mean normalisation silently stops holding at a large canvas
    * (invariant 10 at a boundary), so both go through here — and so does `estimateParticlePixels()`.
    */
+  /** The liquid field targets' size at the current scale (never below one texel). */
+  private liquidFieldSize(): [number, number] {
+    const s = this.liquidFieldScale;
+    return [Math.max(1, Math.ceil(this.width * s)), Math.max(1, Math.ceil(this.height * s))];
+  }
+
+  /**
+   * Decide the field scale from the disc size (with hysteresis, so a slider resting on the threshold cannot flip it
+   * every frame) and re-specify both targets when it changes. ⚠️ Both attachments are resized in ONE place and the FBO
+   * is re-tested — a size disagreement between them is invariant 5's silent black surface.
+   */
+  private updateLiquidFieldScale(): void {
+    const gl = this.gl;
+    if (!gl || !this.liquidTex || !this.liquidColorTex || !this.liquidFBO) return;
+    const d = this.liquidPointDiameter();
+    const want = this.liquidFieldScale === 1
+      ? (d >= LIQUID_HALF_RES_ON ? 0.5 : 1)
+      : (d < LIQUID_HALF_RES_OFF ? 1 : 0.5);
+    if (want === this.liquidFieldScale) return;
+    this.liquidFieldScale = want;
+    this.allocateLiquidField();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.liquidFBO);
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (status !== gl.FRAMEBUFFER_COMPLETE && want !== 1) {
+      console.warn(`PSSS: half-resolution liquid field incomplete (0x${status.toString(16)}); staying at full resolution`);
+      this.liquidFieldScale = 1;
+      this.allocateLiquidField();
+    }
+  }
+
+  /** (Re)specify both liquid field targets at `liquidFieldSize()`. The ONE writer of their size. */
+  private allocateLiquidField(): void {
+    const gl = this.gl;
+    if (!gl || !this.liquidTex) return;
+    const [fw, fh] = this.liquidFieldSize();
+    gl.bindTexture(gl.TEXTURE_2D, this.liquidTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, fw, fh, 0, gl.RED, gl.FLOAT, null);
+    if (this.liquidColorTex) {
+      gl.bindTexture(gl.TEXTURE_2D, this.liquidColorTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fw, fh, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  }
+
   private liquidPointDiameter(): number {
     const scaleFactor = (this.width + this.height) / (1024.0 + 768.0);
     const requested = 8.0 * scaleFactor * this.particleSize * this.liquidConfig.kernelWidth;
@@ -4224,8 +4304,10 @@ void main() {
     }
     if (this.renderMode === 'liquid' && this.liquidTex && this.gl) {
       const gl = this.gl;
+      // At the CURRENT field scale (`liquidFieldSize()` reads the new `this.width/height` set above).
+      const [fw, fh] = this.liquidFieldSize();
       gl.bindTexture(gl.TEXTURE_2D, this.liquidTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, width, height, 0, gl.RED, gl.FLOAT, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, fw, fh, 0, gl.RED, gl.FLOAT, null);
       // ⚠️ **v8 Step 15.2: the colour target is resized in the SAME branch, and a miss here is silent.** The
       // two are attachments of one FBO, so a size disagreement makes it INCOMPLETE — after which every draw
       // sets `INVALID_FRAMEBUFFER_OPERATION`, the field stays at its clear value, and the surface vanishes
@@ -4233,7 +4315,7 @@ void main() {
       // init path running (`checkFramebufferStatus` is not re-tested here, so nothing would report it).
       if (this.liquidColorTex) {
         gl.bindTexture(gl.TEXTURE_2D, this.liquidColorTex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fw, fh, 0, gl.RGBA, gl.HALF_FLOAT, null);
       }
       gl.bindTexture(gl.TEXTURE_2D, null);
       // No `uIsoRef` bookkeeping is needed on resize, and that is a PROPERTY rather than an oversight: the
@@ -4545,7 +4627,7 @@ void main() {
     this.uLiquidSurfThickRef = null;
     this.uLiquidSurfColor = null; this.uLiquidSurfColourMix = null; this.uLiquidSurfMixModel = null;
     this.uLiquidSurfRefraction = null; this.uLiquidSurfSpecular = null; this.uLiquidSurfThickness = null;
-    this.uLiquidSurfEdgeBright = null; this.uLiquidSurfRadius = null;
+    this.uLiquidSurfEdgeBright = null; this.uLiquidSurfRadius = null; this.uLiquidSurfFieldStep = null;
     // v8 Step 15.7. ⚠️ **`uLiquidSurfDye` is nulled; `dyeTexture` is nulled WITHOUT being deleted.** The
     // texture is `DyeFieldProcessor`'s, borrowed through `setDyeTexture` — deleting it here would leave the
     // owner's own non-null field naming a freed object, every subsequent dye pass a silent no-op, and the

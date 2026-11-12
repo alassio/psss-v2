@@ -1269,6 +1269,40 @@ chk('...and the Deformation badge counts the operator (one more while it is on)'
   ffz.badgeOn === ffz.badgeOff + 1, `${ffz.badgeOff} -> ${ffz.badgeOn}`);
 
 
+console.log('\n=== AA. v8 performance pass — the grid animates only the tiles that are on screen (or one margin row) ===\n');
+/*
+ * ⚠️ **A slot LEAK reads as nothing on screen**: an off-screen tile animating costs CPU and GPU and shows nothing. It was
+ * real until 2026-11-10 — an `IntersectionObserver` batch carrying TWO records for one tile (entering, then leaving: the
+ * grid's jump to the active tile at boot) released the tile and then RE-ACQUIRED it from the stale record, so it held a
+ * slot for the session. CALIBRATED ON THAT DEFECT, not a seed: at exactly this configuration (1920×1080, 150 % scale,
+ * `Quader`, whose tile the grid jumps to) the pre-fix code measured 56 live slots for 28 intersecting tiles.
+ * The live count is the `?perf=1` overlay's `grid N tiles`; the reference is a FRESH observer with the panel's own
+ * options (root `.pg-grid-scroll`, `rootMargin: '100px'`), so the clause cannot disagree with the panel about geometry.
+ */
+{
+  const ctxAA = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1.5 });
+  const pAA = await ctxAA.newPage();
+  await pAA.goto((process.env.DEMO_URL ?? 'http://localhost:5190/') + '?perf=1&preset=Quader', { waitUntil: 'load' });
+  // Wait for the overlay's grid line itself (it needs two overlay updates), not a fixed time: beside this checker's
+  // own page a loaded machine boots slowly, and a fixed 8 s once read nothing and reported `live null`.
+  await pAA.waitForFunction(() => [...document.querySelectorAll('div')].some((d) => /grid\s+\d+ tiles/.test(d.textContent ?? '')),
+    null, { timeout: 40000 }).catch(() => {});
+  await pAA.waitForTimeout(2000);
+  const aa = await pAA.evaluate(() => new Promise((res) => {
+    const hud = [...document.querySelectorAll('div')].map((d) => d.textContent ?? '').find((t) => t.startsWith('main')) ?? '';
+    const m = hud.match(/grid\s+(\d+) tiles/);
+    const root = document.querySelector('.pg-grid-scroll');
+    const tiles = [...document.querySelectorAll('.pg-grid [data-preset]')];
+    const o = new IntersectionObserver((es) => { o.disconnect(); res({ live: m ? Number(m[1]) : null, intersecting: es.filter((e) => e.isIntersecting).length, scrollTop: root.scrollTop }); },
+      { root, rootMargin: '100px', threshold: 0 });
+    tiles.forEach((t) => o.observe(t));
+  }));
+  chk('the grid holds a live slot ONLY for tiles the observer reports as intersecting — no leaked off-screen tiles',
+    aa.live !== null && aa.live <= aa.intersecting && aa.scrollTop > 0,
+    `live ${aa.live}, intersecting ${aa.intersecting}, scrollTop ${aa.scrollTop} (scrollTop > 0: the boot jump that caused the leak happened)`);
+  await ctxAA.close();
+}
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

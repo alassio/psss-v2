@@ -400,10 +400,10 @@ readout appears in the top-left corner and updates twice a second:
 
 | Line | What it tells you |
 |---|---|
-| **main** | the big view's frames per second, and its typical (p50) and worst-case (p95) frame time |
+| **main** | the big view's frames per second, its typical (p50) and worst-case (p95) frame time, and **worst 10 s** — the single longest frame of the last ten seconds, which shows a brief freeze such as the moment a reel switches presets |
 | **guard**, **canvas** | how hard PSSS is protecting the big view (0 relaxed, 2 thumbnails frozen), and the drawing size in pixels |
-| **per frame** | for each part of the frame — `figure` (calculating the curve), `particles`, `lines`, `ribbons`, `warp`, `discharge`, `glow`, `grade`, `tiles` — the time it takes on the processor (**cpu**) and on the graphics card (**gpu**). The graphics times appear only on machines whose browser can measure them; otherwise the column says *n/a* |
-| **grid**, **reel**, … | per thumbnail grid: how many thumbnails it holds, how many it draws and shows per second, and **pressure** — 1 means the big view keeps up with the screen, and above about 2.5 the thumbnails stop animating to protect it |
+| **per frame** | for each part of the frame — `trail` (fading the previous frames), `figure` (calculating the curve), `particles`, `lines`, `ribbons`, `warp`, `discharge`, `glow`, `grade` (or `present` on presets without a grade), `tiles` — the time it takes on the processor (**cpu**) and on the graphics card (**gpu**). The graphics times appear only on machines whose browser can measure them; otherwise the column says *n/a* |
+| **grid**, **reel**, … | per thumbnail grid: how many thumbnails it holds, how many it draws and shows per second, and **pressure** — 1 means the big view keeps up with the screen (or holds 60 fps on a faster screen); the thumbnails animate fully up to about 1.05, slow down above it, and stop animating at about 1.4 to protect it |
 
 The readout only reads; it changes nothing, so it is safe to leave on while you try presets.
 

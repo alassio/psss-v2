@@ -838,6 +838,12 @@ export class PreviewGridPanel {
 
         for (const tile of incoming) {
           const name = tile.dataset.preset!;
+          // ⚠️ **A batch can carry TWO records for one tile — entering, then leaving — when the grid JUMPS past it**
+          // (the scroll to the active tile at boot, a search, a reorder). The loop above applied both in order, so
+          // `intersecting` holds the tile's FINAL state; acquiring from the stale "entering" record anyway gave a slot
+          // to a tile already off screen, and nothing ever reported it leaving again — it animated unseen for the
+          // whole session. Measured 2026-11-10 at 150 % display scale: 56 live tiles for 24 visible.
+          if (!this.intersecting.has(name)) continue;
           const canvas = this.tileCanvases.get(name)!;
           const preset = this.config.getPreset(name);
           if (preset) {

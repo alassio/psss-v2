@@ -3062,9 +3062,13 @@ console.log('\n=== O. the liquid iso-surface: an ON-CURVE reference, count-indep
   // so a `vUv`-denominated offset tilts the lighting by the frame aspect; and because a tile's aspect is
   // FIXED at 4:3 the error would be constant, i.e. it would look deliberate.
   for (const [label, src] of [['main', hdrSrc], ['tile', tileSrc]]) {
+    // ⚠️ 2026-11-10: the main pass may step by `ftexel = texel * uFieldStep` (one FIELD texel of the half-resolution
+    // liquid field). That is still texel units from `uResolution`, scaled by ONE float on both axes — so it is accepted
+    // ONLY in exactly that form; any other definition of `ftexel` (a vec2, a vUv term) fails the clause as before.
+    const tap = /vec2 ftexel = texel \* uFieldStep;/.test(src) && /uniform float uFieldStep;/.test(src) ? 'f?texel' : 'texel';
     chk(`the ${label} surface pass steps the 4-tap gradient in TEXEL units via uResolution (invariant 26)`,
       /vec2 texel = 1\.0 \/ max\(uResolution, vec2\(1\.0\)\);/.test(src)
-      && /vUv \+ vec2\(texel\.x, 0\.0\)/.test(src) && /vUv \+ vec2\(0\.0, texel\.y\)/.test(src),
+      && new RegExp(`vUv \\+ vec2\\(${tap}\\.x, 0\\.0\\)`).test(src) && new RegExp(`vUv \\+ vec2\\(0\\.0, ${tap}\\.y\\)`).test(src),
       'a vUv-denominated offset tilts the normal by the frame aspect — constant, so it reads as a style');
   }
 

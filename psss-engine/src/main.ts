@@ -3258,6 +3258,10 @@ async function init() {
      * was not known when the constant was chosen.
      */
     const dt = lastTime === 0 ? 16.667 : Math.min(time - lastTime, 100);
+    // The UNCLAMPED interval, for the `?perf=1` overlay only: the clamp above is for the animation's speed, and a
+    // reading through it can never show a frame longer than 100 ms — a preset switch that freezes for a second
+    // read as 100 ms, and every p95 was capped there.
+    const rawFrameMs = lastTime === 0 ? 16.667 : time - lastTime;
     lastTime = time;
     elapsedTime += dt * speedFactor * 0.001;
 
@@ -3277,6 +3281,7 @@ async function init() {
     reelTick(time);
 
     // Step 1: Decay pass — read FBO-A, write to FBO-B (with optional blur)
+    perfHud?.begin('trail');
     gl.bindFramebuffer(gl.FRAMEBUFFER, fboState.fboB);
     gl.viewport(0, 0, fboState.width, fboState.height);
     gl.disable(gl.BLEND);
@@ -3338,6 +3343,7 @@ async function init() {
     gl.bindVertexArray(fadeVao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
+    perfHud?.end('trail');
 
     // Step 2: Render new particles into FBO-B
     // FBO-B is still bound from step 1
@@ -3972,6 +3978,7 @@ async function init() {
         perfHud?.end('grade');
       } else {
         // Blit post-processed to screen
+        perfHud?.begin('present');
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.disable(gl.BLEND);
@@ -3982,9 +3989,11 @@ async function init() {
         gl.bindVertexArray(blitVao);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         gl.bindVertexArray(null);
+        perfHud?.end('present');
       }
     } else {
       // Legacy path: direct blit FBO-A to screen — ⚠️ `presentSource`, NOT `fboState.texA`. See Step 3b above.
+      perfHud?.begin('present');
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.disable(gl.BLEND);
@@ -3995,6 +4004,7 @@ async function init() {
       gl.bindVertexArray(blitVao);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindVertexArray(null);
+      perfHud?.end('present');
     }
 
     // Performance guard + Evolution tile rendering + Preview grid tiles
@@ -4017,7 +4027,7 @@ async function init() {
       reelTileRenderer.tick(dt, tileThrottle);
       previewGrid.tick(dt, tileThrottle);
       perfHud?.end('tiles');
-      perfHud?.frame(dt);
+      perfHud?.frame(rawFrameMs);
     }
     // ⚠️ NO `requestAnimationFrame` here. The re-arm lives in `drawFrame`'s `finally` — see the note there.
     // Re-adding one here would double the frame rate AND restore the "one throw kills the canvas" failure for
@@ -7920,15 +7930,11 @@ async function init() {
       // and VAO survive; and it clears the `failed` latch, so a resolution that a driver refused `R16F` at does
       // not condemn the next one.
       depthField.resize(w, h);
-      // ⚠️ **`transMapForce.resize(w, h)` IS STILL MISSING HERE AND THAT IS A KNOWN, UNFIXED DEFECT**
-      // (found 2026-10-15, deliberately left out of that sitting's scope). `transMapForce.init()` runs once
-      // at startup and `TransMapForceField.resize()` has ZERO callers, so after any resize its
-      // `width`/`height` describe the OLD canvas: `readback()` issues `gl.readPixels(0, 0, staleW, staleH, …)`
-      // against the live displacement texture and `sampleForce()` clamps and scales every lookup against the
-      // old frame. **Silent in both directions** — an out-of-range `readPixels` is undefined data, not a GL
-      // error, so the console stays clean while the force acts on the wrong part of the figure. It reaches
-      // the 9 presets with `transMapForceBlend > 0`. The fix is the one line; it is not here because it was
-      // not asked for, not because it is wrong.
+      // ⚠️ **`transMapForce` follows the canvas here** (fixed 2026-11-12; found 2026-10-15). Its `readback()` reads
+      // `width × height` of the live displacement texture and `sampleForce()` scales every lookup by them, so
+      // without this, after any resize — entering FULLSCREEN is one — the 9 presets with `transMapForceBlend > 0`
+      // read a stale rectangle (undefined data, no GL error) and pushed the wrong part of the figure, silently.
+      transMapForce.resize(w, h);
     }
     // ⚠️ **The grid's slots are repaired here, and a resize is the case that needs it** (2026-09-25): the tile
     // track is `repeat(auto-fill, minmax(200px, 1fr))`, so a wider window grows the tile COUNT and acquires a

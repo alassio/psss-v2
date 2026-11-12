@@ -5,8 +5,13 @@
  * Opt-in only, and cheap: it records one number per frame and touches the DOM twice a second. It READS — it changes no
  * budget and no setting — so turning it on does not change what it measures beyond that DOM write.
  *
- * ⚠️ **THE FRAME BREAKDOWN** — `begin(name)`/`end(name)` around each section of the main frame (`figure` = the CPU figure
- * computation; `particles`, `lines`, `ribbons`, `warp`, `discharge`, `glow`, `grade`, `tiles`). CPU time is always
+ * ⚠️ **THE FRAME BREAKDOWN** — `begin(name)`/`end(name)` around each section of the main frame (`trail` = the decay
+ * pass, a copy plus a fade; `figure` = the CPU figure computation; `particles`, `lines`, `ribbons`, `warp`,
+ * `discharge`, `glow`, `grade`, `present` = the plain blit to the screen when there is no grade; `tiles`).
+ *
+ * ⚠️ **`worst 10 s`** is the longest single frame of the last ten seconds. p50/p95 are taken over one half-second
+ * window, so a lone hitch — the frame a reel spends switching presets — is invisible in them; this is the reading
+ * for it. CPU time is always
  * measured. GPU time is measured with `EXT_disjoint_timer_query_webgl2` WHERE THE MACHINE OFFERS IT (most real GPUs
  * do; a software renderer usually does not, and the row then says `gpu n/a`). Queries are read back FRAMES later —
  * never waited on — and a window in which the GPU reports a DISJOINT event (a clock change, a context switch) is
@@ -37,6 +42,8 @@ interface TimerExt { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
 export class PerfHud {
   private readonly el: HTMLDivElement;
   private readonly dts: number[] = [];
+  /** Every frame of the last ten seconds as [timestamp, dt], for `worst 10 s`. */
+  private readonly recent: [number, number][] = [];
   private lastPaint = 0;
   private prev = new Map<string, TileStats>();
   /** Section order as first seen, CPU ms accumulated this window, GPU ms accumulated, and frames this window. */
@@ -107,10 +114,11 @@ export class PerfHud {
 
   /** Called once per main-loop frame with its interval in ms. */
   frame(dt: number): void {
-    if (Number.isFinite(dt) && dt > 0) this.dts.push(dt);
+    const now = performance.now();
+    if (Number.isFinite(dt) && dt > 0) { this.dts.push(dt); this.recent.push([now, dt]); }
+    while (this.recent.length > 0 && now - this.recent[0]![0] > 10_000) this.recent.shift();
     this.frames++;
     this.pollQueries();
-    const now = performance.now();
     const span = now - this.lastPaint;
     if (span < 500) return;
     this.lastPaint = now;
@@ -118,7 +126,7 @@ export class PerfHud {
     const q = (f: number): number => (s.length ? s[Math.min(s.length - 1, Math.floor(f * (s.length - 1)))]! : 0);
     const m = this.src.main();
     const lines = [
-      `main  ${(s.length / (span / 1000)).toFixed(1).padStart(5)} fps   p50 ${q(0.5).toFixed(1)} ms   p95 ${q(0.95).toFixed(1)} ms`,
+      `main  ${(s.length / (span / 1000)).toFixed(1).padStart(5)} fps   p50 ${q(0.5).toFixed(1)} ms   p95 ${q(0.95).toFixed(1)} ms   worst 10 s ${this.recent.reduce((m, r) => Math.max(m, r[1]), 0).toFixed(0)} ms`,
       `      guard L${m.guardLevel}   canvas ${m.canvasW}x${m.canvasH}   ${this.ext ? (this.disjoint ? 'gpu timing: window discarded (disjoint)' : 'gpu timing: on') : 'gpu timing: n/a on this machine'}`,
       'per frame         cpu ms   gpu ms',
     ];

@@ -735,6 +735,16 @@ function tilePaletteFor(preset: UnifiedPreset): {
   return { lut, mapping, indexPalette: null };
 }
 
+/**
+ * v8 performance pass — the tile animation budget against the main loop's PRESSURE (frame time over the target
+ * interval; see `GridTileRenderer.refreshMs`). Full budget at or below `TILE_PRESSURE_FULL`, none at or above
+ * `TILE_PRESSURE_ZERO`, linear between; warm-up drops to one render per tick at `TILE_PRESSURE_ZERO`.
+ */
+const TILE_PRESSURE_FULL = 1.05;
+const TILE_PRESSURE_ZERO = 1.4;
+/** The target interval is never shorter than a 60 fps frame: a smooth main view is the goal, not the panel's maximum. */
+const TILE_TARGET_MIN_MS = 1000 / 60;
+
 export class GridTileRenderer {
   private gl: WebGL2RenderingContext;
 
@@ -805,8 +815,16 @@ export class GridTileRenderer {
   /**
    * v8 performance pass — the frame-budget controller (`#3`). `refreshMs` is the display's frame interval, estimated as
    * the best recent frame (it drifts up slowly so a monitor change is followed); `pressure` is how far the main loop is
-   * from it (1 = every frame on time). The STEADY animation budget scales from full at pressure ≤ 1.25 to NONE at ≥ 2.5
-   * (on a 60 Hz screen: full above ~48 fps, none below 24) — wide enough that a merely weak machine keeps some motion.
+   * from it (1 = every frame on time). The STEADY animation budget scales from full at pressure ≤ `TILE_PRESSURE_FULL`
+   * to NONE at ≥ `TILE_PRESSURE_ZERO`.
+   *
+   * ⚠️ **"On time" is the screen's refresh OR 60 fps, whichever is SLOWER** (`TILE_TARGET_MIN_MS`). Against a 144 Hz
+   * refresh a smooth 60–90 fps main view reads 1.6–2.4, which would freeze the tiles on every fast high-refresh
+   * machine; the tiles yield to keep the main view SMOOTH, not to chase the panel's maximum.
+   * ⚠️ **The window is narrow on purpose (owner, 2026-11-10, after the weaker machines' `?perf=1`):** pressure is about
+   * 1 + the share of main frames that miss the refresh, so the old 1.25 → 2.5 window let the tiles keep their time
+   * while a quarter or more of the main view's frames were late. Measured on a processor-bound machine: tiles 6.75 ms
+   * of a 16.7 ms frame at pressure 1.26 with their FULL budget.
    */
   private refreshMs = 1000 / 60;
   private pressureEma = 1;
@@ -1737,8 +1755,9 @@ export class GridTileRenderer {
     this.frameMsEma = this.frameMsEma * 0.9 + frameMs * 0.1;
     // #3 — the refresh estimate and the main loop's pressure against it (see the fields).
     this.refreshMs = Math.max(4, Math.min(34, Math.min(this.refreshMs * 1.0005, frameMs)));
-    this.pressureEma = this.pressureEma * 0.95 + (frameMs / this.refreshMs) * 0.05;
-    const steadyScale = firstImagesOnly ? 0 : Math.max(0, Math.min(1, (2.5 - this.pressureEma) / 1.25));
+    this.pressureEma = this.pressureEma * 0.95 + (frameMs / Math.max(this.refreshMs, TILE_TARGET_MIN_MS)) * 0.05;
+    const steadyScale = firstImagesOnly ? 0 : Math.max(0, Math.min(1,
+      (TILE_PRESSURE_ZERO - this.pressureEma) / (TILE_PRESSURE_ZERO - TILE_PRESSURE_FULL)));
     // The async readback is polled EVERY tick — a fence check, no wait — so a finished pass paints at once.
     this.pollReadback();
     this.blitAccumMs = Math.min(TILE_STEP_INTERVAL_MS, this.blitAccumMs + frameMs);
@@ -1806,7 +1825,7 @@ export class GridTileRenderer {
       // The ONLY site the throttle reaches. `frameSliceMs` turns the duty cycle into this frame's slice; the
       // divisor is `PerfGuard`'s. The loop below still always renders one tile, so a throttle can slow the
       // grid but never stop it — which is the whole difference between level 1 and level 2.
-      // #3 — the steady budget scales with the main view's headroom; at pressure >= 2.5 it is ZERO.
+      // #3 — the steady budget scales with the main view's headroom; at pressure >= TILE_PRESSURE_ZERO it is ZERO.
       const deadline = t0 + this.frameSliceMs(STEADY_DUTY) * steadyScale / this.throttle;
       const start = this.steadyCursor % due.length;
       let rendered = 0;
@@ -1835,7 +1854,7 @@ export class GridTileRenderer {
       // NOT divided by the throttle — see `tick`'s warm-up exemption. ⚠️ Under pressure (or in first-images-only
       // mode) a warm-up still progresses, but ONE render per tick, so every tile reaches its first image without
       // taking a frame's worth of time from the main view.
-      const starved = firstImagesOnly || this.pressureEma >= 2.5;
+      const starved = firstImagesOnly || this.pressureEma >= TILE_PRESSURE_ZERO;
       const deadline = starved ? Number.POSITIVE_INFINITY : performance.now() + this.frameSliceMs(GL_WARM_DUTY);
       let starvedBudget = 1;
       // One render per tile per pass, re-passing until the deadline. Every

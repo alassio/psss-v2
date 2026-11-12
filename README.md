@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.4.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.8.4](https://github.com/alassio/psss-v2/releases/tag/v1.8.4)** — **Faster figure calculation, and no more periodic stutter on moving curves.** The processor work behind every frame is roughly halved on most presets, so the main view runs smoother and the preview grid gets more time to animate. Moving self-similar curves no longer pause every second or so. Nothing looks different: every preset draws the same picture it drew before.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.4)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.8.5.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.8.5](https://github.com/alassio/psss-v2/releases/tag/v1.8.5)** — **Faster liquid presets, a preview grid that no longer animates thumbnails you cannot see, and a fix for presets with a Translation Map force in full screen.** The heaviest liquid presets draw a quarter of the pixels they did; the preview grid gives way to the main view sooner and stops animating off-screen thumbnails; and the performance readout now shows the brief freezes it used to hide.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.8.5)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
