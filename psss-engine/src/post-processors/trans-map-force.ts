@@ -1,4 +1,5 @@
 import type { GeneratorState } from '../core/interfaces.ts';
+import { compileProgram } from '../core/gl-program.ts';
 import type { ForceGateSource } from '../presets/types.ts';
 
 /** Reference frame time the force constants below were tuned at. */
@@ -44,6 +45,45 @@ function frameNormalisation(returnForce: number, dt: number): { retain: number; 
   return { retain, depositScale: (1 - retain) / rate60 };
 }
 
+/**
+ * v8 performance pass (2026-11-12, after the owner's v1.8.8 log) — **the force field is READ BACK at 1/`FORCE_READ_DIV`
+ * of the canvas in each direction**, box-averaged on the GPU first. The asynchronous read (G4b) removed the WAIT, but
+ * the read itself was the whole canvas as RGBA float — 1788 × 1118 × 16 B ≈ 32 MB every 4th frame — and `Lava Flow`
+ * still measured p95 50 ms / worst 92 ms. At 4 it is 1/16 of that (≈ 2 MB). The displacement field is smooth (it is a
+ * flow field, and `sampleForce` already interpolates it bilinearly), so the average over a 4 × 4 block is what a
+ * particle there feels; judged by a frame-matched comparison and by eye.
+ */
+const FORCE_READ_DIV = 4;
+const FORCE_DOWN_VERT = `#version 300 es
+void main() {
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+// texelFetch, not texture(): linear filtering of float textures is not guaranteed in WebGL2, and an exact box average
+// needs no filtering at all. Edge blocks average only the texels that exist.
+const FORCE_DOWN_FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+uniform sampler2D uSrc;
+uniform ivec2 uSrcSize;
+out vec4 fragColor;
+void main() {
+  ivec2 base = ivec2(gl_FragCoord.xy) * ${FORCE_READ_DIV};
+  vec4 s = vec4(0.0);
+  float n = 0.0;
+  for (int j = 0; j < ${FORCE_READ_DIV}; j++) {
+    for (int i = 0; i < ${FORCE_READ_DIV}; i++) {
+      ivec2 q = base + ivec2(i, j);
+      if (q.x < uSrcSize.x && q.y < uSrcSize.y) { s += texelFetch(uSrc, q, 0); n += 1.0; }
+    }
+  }
+  fragColor = s / max(n, 1.0);
+}`;
+
+/** The read-back field's size for a canvas: 1/`FORCE_READ_DIV` per axis, rounded up (edge blocks are partial). */
+function readW(width: number): number { return Math.max(1, Math.ceil(width / FORCE_READ_DIV)); }
+function readH(height: number): number { return Math.max(1, Math.ceil(height / FORCE_READ_DIV)); }
+
 export class TransMapForceField {
   private gl: WebGL2RenderingContext | null = null;
   private width = 0;
@@ -62,9 +102,6 @@ export class TransMapForceField {
   private active = false;
   private currentTexture: WebGLTexture | null = null;
 
-  /** Reused readback FBO, and the texture currently attached to it. See `readback()`. */
-  private readbackFBO: WebGLFramebuffer | null = null;
-  private attachedTexture: WebGLTexture | null = null;
   /**
    * v8 performance pass (G4b, 2026-11-12) — the ASYNC readback: a PIXEL_PACK buffer the read lands in, the fence that
    * says it has, and the size it was issued at (a read that predates a resize is dropped, never copied — its rows
@@ -72,6 +109,16 @@ export class TransMapForceField {
    */
   private packBuffer: WebGLBuffer | null = null;
   private packBytes = 0;
+  /** The quarter-resolution read target and its program (see `FORCE_READ_DIV`). */
+  private downProgram: WebGLProgram | null = null;
+  private downVao: WebGLVertexArrayObject | null = null;
+  private downTex: WebGLTexture | null = null;
+  private downFBO: WebGLFramebuffer | null = null;
+  private downW = 0;
+  private downH = 0;
+  private uDownSrc: WebGLUniformLocation | null = null;
+  private uDownSrcSize: WebGLUniformLocation | null = null;
+  private downFailed = false;
   private packSync: WebGLSync | null = null;
   private packW = 0;
   private packH = 0;
@@ -103,17 +150,15 @@ export class TransMapForceField {
   init(gl: WebGL2RenderingContext, width: number, height: number): void {
     // Drop any FBO from a previous init — a re-init can carry a different context, and an FBO is not
     // valid across contexts. Cheap insurance: this is called once at startup today.
-    if (this.gl && this.readbackFBO) this.gl.deleteFramebuffer(this.readbackFBO);
-    this.readbackFBO = null;
-    this.attachedTexture = null;
     // G4b: likewise the async readback's buffer and fence (they belong to the previous context).
     if (this.gl && this.packBuffer) this.gl.deleteBuffer(this.packBuffer);
     if (this.gl && this.packSync) this.gl.deleteSync(this.packSync);
     this.packBuffer = null; this.packSync = null; this.packBytes = 0; this.packW = 0; this.packH = 0;
+    this.releaseDown();
     this.gl = gl;
     this.width = width;
     this.height = height;
-    this.rgbaBuffer = new Float32Array(width * height * 4);
+    this.rgbaBuffer = new Float32Array(readW(width) * readH(height) * 4);
     this.frameCounter = 0;
   }
 
@@ -215,7 +260,7 @@ export class TransMapForceField {
     if (this.packSync) {
       const status = gl.getSyncParameter(this.packSync, gl.SYNC_STATUS);
       if (status === gl.SIGNALED) {
-        if (this.packW === this.width && this.packH === this.height && this.packBuffer) {
+        if (this.packW === readW(this.width) && this.packH === readH(this.height) && this.packBuffer) {
           gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
           gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.rgbaBuffer);
           gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
@@ -228,34 +273,98 @@ export class TransMapForceField {
     this.frameCounter++;
     if (this.frameCounter % 4 !== 0 || this.packSync) return;
 
-    // One FBO for the life of the object, re-attached only when the source texture actually changes.
-    //
-    // This used to `createFramebuffer` + `deleteFramebuffer` on every readback — 15 driver-side object
-    // create/destroy pairs per second, all to read the same texture with the same attachment. The
-    // attachment is the only thing that varies, and `setFlowTexture` is the only thing that varies it,
-    // so caching what is attached makes the steady-state cost a single `bindFramebuffer`.
-    if (!this.readbackFBO) {
-      this.readbackFBO = gl.createFramebuffer();
-      this.attachedTexture = null;
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.readbackFBO);
-    if (this.attachedTexture !== this.currentTexture) {
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.currentTexture, 0);
-      this.attachedTexture = this.currentTexture;
-    }
-    const bytes = this.width * this.height * 16;
+    // The box-average into the quarter-resolution target, then the read of THAT (see `FORCE_READ_DIV`).
+    const rw = readW(this.width), rh = readH(this.height);
+    if (!this.ensureDownTarget(gl, rw, rh)) return;
+    // ⚠️ GL state this pass touches is SAVED and RESTORED — it runs in the middle of the frame (`main.ts` reads the
+    // trail binding back after it), and a leaked viewport, blend, program, VAO or unit-0 texture would reach the next
+    // draw silently. Blending is OFF for the draw: the target is float, and float blending is an extension.
+    const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
+    const blend = gl.isEnabled(gl.BLEND);
+    const prog = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
+    const vao = gl.getParameter(gl.VERTEX_ARRAY_BINDING) as WebGLVertexArrayObject | null;
+    const active = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
+    gl.activeTexture(gl.TEXTURE0);
+    const tex0 = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.downFBO);
+    gl.viewport(0, 0, rw, rh);
+    gl.disable(gl.BLEND);
+    gl.useProgram(this.downProgram);
+    gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+    gl.uniform1i(this.uDownSrc, 0);
+    gl.uniform2i(this.uDownSrcSize, this.width, this.height);
+    gl.bindVertexArray(this.downVao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    const bytes = rw * rh * 16;
     if (!this.packBuffer) this.packBuffer = gl.createBuffer();
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.packBuffer);
     if (this.packBytes !== bytes) {
       gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
       this.packBytes = bytes;
     }
-    gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, 0);
+    gl.readPixels(0, 0, rw, rh, gl.RGBA, gl.FLOAT, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     this.packSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    this.packW = this.width;
-    this.packH = this.height;
+    this.packW = rw;
+    this.packH = rh;
+
+    gl.bindVertexArray(vao);
+    gl.bindTexture(gl.TEXTURE_2D, tex0);
+    gl.activeTexture(active);
+    gl.useProgram(prog);
+    if (blend) gl.enable(gl.BLEND);
+    gl.viewport(vp[0]!, vp[1]!, vp[2]!, vp[3]!);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  /** Free the downsample resources (invariant 1: every deleted handle nulled). */
+  private releaseDown(): void {
+    const gl = this.gl;
+    if (gl) {
+      if (this.downProgram) gl.deleteProgram(this.downProgram);
+      if (this.downVao) gl.deleteVertexArray(this.downVao);
+      if (this.downTex) gl.deleteTexture(this.downTex);
+      if (this.downFBO) gl.deleteFramebuffer(this.downFBO);
+    }
+    this.downProgram = null; this.downVao = null; this.downTex = null; this.downFBO = null;
+    this.uDownSrc = null; this.uDownSrcSize = null; this.downW = 0; this.downH = 0; this.downFailed = false;
+  }
+
+  /**
+   * The quarter-resolution target and its program, (re)made for `rw × rh`. ⚠️ Through `compileProgram` (a failed compile
+   * throws nothing and draws nothing) and with a completeness check (invariant 5); a failure LATCHES `downFailed` and
+   * the force field simply stops updating rather than reading an incomplete framebuffer every 4th frame.
+   */
+  private ensureDownTarget(gl: WebGL2RenderingContext, rw: number, rh: number): boolean {
+    if (this.downFailed) return false;
+    if (!this.downProgram) {
+      this.downProgram = compileProgram(gl, FORCE_DOWN_VERT, FORCE_DOWN_FRAG, 'TransMap force downsample');
+      this.uDownSrc = gl.getUniformLocation(this.downProgram, 'uSrc');
+      this.uDownSrcSize = gl.getUniformLocation(this.downProgram, 'uSrcSize');
+      this.downVao = gl.createVertexArray();
+    }
+    if (this.downTex && this.downW === rw && this.downH === rh) return true;
+    if (!this.downTex) this.downTex = gl.createTexture();
+    const unit0 = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+    gl.bindTexture(gl.TEXTURE_2D, this.downTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, rw, rh, 0, gl.RGBA, gl.FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.bindTexture(gl.TEXTURE_2D, unit0);
+    if (!this.downFBO) this.downFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.downFBO);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.downTex, 0);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!ok) {
+      console.warn('PSSS: TransMap force downsample target incomplete; the texture-sourced force stops updating');
+      this.downFailed = true;
+      return false;
+    }
+    this.downW = rw; this.downH = rh;
+    return true;
   }
 
 
@@ -280,24 +389,28 @@ export class TransMapForceField {
     }
     if (!this.rgbaBuffer) return [ax, ay];
 
-    // Convert pixel coords to buffer coords with bilinear interpolation
-    const fx = Math.max(0, Math.min(this.width - 1.001, x));
-    const fy = Math.max(0, Math.min(this.height - 1.001, y));
+    // Pixel coords to the READ grid (1/FORCE_READ_DIV per axis), bilinear. In this function's convention a texel's
+    // value sits at its integer coordinate, so a block of FORCE_READ_DIV pixels averages to the coordinate
+    // `FORCE_READ_DIV·i + (FORCE_READ_DIV − 1)/2` — hence the offset before the division.
+    const rw = readW(this.width), rh = readH(this.height);
+    const half = (FORCE_READ_DIV - 1) / 2;
+    const fx = Math.max(0, Math.min(rw - 1.001, (x - half) / FORCE_READ_DIV));
+    const fy = Math.max(0, Math.min(rh - 1.001, (y - half) / FORCE_READ_DIV));
     const ix = Math.floor(fx);
     const iy = Math.floor(fy);
     const fracX = fx - ix;
     const fracY = fy - iy;
 
-    const ix1 = Math.min(ix + 1, this.width - 1);
-    const iy1 = Math.min(iy + 1, this.height - 1);
+    const ix1 = Math.min(ix + 1, rw - 1);
+    const iy1 = Math.min(iy + 1, rh - 1);
 
     // Stride 4, reading R and G in place. This was stride 2 over a compact RG copy until H2 deleted
     // that copy — the displacement is in `.rg`, so `+ 1` is still the G channel and the interpolation
     // below is unchanged.
-    const idx00 = (iy * this.width + ix) * 4;
-    const idx10 = (iy * this.width + ix1) * 4;
-    const idx01 = (iy1 * this.width + ix) * 4;
-    const idx11 = (iy1 * this.width + ix1) * 4;
+    const idx00 = (iy * rw + ix) * 4;
+    const idx10 = (iy * rw + ix1) * 4;
+    const idx01 = (iy1 * rw + ix) * 4;
+    const idx11 = (iy1 * rw + ix1) * 4;
 
     const buf = this.rgbaBuffer;
     const dx = (buf[idx00]! * (1 - fracX) * (1 - fracY) +
@@ -615,7 +728,7 @@ export class TransMapForceField {
   resize(width: number, height: number): void {
     this.width = width;
     this.height = height;
-    this.rgbaBuffer = new Float32Array(width * height * 4);
+    this.rgbaBuffer = new Float32Array(readW(width) * readH(height) * 4);
   }
 
   /**
@@ -632,13 +745,11 @@ export class TransMapForceField {
 
   dispose(): void {
     // Delete BEFORE nulling `gl` — the handle is unreachable afterwards and would leak.
-    if (this.gl && this.readbackFBO) this.gl.deleteFramebuffer(this.readbackFBO);
-    this.readbackFBO = null;
     // G4b — invariant 1: the async readback's buffer and fence die with the object, and their records with them.
     if (this.gl && this.packBuffer) this.gl.deleteBuffer(this.packBuffer);
     if (this.gl && this.packSync) this.gl.deleteSync(this.packSync);
     this.packBuffer = null; this.packSync = null; this.packBytes = 0; this.packW = 0; this.packH = 0;
-    this.attachedTexture = null;
+    this.releaseDown();
     this.gl = null;
     this.rgbaBuffer = null;
     this.offsetX = null;

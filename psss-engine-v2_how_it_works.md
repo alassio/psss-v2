@@ -3683,7 +3683,10 @@ Translation Map force (the whole displacement field, every 4th frame), fluid adv
 2nd frame) and physarum (its trail, every 4th frame). Each read goes into a GPU-side pixel buffer behind a fence;
 every frame the fence is checked without waiting, and once it has signalled the data is copied to the array the
 effect samples. The data is therefore one or two frames older than the read — the force field was already up to
-four frames old by design — and the frame never stalls on the graphics card.
+four frames old by design — and the frame never stalls on the graphics card. The Translation Map force is read at a
+quarter of the canvas resolution in each direction: a small GPU pass first averages each 4 × 4 block of the
+displacement field, so a read moves a sixteenth of the data (about 2 MB instead of 32 MB at 1788 × 1118), and the
+particles sample that smooth field bilinearly.
 
 **The trail decay is one full-screen pass.** Each frame the previous trail is copied into the other buffer and
 faded by the decay factor; both happen in one draw that writes `rgb · decay` (and the matching alpha) directly,
