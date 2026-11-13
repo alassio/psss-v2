@@ -692,6 +692,48 @@ export const OVERLAY_RULES = {
     },
     scale: { kind: 'mul-clamped', min: 0, max: 1, unit: 'fraction' },
   },
+  /*
+   * v8 Phase 37 — the attractor LAYOUT and the strand's six scalars (`37.D9`). ⚠️ **All seven SNAP, as every
+   * attractor key does** (`37.D1`) — and the five scalars must NOT be `lerp`: no value is an identity, so
+   * `SCALAR_IDENTITIES` would refuse them (premise correction 9), and an absent key must stay absent for the export
+   * gate. ⚠️ **The layout is FROZEN for the Randomiser with the renderer-population reason (`37.D7`)**; the six
+   * scalars are `continuous`, and `randomize.ts` jitters them ONLY while the strand is what is drawn (`37.9`).
+   */
+  attractorLayout: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: WHY_POPULATION },
+    scale: { kind: 'categorical' },
+  },
+  attractorArcSpan: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 16, max: 96, scale: 'geometric', unit: 'half-extents of arc along the strand' },
+    scale: { kind: 'none', why: 'Read only on the strand layout; no Sliders multiplier owns a strand.' },
+  },
+  attractorArcSpanDepth: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 0, max: 32, scale: 'linear', unit: 'half-extents of breathing on the strand length' },
+    scale: { kind: 'none', why: 'Identity is 0, where the modulator is SKIPPED; no scaler owns it.' },
+  },
+  attractorArcSpanRate: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 0.4, max: 20, scale: 'geometric', unit: 'OP_RATE_* breathing rate' },
+    scale: { kind: 'none', why: 'A rate is not a magnitude a Sliders multiplier could mean anything by.' },
+  },
+  attractorAdvance: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 1, max: 64, scale: 'geometric', unit: 'emitted points per 60 Hz frame' },
+    scale: { kind: 'none', why: 'Read only on the strand layout; no Sliders multiplier owns a strand.' },
+  },
+  attractorAdvanceDepth: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 0, max: 16, scale: 'linear', unit: 'points per frame of breathing on the strand speed' },
+    scale: { kind: 'none', why: 'Identity is 0, where the modulator is SKIPPED; no scaler owns it.' },
+  },
+  attractorAdvanceRate: {
+    group: 'attractor', law: { kind: 'snap' },
+    mutate: { kind: 'continuous', min: 0.4, max: 20, scale: 'geometric', unit: 'OP_RATE_* breathing rate' },
+    scale: { kind: 'none', why: 'A rate is not a magnitude a Sliders multiplier could mean anything by.' },
+  },
 
   // ── Render mode. Twin of `renderer.mode`, which snaps in the SAME group (see the twin rule above).
   // ⚠️ **`overlay.renderMode` IS THE ONLY CHANNEL A RE-APPLY READS** — `main.ts`'s resolution is

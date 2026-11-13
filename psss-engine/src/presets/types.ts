@@ -1263,6 +1263,31 @@ export interface OverlayState {
   paletteHueShift?:      number;
   attractorIndex?:       number;
   attractorBlend?:       number;
+  /**
+   * v8 Phase 37 — **the attractor LAYOUT** (`37.D1`/`37.D8`): `'cloud'` (absent = today's behaviour, 32 unrelated
+   * reference orbits, even coverage) or `'strand'` (ONE trajectory walked into a ring buffer at fixed arc-length
+   * spacing, so consecutive particles are consecutive points along the path — an OPEN, scrolling figure;
+   * `generators/attractor-strand.ts`). ⚠️ **Only the six ODE types can draw a strand** (`STRAND_CAPABLE`); on the
+   * two maps and the two escape fields the cloud draws and the row says so inline (`37.D16`).
+   * ⚠️ **The name is NOT `ribbon`**: `ribbonMode` is the per-particle trail renderer, eighty lines away in the tab.
+   */
+  attractorLayout?:      'cloud' | 'strand';
+  /**
+   * v8 Phase 37 — the strand's LENGTH in half-extents of arc (1–30, default 6): `ds = span · half / count`. Read
+   * only on the strand layout. The buffer is laid at this base and a breathing length RE-READS it, so the strand
+   * stretches rather than re-draws. `…Depth`/`…Rate` follow `34.4`'s breathing convention; a depth of 0 is exact.
+   */
+  attractorArcSpan?:      number;
+  attractorArcSpanDepth?: number;
+  attractorArcSpanRate?:  number;
+  /**
+   * v8 Phase 37 — the strand's SPEED in emitted points per 60 Hz frame (0–64, default 12; 0 FREEZES the strand).
+   * ⚠️ **`37.D4`'s dangerous one: a long trail plus a fast advance smears the strand**, and a breathing speed walks
+   * into that regime periodically. `…Depth`/`…Rate` as above.
+   */
+  attractorAdvance?:      number;
+  attractorAdvanceDepth?: number;
+  attractorAdvanceRate?:  number;
   renderMode?:           RenderMode;
   transMapEnabled?:      boolean;
   transMapStyle?:        TransMapStyle;

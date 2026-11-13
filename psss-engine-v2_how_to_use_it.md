@@ -165,8 +165,9 @@ the stroke has folded itself into something intricate — a lattice that fills a
 branching tree — while still being a single line you could draw without lifting the pen.
 
 The famous members of this family have names: the **Hilbert** curve, which visits every cell of a cube
-exactly once; the **dragon** and **terdragon**; the **Koch** curve; the **Gosper** island; the
-**Sierpiński** arrowhead; the **Minkowski** sausage. PSSS ships fifteen of them.
+exactly once; the **dragon** and **terdragon**; the **Koch** curve and **snowflake**; the **Gosper** island; the
+**Sierpiński** arrowhead; the **Minkowski** sausage; the **pentigree**; the **twindragon** and **fudgeflake**
+tiles. PSSS ships nineteen of them.
 
 What makes them useful here rather than merely pretty is one property that is easy to miss: **the angle
 the rule turns at is not part of the rule.** Run the Koch production at its published 90° and you get
@@ -1005,9 +1006,32 @@ copies out: *8 positions × 1 = 8 copies*. The section's badge counts it as one 
 |---|---|
 | **Preset** | Replaces the sine-wave curve with a **strange attractor**, keeping the current rendering and grading. Thirty-five are offered, from the Clifford, De Jong, Lorenz, Rössler, Thomas, Halvorsen, Aizawa and Nosé-Hoover families, plus a long list of Julia and Mandelbrot windows. *Off* restores the preset's own waves |
 | **Blend** | How far to move from the wave figure toward the attractor: 0 is the preset untouched, 1 the attractor alone |
+| **Layout** | How the attractor's particles are arranged. **Cloud** spreads them over many unrelated orbits, for even coverage. **Strand** follows ONE trajectory, so neighbouring particles are neighbouring points along the path: the figure becomes a single moving stroke with two free ends. Only the six flows (Lorenz, Rössler, Thomas, Halvorsen, Aizawa, Nosé-Hoover) have a trajectory to follow; on the others the row says so and the cloud draws |
+| **Strand Length** | How much of the trajectory the strand shows, in multiples of the attractor's size. Around 48 shows most of the shape; longer strands pile up where the path retraces itself and wash towards white. Thomas and Aizawa never fill in the way their clouds do, because one orbit does not visit all of them |
+| **Strand Speed** | How fast the strand travels along its trajectory, in new points per frame. 0 freezes it |
+| **Length Breath**, **Length Rate**, **Speed Breath**, **Speed Rate** | Make the length or the speed swell and settle over time. The length breathes by stretching the strand, not by redrawing it. 0 holds it still |
 
 Use **Blend** rather than switching outright — a mid value gives an attractor that still has some of
 the preset's character in it. Blend also fades the Translation Map warp as it rises.
+
+**A strand changes what colour and motion mean.** With the palette mapped by **particle index**, the colour
+runs as a gradient along the stroke instead of as noise. The **velocity** colour and stretch measure how
+fast the strand travels, not the attractor's own speed. And because a strand's value is its order, the
+effects that push particles around (curl noise, fluid, physarum) work against it. A long trail with a
+fast strand smears it into a blur, so a strand reads best with a shorter trail than a cloud.
+
+**Blend works point by point on a strand.** Both the wave figure and the strand are ordered strokes, so a
+mid Blend gives a single stroke between the two, and dragging Blend from 0 to 1 morphs one into the other
+(`Lorenz Strand Morph`). A cloud cannot do this, because its neighbouring particles sit on unrelated orbits.
+
+![The Attractor section on Lorenz Strand: Layout set to Strand, with Strand Length, Length Breath, Length Rate, Strand Speed, Speed Breath and Speed Rate below it](manual-images/lab-visual-fx-strand.png)
+
+*The **Attractor** section on `Lorenz Strand`: **Preset** *Lorenz Classic* at **Blend** 0.95, **Layout** set to
+**Strand**, and its rows below it — **Strand Length** 103 × size breathing ±25 every 94.4 s, **Strand Speed** 9 new
+points per frame, its breathing Off. On **Cloud** the six strand rows are hidden.*
+
+> The preview tiles draw a lighter version of the attractor — fewer particles and a shorter start-up, so a
+> tile shows the right figure but a thinner sample of it than the main view. Judge the detail in the main view.
 
 > Some attractor families flicker slightly by their nature. That is the mathematics, not a fault.
 
@@ -2203,8 +2227,8 @@ wobbling angle rebuilds this rule's curve every frame.*
 - **Descend and Twist do not combine.** While the curve is descending, Twist and Stretch have no effect;
   set Descend back to 1× to use them.
 - **On a few rules a wobbling angle is noticeably more expensive**, and the tab says so in a note when
-  it applies. The space-filling rules — Hilbert, Moore, Peano — have to rebuild the whole stroke every
-  frame when an angle moves, because their shape is not a smooth function of the angle at any useful
+  it applies. The space-filling rules — Hilbert, Moore, Peano — and the Twindragon have to rebuild the whole
+  stroke every frame when an angle moves, because their shape is not a smooth function of the angle at any useful
   step. Recursion and Smoothness are unaffected on every rule.
 
 ##### Customize — editing the generator
@@ -2278,8 +2302,10 @@ second, smaller table appears: the steps of a shape the copies are laid along in
 a loop. Ticking it adds one straight step, which changes nothing; add and edit steps from there. **Moore**
 shows what it is for: its generator is exactly Hilbert 2D's, laid along a starting shape of four steps up
 the square's centre line, a U-turn, and back down — each copy fills the square on one side of its step, so
-the way up fills one half and the way back the other. **Descend** is not available while a starting shape
-is set.
+the way up fills one half and the way back the other. The four closed tiles open the same way: Customize on the
+**Koch snowflake** shows Koch's four steps on a starting triangle, on the **Pentigree** its six steps on a
+pentagon, on the **Twindragon** the dragon's two steps out along one step and back, and on the **Fudgeflake**
+the terdragon's three steps on a triangle. **Descend** is not available while a starting shape is set.
 
 ![Customize on Moore: the Hilbert 2D generator in Cells mode and a four-step starting shape](manual-images/lab-composer-customize-moore.png)
 
@@ -2309,8 +2335,11 @@ and glow brighter there. Every named rule reads *even* or *uneven*.
 > | **Stretch** | `Curve Breathing Thicket` — the branches growing and receding at every level at once |
 > | **Yaw** between two named fractals on one rule | `Curve Koch Cesaro` — the Koch curve at 60° opening into the Cesàro curve at 85° |
 > | **Descend** on a rule that divides by three | `Curve Peano Descent` |
-> | a rule that **closes into a loop** | `Curve Weave` — the one shipped curve you can trace all the way round |
+> | a rule that **closes into a loop** | `Curve Weave` (Moore), `Curve Snowflake` (the Koch curve round a triangle, its recursion breathing so the flake subdivides), `Curve Pentigree` (the only five-fold figure), `Curve Twindragon` (two dragons back to back, a tile) and `Curve Fudgeflake` (three terdragons round a triangle) |
 > | a **Customize** generator, edited in the table | `Curve Rosette Chain` — three steps no named rule has, a chain of hexagonal rosettes opening into 3-D as its Twist breathes |
+> | a **Customize** curve no named rule draws | `Curve Golden Dragon` — the golden dragon, two steps of unequal length (1 and 0.75) at about 80°, curling into a chain of spirals |
+> | the **same Customize steps with one copy reversed** | `Curve Golden Lightning` — the golden dragon's two steps with the second walked backwards: the spirals become a branching, lightning-like dendrite |
+> | a **Customize** coastline under **3-D Symmetry** | `Curve Zigzag Cross` — six unit steps at right angles (turns 0, +1, −1, −1, +1, 0) breathing their angle, repeated round the vertices of a tetrahedron |
 > | a **Customize** starting from a 3-D rule | `Chaos to Order` — the Hilbert 3-D lattice under Customize, drawn as cells, its Twist breathing so the lattice folds out of disorder into order and back |
 > | **Bush 3D** growing, as a surface | `Growing Corals` — the growth rule with its Recursion breathing, so branches sprout and recede, drawn as Liquid under a 3-D Symmetry of overlapping copies |
 > | a curve under a **liquid surface** | `Liquid Maze` — the Hilbert 3-D lattice of `Curve Subdivide`, its recursion breathing, drawn as liquid |

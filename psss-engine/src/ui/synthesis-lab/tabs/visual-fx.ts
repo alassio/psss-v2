@@ -121,6 +121,9 @@ import {
   FRACTAL_FOLD_MAX_ITERATIONS, FRACTAL_FOLD_MIN_LIMIT, FRACTAL_FOLD_MAX_LIMIT, FRACTAL_FOLD_LIMIT_STEP,
   FRACTAL_FOLD_MAX_SCALE, FRACTAL_FOLD_SCALE_STEP, FRACTAL_FOLD_LIMIT_DEPTH_MAX, FRACTAL_FOLD_SCALE_DEPTH_MAX,
 } from '../../../core/fractal-fold.ts';
+// v8 Phase 37 — the strand's bounds are the engine's CLAMP constants, shared rather than typed twice.
+import { STRAND_SPAN_MIN, STRAND_SPAN_MAX, STRAND_ADVANCE_MIN, STRAND_ADVANCE_MAX } from '../../../generators/attractor-strand.ts';
+import type { AttractorStrandSettings } from '../../../generators/lissajous.ts';
 
 /**
  * v8 `31.2` (`E112`/`E113`/`E137`) — **the channel drivers' labels, and this record is the half of the
@@ -1152,6 +1155,15 @@ export interface VisualFxControls {
     limitDepth: number; limitRate: number; scaleDepth: number; scaleRate: number;
   }>): void;
   /**
+   * v8 Phase 37 — the attractor LAYOUT and the strand's six scalars: one getter returning the ENGINE's clamped
+   * values, one patch setter. `strandCapable` answers *can the CURRENT attractor type draw a strand* (the six ODE
+   * flows), `isStrandActive` *is a strand being drawn right now* (layout, type and a live blend together).
+   */
+  getAttractorStrand(): AttractorStrandSettings;
+  setAttractorStrand(patch: Partial<AttractorStrandSettings>): void;
+  strandCapable(): boolean;
+  isStrandActive(): boolean;
+  /**
    * v8 `31.2` (`E112`/`E113`/`E137`) — per-particle appearance: one shared driver, three amounts.
    *
    * ⚠️ **The setter takes a `ChannelDriver`, not a `string`**, so this tab cannot hand the engine a word
@@ -1827,6 +1839,9 @@ export class VisualFxTab implements TabModule {
   /** v8 Phase 38 — the Fractal Fold's rows below its gate, and its scale-0 precondition note. */
   private fractalFoldRows: HTMLElement[] = [];
   private fractalFoldZeroNote: HTMLElement | null = null;
+  /** v8 Phase 37 — the strand's rows below `Layout`, and the type precondition note (`37.D16`). */
+  private strandRows: HTMLElement[] = [];
+  private strandTypeNote: HTMLElement | null = null;
   // v8 31.1 — the three rows the plate's BLEND gates. The blend row itself is always visible.
   // v8 31.4 — the three 4D angles, gated on the extent. The extent row itself is always visible.
   /*
@@ -2607,6 +2622,13 @@ export class VisualFxTab implements TabModule {
       const ffNow = this.controls.getFractalFold();
       for (const r of this.fractalFoldRows) show(r, ffNow.iterations > 0);
       show(this.fractalFoldZeroNote, ffNow.iterations > 0 && ffNow.scale === 0 && ffNow.scaleDepth === 0);
+      // v8 Phase 37 — the LAYOUT is the gate for the four strand rows (hidden on the cloud, never deleted: the values
+      // stay authored and exported). The precondition note shows only where it is TRUE: a strand chosen on a live
+      // attractor whose type has no trajectory to order (`37.D16` — visible and stated, never hidden-and-inert).
+      const stNow = this.controls.getAttractorStrand();
+      const attractorOn = this.controls.getAttractorIndex() >= 0;
+      for (const r of this.strandRows) show(r, stNow.layout === 'strand');
+      show(this.strandTypeNote, stNow.layout === 'strand' && attractorOn && !this.controls.strandCapable());
     }
     // v8 31.4 — the three angles are provably inert at extent 0 (the stage is skipped), so the row is
     // hidden there rather than shown dead. ⚠️ `display: none` stops a row being SEEN, not working: the
@@ -3634,6 +3656,77 @@ export class VisualFxTab implements TabModule {
       set: v => this.controls.setAttractorBlend(v),
     })));
     /*
+     * v8 Phase 37 — **the attractor LAYOUT and the strand**, below `Preset` and `Blend` (`37.6`) so the attractor
+     * source rows stay together. `Layout` is the gate and always visible; the four strand rows hide on `Cloud`.
+     *
+     * ⚠️ **`Layout` STAYS VISIBLE ON EVERY TYPE (`37.D16`, reversing the spec's §4.4)**: on the two maps and the two
+     * escape fields a strand is impossible and the cloud draws, so the row states that INLINE (a precondition stays
+     * inline, never in a tooltip) instead of hiding a control the preset may carry.
+     *
+     * ⚠️ **Steps are negative powers of two** (the Slider-tracks rule: a form control refuses an overshooting
+     * stop), and the rows re-read after set so the panel shows the engine's CLAMPED value.
+     */
+    tgt.appendChild(this.makeRow('Layout', this.select({
+      key: 'attractorLayout',
+      options: [['cloud', 'Cloud'], ['strand', 'Strand']],
+      get: () => this.controls.getAttractorStrand().layout,
+      set: v => { this.controls.setAttractorStrand({ layout: v === 'strand' ? 'strand' : 'cloud' }); this.syncVisibility(); },
+    })));
+    {
+      // One literal, set ONCE, `display` toggled (`tipcheck`'s inline-copy scan cannot see a ternary).
+      const note = document.createElement('p');
+      note.className = 'sl-tab-desc';
+      note.textContent = 'This attractor has no single trajectory to order, so it draws as a cloud. A strand needs '
+        + 'one of the six flows: Lorenz, R\u00f6ssler, Thomas, Halvorsen, Aizawa or Nos\u00e9-Hoover.';
+      this.strandTypeNote = note;
+      tgt.appendChild(note);
+    }
+    const st = () => this.controls.getAttractorStrand();
+    const stRow = (label: string, el: HTMLElement): HTMLElement => {
+      const r = this.makeRow(label, el);
+      this.strandRows.push(r);
+      tgt.appendChild(r);
+      return r;
+    };
+    stRow('Strand Length', this.slider({
+      key: 'attractorArcSpan', min: STRAND_SPAN_MIN, max: STRAND_SPAN_MAX, step: 1, decimals: 0, rereadAfterSet: true,
+      get: () => st().span,
+      set: v => this.controls.setAttractorStrand({ span: v }),
+      fmt: v => `${v.toFixed(0)} \u00d7 size`,
+    }));
+    stRow('Length Breath', this.slider({
+      key: 'attractorArcSpanDepth', min: 0, max: 64, step: 1, rereadAfterSet: true,
+      get: () => st().spanDepth,
+      set: v => this.controls.setAttractorStrand({ spanDepth: v }),
+      fmt: d => fmtDepth(d, 'length', st().span + d > STRAND_SPAN_MAX || st().span - d < STRAND_SPAN_MIN),
+    }));
+    stRow('Length Rate', this.slider({
+      key: 'attractorArcSpanRate', min: 0, max: 1, step: OP_RATE_STEP,
+      get: () => st().spanRate,
+      set: v => this.controls.setAttractorStrand({ spanRate: v }),
+      toPos: OP_RATE_TRACK.toPos, fromPos: OP_RATE_TRACK.fromPos, fmt: r => this.fmtOpRate(r),
+      wideLabel: true,
+    }));
+    stRow('Strand Speed', this.slider({
+      key: 'attractorAdvance', min: STRAND_ADVANCE_MIN, max: STRAND_ADVANCE_MAX, step: 1, decimals: 0, rereadAfterSet: true,
+      get: () => st().advance,
+      set: v => this.controls.setAttractorStrand({ advance: v }),
+      fmt: v => (v === 0 ? 'Frozen' : `${v.toFixed(0)} / frame`),
+    }));
+    stRow('Speed Breath', this.slider({
+      key: 'attractorAdvanceDepth', min: 0, max: 32, step: 1, decimals: 0, rereadAfterSet: true,
+      get: () => st().advanceDepth,
+      set: v => this.controls.setAttractorStrand({ advanceDepth: v }),
+      fmt: d => fmtDepth(d, 'speed', st().advance + d > STRAND_ADVANCE_MAX || st().advance - d < STRAND_ADVANCE_MIN),
+    }));
+    stRow('Speed Rate', this.slider({
+      key: 'attractorAdvanceRate', min: 0, max: 1, step: OP_RATE_STEP,
+      get: () => st().advanceRate,
+      set: v => this.controls.setAttractorStrand({ advanceRate: v }),
+      toPos: OP_RATE_TRACK.toPos, fromPos: OP_RATE_TRACK.fromPos, fmt: r => this.fmtOpRate(r),
+      wideLabel: true,
+    }));
+    /*
      * ⚠️⚠️ **THE ATTRACTOR `Flow` ROW WAS REMOVED FROM THIS TAB ON 2026-11-01 (owner) AND THE ENGINE PATH
      * WAS DELIBERATELY KEPT.** The row offered `33.4`'s two escape-field flows — *Contours (around the
      * set)* and *Field lines (into the set)* — and the owner's verdict on the second was that it has no
@@ -3653,7 +3746,9 @@ export class VisualFxTab implements TabModule {
      *
      * ⚠️ **No preset in the library authors it any more either**: the three that did (`Black Hole Rays`,
      * `Mandelbrot River Rays`, `Siegel Disk Rays`) were converted to contours and renamed in the same
-     * sitting. So the ray path now ships REACHABLE AND DEMONSTRATED BY NOTHING, which is `shapecheck`
+     * sitting — ⚠️ and DELETED 2026-11-13 (owner): once converted, each was a byte-identical copy of its own
+     * parent (`Birth of a Black Hole`, `Mandelbrot River`, `Julia Siegel Disk River`), because the flow was
+     * the ONLY thing that set them apart. So the ray path now ships REACHABLE AND DEMONSTRATED BY NOTHING, which is `shapecheck`
      * §G0b's lesson arriving in a second subsystem — recorded here because this file is where the control
      * was, and `33.22`'s diagnosis is the only other place that knows the path is defective.
      */

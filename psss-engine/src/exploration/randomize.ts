@@ -9,6 +9,7 @@ import type { PresetStatistics } from './preset-stats.ts';
 import { deepCopy } from './state.ts';
 import { ATTRACTOR_ENTRY_BLEND, OVERLAY_RULES } from './overlay-rules.ts';
 import { ATTRACTOR_PRESETS } from '../generators/attractors.ts';
+import { STRAND_CAPABLE } from '../generators/attractor-strand.ts';
 import { getMaterialPreset, MATERIAL_PRESETS, resolveModeAgainstMaterial } from '../generators/material-presets.ts';
 import { FILM_LOOKS } from '../renderers/film-looks.ts';
 import { getAllPaletteNames } from '../presets/palettes.ts';
@@ -389,6 +390,14 @@ const CONTINUOUS: Record<KeysWithMutate<'continuous'>, Extract<MutateLaw, { kind
   growRateX: OVERLAY_RULES.growRateX.mutate,
   growRateY: OVERLAY_RULES.growRateY.mutate,
   growRateZ: OVERLAY_RULES.growRateZ.mutate,
+  // v8 Phase 37 (`37.9`). The strand's six scalars, jittered ONLY while the strand is what is drawn — see the
+  // attractor block in `jitterParameters`. `attractorLayout` is frozen (`37.D7`) and is absent by construction.
+  attractorArcSpan: OVERLAY_RULES.attractorArcSpan.mutate,
+  attractorArcSpanDepth: OVERLAY_RULES.attractorArcSpanDepth.mutate,
+  attractorArcSpanRate: OVERLAY_RULES.attractorArcSpanRate.mutate,
+  attractorAdvance: OVERLAY_RULES.attractorAdvance.mutate,
+  attractorAdvanceDepth: OVERLAY_RULES.attractorAdvanceDepth.mutate,
+  attractorAdvanceRate: OVERLAY_RULES.attractorAdvanceRate.mutate,
 };
 
 /**
@@ -514,6 +523,29 @@ function applyGaussianJitter(preset: UnifiedPreset, sigma: number, locks: Set<Ca
         ...preset.overlay,
         attractorBlend: jitterRuled(preset.overlay?.attractorBlend ?? ATTRACTOR_ENTRY_BLEND, 'attractorBlend', sigma),
       };
+      /*
+       * v8 Phase 37 (`37.9`) — the strand's scalars, ⚠️ **GATED ON THE STRAND BEING WHAT IS DRAWN**: the strand
+       * layout on a strand-capable type. A strand length with no strand is not a mutation anyone can see — which is
+       * `WHY_POPULATION`'s own sentence one level down. And a RATE is jittered only where its DEPTH is live: a rate
+       * with no depth is read by nothing. ⚠️ Only keys the preset already AUTHORS are nudged — an absent key stays
+       * absent, so the export gate still omits a strand the author never breathed.
+       */
+      const ap = ATTRACTOR_PRESETS[idx];
+      const ov = preset.overlay;
+      if (ap && ov.attractorLayout === 'strand' && STRAND_CAPABLE[ap.type]) {
+        const next = { ...ov };
+        if (ov.attractorArcSpan !== undefined) next.attractorArcSpan = jitterRuled(ov.attractorArcSpan, 'attractorArcSpan', sigma);
+        if (ov.attractorAdvance !== undefined) next.attractorAdvance = jitterRuled(ov.attractorAdvance, 'attractorAdvance', sigma);
+        if ((ov.attractorArcSpanDepth ?? 0) > 0) {
+          next.attractorArcSpanDepth = jitterRuled(ov.attractorArcSpanDepth!, 'attractorArcSpanDepth', sigma);
+          if (ov.attractorArcSpanRate !== undefined) next.attractorArcSpanRate = jitterRuled(ov.attractorArcSpanRate, 'attractorArcSpanRate', sigma);
+        }
+        if ((ov.attractorAdvanceDepth ?? 0) > 0) {
+          next.attractorAdvanceDepth = jitterRuled(ov.attractorAdvanceDepth!, 'attractorAdvanceDepth', sigma);
+          if (ov.attractorAdvanceRate !== undefined) next.attractorAdvanceRate = jitterRuled(ov.attractorAdvanceRate, 'attractorAdvanceRate', sigma);
+        }
+        preset.overlay = next;
+      }
     }
   }
 

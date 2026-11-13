@@ -507,6 +507,21 @@ const CUSTOM_ONLY_STRUCTURES: Partial<Record<RuleKey, () => RuleStructure>> = {
     const h = ruleStructure('hilbert2d')!;
     return { draw: 'cells', steps: h.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(0, 0, 0), mv(2, 0, 0), mv(0, 0, 0)] };
   },
+  /*
+   * v8 2026-11-13 — the four CLOSED tiles: a base generator laid round the axiom's own STARTING SHAPE, each found by
+   * search through this module's composition (`p71d-structures.mjs`, `p71e-twin90.mjs`) as the plain-flag member of
+   * its exact set. Koch snowflake: Koch round a triangle. Pentigree: its six-step generator round a pentagon (the ONE
+   * exact set). Twindragon: the Dragon generator out and back along one chord (turn 2 = 180° at 90°). Fudgeflake: the
+   * terdragon generator round a triangle.
+   */
+  kochSnowflake: () => ({ draw: 'path', steps: ruleStructure('koch')!.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(-2, 0, 0), mv(-2, 0, 0)] }),
+  pentigree: () => ({
+    draw: 'path',
+    steps: [mv(0, 0, 0), mv(-1, 0, 0), mv(2, 0, 0), mv(1, 0, 0), mv(-1, 0, 0), mv(-1, 0, 0)],
+    initiator: [mv(0, 0, 0), mv(-1, 0, 0), mv(-1, 0, 0), mv(-1, 0, 0), mv(-1, 0, 0)],
+  }),
+  twindragon: () => ({ draw: 'path', steps: ruleStructure('dragon')!.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(2, 0, 0)] }),
+  fudgeflake: () => ({ draw: 'path', steps: ruleStructure('terdragon')!.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(1, 0, 0), mv(1, 0, 0)] }),
 };
 
 /** The STRUCTURE of a rule's generator — its steps and draw mode, independent of every parameter. Memoised. */
@@ -670,10 +685,22 @@ function latticeFit(src: Float64Array, ref: Float64Array, n: number): CustomCurv
 function similarityFit(src: Float64Array, ref: Float64Array, n: number): { rotate: number; mirror: boolean } | null {
   let ext = 0;
   for (let i = 0; i < n; i++) ext = Math.max(ext, Math.abs(ref[i * 3]!), Math.abs(ref[i * 3 + 1]!));
+  /*
+   * The anchor pair: the first and LAST points, the chord. ⚠️ A CLOSED curve (the four tiles of 2026-11-13) has a zero
+   * chord, so there the anchor is the point FARTHEST from the start instead — any two distinct points fix an exact
+   * similarity, and an open rule keeps its last point, so every existing seed fits exactly as before.
+   */
+  let j = n - 1;
+  if (Math.hypot(ref[j * 3]! - ref[0]!, ref[j * 3 + 1]! - ref[1]!) <= 1e-9 * Math.max(ext, 1e-12)) {
+    let far = 0;
+    for (let i = 1; i < n; i++) {
+      const d = Math.hypot(ref[i * 3]! - ref[0]!, ref[i * 3 + 1]! - ref[1]!);
+      if (d > far) { far = d; j = i; }
+    }
+  }
   let best: { rotate: number; mirror: boolean; err: number } | null = null;
   for (const mirror of [false, true]) {
     const sy = (i: number): number => (mirror ? -src[i * 3 + 1]! : src[i * 3 + 1]!);
-    const j = n - 1;
     const dsr = src[j * 3]! - src[0]!, dsi = sy(j) - sy(0);
     const drr = ref[j * 3]! - ref[0]!, dri = ref[j * 3 + 1]! - ref[1]!;
     const den = dsr * dsr + dsi * dsi;

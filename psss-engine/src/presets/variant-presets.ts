@@ -12366,1187 +12366,6 @@ export const VARIANT_PRESETS: VariantPreset[] = [
   {
     after: 'Birth of a Black Hole',
     atEnd: true,   // v8 31.6 — every demo sits at the END of the library (owner, 2026-10-25)
-    name: 'Black Hole Contours',
-    /*
-     * v8 `33.4` — the escape field's OTHER foliation. **The ONE change this demo owns.**
-     *
-     * Its parent follows the field's iso-contours, which are the equipotentials of the Douady–Hubbard
-     * potential — particles circle the Julia set at a constant distance. This follows the GRADIENT instead,
-     * so they run straight at it: the dendrite's spikes gain filaments converging on their tips.
-     *
-     * ⚠️⚠️ **IT IS NOT AN EXTERNAL-RAY TRACER and the manual must not call it one.** The field is
-     * low-passed by three 3×3 blur passes before anything reads it, so its gradient lines diverge from true
-     * external rays by more than the 512² sampling implies. Two independent research agents reached that
-     * separately. **A new visual family, not the exact object.**
-     *
-     * ⚠️ **Expect it to be GRAINIER than its parent, and that is structural rather than a tuning fault**: a
-     * field line runs out to the window edge, so it fails the flow test and respawns far more often than a
-     * closed contour does. Measured over the whole population, every particle lands somewhere different.
-     */
-    preset: {
-      metadata: {
-        name: 'Black Hole Contours',
-        version: 2,
-        designResolution: {
-          width: 80,
-          height: 80
-        }
-      },
-      generators: {
-        type: 'lissajous',
-        particleCount: 20000,
-        waveSpeed: 0.05,
-        rotation: [
-          0,
-          0,
-          0
-        ],
-        angle: [
-          0,
-          0,
-          0
-        ],
-        waves: [
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 90,
-                am: {
-                  base: 0,
-                  amplitude: 40,
-                  frequency: 1
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 40,
-                  frequency: 2
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 30,
-                am: {
-                  base: 0,
-                  amplitude: 20,
-                  frequency: 3
-                },
-                fm: {
-                  base: 3,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 20,
-                  frequency: 4
-                },
-                fm: {
-                  base: 3,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          }
-        ],
-        colorBase: [
-          32,
-          64,
-          128
-        ],
-        colorAmp: [
-          64,
-          64,
-          128
-        ],
-        colorFreq: [
-          0.01,
-          0.02,
-          0.03
-        ],
-        colorShift: [
-          0.5,
-          0.23,
-          0.3
-        ]
-      },
-      renderer: {
-        mode: 'star',
-        glow: 2,
-        decayFactor: 0.9876543209876544,
-        blurRadius: 4,
-        depthSize: 0,
-        streaks: 0
-      },
-      postProcessors: {
-        transMap: {
-          enabled: true,
-          style: 3,
-          beforeParticles: false,
-          sinMagicParams: [
-            [
-              20,
-              10,
-              5,
-              2.5
-            ],
-            [
-              -1,
-              -2,
-              -3,
-              -4
-            ],
-            [
-              20,
-              10,
-              5,
-              2.5
-            ],
-            [
-              1,
-              2,
-              3,
-              4
-            ]
-          ],
-          sinMagicParams2: [
-            [
-              -0.2,
-              0,
-              0,
-              0
-            ],
-            [
-              0.5,
-              0,
-              0,
-              0
-            ],
-            [
-              -0.2,
-              0,
-              0,
-              0
-            ],
-            [
-              -0.5,
-              0,
-              0,
-              0
-            ]
-          ],
-          zoomCenter: {
-            x: 50,
-            y: 50
-          }
-        },
-        bloom: {
-          enabled: false,
-          threshold: 0.8,
-          intensity: 0.3,
-          radius: 5
-        },
-        toneMap: {
-          curve: 'none',
-          exposure: 1,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ]
-        }
-      },
-      overlay: {
-        ribbonMode: 'off',
-        ribbonWidth: 3,
-        linesEnabled: false,
-        lineWidth: 1,
-        filmLook: 'Customize',
-        attractorIndex: 13,
-        attractorBlend: 0.75,
-        renderMode: 'blend',
-        transMapEnabled: true,
-        transMapStyle: 3,
-        transMapChain: [
-          {
-            style: 3,
-            enabled: true,
-            weight: 1
-          },
-          {
-            style: 7,
-            enabled: true,
-            weight: 1,
-            refraction: {
-              strength: 0.3,
-              reach: 2.3,
-              invert: false,
-              source: 'density'
-            }
-          }
-        ],
-        curlNoise: {
-          enabled: false,
-          turbulence: 0,
-          scale: 1,
-          evolutionSpeed: 0.5
-        },
-        speedFactor: 1,
-        figureScale: 1.137411461756029,
-        physarum: {
-          blend: 0,
-          sensorAngle: 30,
-          sensorDistance: 20,
-          turnSpeed: 45,
-          decayRate: 0.2,
-          depositAmount: 0.05,
-          showTrail: true,
-          trailOpacity: 0.8
-        },
-        fluidAdvection: {
-          blend: 0,
-          returnForce: 0.5
-        },
-        customFilmLookParams: {
-          glow: 4,
-          depthSize: 0,
-          depthBrightness: 0,
-          depthDof: 0,
-          depthColorShift: 0,
-          lightingMode: 0,
-          lightDir: [
-            0.5,
-            -0.7,
-            0.3
-          ],
-          rimPower: 3,
-          bloomEnabled: true,
-          bloomThreshold: 0.6,
-          bloomIntensity: 0.3,
-          toneMapEnabled: true,
-          toneMapCurve: 'aces',
-          exposure: 1.4,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ],
-          saturation: 1,
-          vignette: 0,
-          palette: 'none',
-          paletteMapping: 'depth'
-        },
-        palette: 'Cycle: Deep Blue',
-        paletteMapping: 'index',
-        // ⚠️⚠️ CONVERTED TO CONTOURS 2026-11-01 (owner): this body authored `escapeFlow: 'ray'`,
-        // and the field-lines flow was withdrawn from the UI because the lines get SWALLOWED at the
-        // boundary — which is `33.22`'s replenishment defect, diagnosed and never fixed. **The key is now
-        // ABSENT, and absent resolves to `'contour'`, the engine's default since `33.4`** — so the preset
-        // still renders, with the flow it has rather than the one it was built for. ⚠️ **The name changed in
-        // the same edit (`… Rays` → `… Contours`): a name is a claim about the picture, and this one's was
-        // about to become false.** ⚠️ The ray path is still LIVE in the engine for an imported body.
-      }
-    },
-  },
-  {
-    after: 'Mandelbrot River',
-    atEnd: true,   // v8 31.6 — every demo sits at the END of the library (owner, 2026-10-25)
-    name: 'Mandelbrot River Contours',
-    /*
-     * v8 `33.4` — the same one change on the full Mandelbrot set, at 30 100 particles.
-     *
-     * ⚠️ **Two hosts for one operator, deliberately**: the dendrite is all spikes and the full set is one
-     * body with a boundary, so if the two read alike the finding is about the foliation, and if they differ
-     * it is about the set. One demo could not separate those.
-     */
-    preset: {
-      metadata: {
-        name: 'Mandelbrot River Contours',
-        version: 2,
-        designResolution: {
-          width: 75,
-          height: 60
-        },
-        createdWith: 'refined-presets generator',
-        tags: [
-          'refined',
-          'geo'
-        ]
-      },
-      generators: {
-        type: 'lissajous',
-        particleCount: 30100,
-        waveSpeed: 0.05,
-        rotation: [
-          0,
-          0,
-          0.9
-        ],
-        angle: [
-          0,
-          0,
-          0
-        ],
-        waves: [
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 90,
-                am: {
-                  base: 25,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 25,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 67.5,
-                  frequency: 1
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          }
-        ],
-        colorBase: [
-          128,
-          128,
-          128
-        ],
-        colorAmp: [
-          128,
-          128,
-          128
-        ],
-        colorFreq: [
-          0.1,
-          0.3,
-          0.2
-        ],
-        colorShift: [
-          0.2,
-          0.3,
-          0.1
-        ]
-      },
-      renderer: {
-        mode: 'star',
-        glow: 2,
-        decayFactor: 0.9876543209876544,
-        blurRadius: 4,
-        depthSize: 0,
-        streaks: 0
-      },
-      postProcessors: {
-        transMap: {
-          enabled: true,
-          style: 0,
-          beforeParticles: false,
-          sinMagicParams: [
-            [
-              -3.5252395,
-              -0.13100608,
-              3.4336207,
-              -0.18399265
-            ],
-            [
-              -0.85365725,
-              1.4781172,
-              6.382013,
-              0.35840952
-            ],
-            [
-              1.2670563,
-              -2.5264447,
-              3.7346892,
-              1.4638029
-            ],
-            [
-              6.2106223,
-              -0.96369255,
-              2.1401706,
-              -8.016661
-            ]
-          ],
-          sinMagicParams2: [
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ],
-          zoomCenter: {
-            x: 50,
-            y: 50
-          }
-        },
-        bloom: {
-          enabled: false,
-          threshold: 0.8,
-          intensity: 0.3,
-          radius: 5
-        },
-        toneMap: {
-          curve: 'none',
-          exposure: 1,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ]
-        }
-      },
-      overlay: {
-        ribbonMode: 'off',
-        ribbonWidth: 2.5,
-        linesEnabled: false,
-        lineWidth: 2,
-        filmLook: 'Customize',
-        attractorIndex: 25,
-        attractorBlend: 1,
-        renderMode: 'star',
-        transMapEnabled: false,
-        transMapStyle: 0,
-        transMapChain: [
-          {
-            style: 0,
-            enabled: false,
-            weight: 1
-          },
-          {
-            style: 4,
-            enabled: false,
-            weight: 1
-          },
-          {
-            style: 6,
-            enabled: false,
-            weight: 1
-          }
-        ],
-        ifsParams: [
-          {
-            angle: 120,
-            scale: 0.9,
-            tx: 0,
-            ty: 0,
-            weight: 1
-          },
-          {
-            angle: 240,
-            scale: 0.9,
-            tx: 0,
-            ty: 0,
-            weight: 1
-          },
-          {
-            angle: 360,
-            scale: 0.9,
-            tx: 0,
-            ty: 0,
-            weight: 1
-          }
-        ],
-        transMapDispersion: 0.23,
-        fluidFeedback: {
-          persist: 0.97,
-          amplify: 1,
-          dispersion: 0,
-          fieldDecay: 0.985,
-          glowBoost: 0
-        },
-        curlNoise: {
-          enabled: false,
-          turbulence: 0,
-          scale: 1,
-          evolutionSpeed: 0.5
-        },
-        speedFactor: 3.01,
-        figureScale: 1.4021152112778286,
-        physarum: {
-          blend: 0,
-          sensorAngle: 30,
-          sensorDistance: 20,
-          turnSpeed: 45,
-          decayRate: 0.2,
-          depositAmount: 0.05,
-          showTrail: true,
-          trailOpacity: 0.8
-        },
-        fluidAdvection: {
-          blend: 0,
-          returnForce: 0.5
-        },
-        customFilmLookParams: {
-          glow: 4,
-          depthSize: 0,
-          depthBrightness: 0,
-          depthDof: 0,
-          depthColorShift: 0,
-          lightingMode: 0,
-          lightDir: [
-            0.5,
-            -0.7,
-            0.3
-          ],
-          rimPower: 3,
-          bloomEnabled: false,
-          bloomThreshold: 0.05,
-          bloomIntensity: 0.65,
-          toneMapEnabled: true,
-          toneMapCurve: 'aces',
-          exposure: 2.3,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ],
-          saturation: 1,
-          vignette: 0,
-          palette: 'none',
-          paletteMapping: 'depth'
-        },
-        palette: 'Cycle: Neutral',
-        paletteMapping: 'index',
-        // ⚠️⚠️ CONVERTED TO CONTOURS 2026-11-01 (owner): this body authored `escapeFlow: 'ray'`,
-        // and the field-lines flow was withdrawn from the UI because the lines get SWALLOWED at the
-        // boundary — which is `33.22`'s replenishment defect, diagnosed and never fixed. **The key is now
-        // ABSENT, and absent resolves to `'contour'`, the engine's default since `33.4`** — so the preset
-        // still renders, with the flow it has rather than the one it was built for. ⚠️ **The name changed in
-        // the same edit (`… Rays` → `… Contours`): a name is a claim about the picture, and this one's was
-        // about to become false.** ⚠️ The ray path is still LIVE in the engine for an imported body.
-      }
-    },
-  },
-  {
-    after: 'Julia Siegel Disk River',
-    atEnd: true,   // v8 31.6 — every demo sits at the END of the library (owner, 2026-10-25)
-    name: 'Siegel Disk Contours',
-    /*
-     * v8 `33.4` — the third host, chosen because its interior is ROTATION-dominated.
-     *
-     * ⚠️ A Siegel disk's dynamics are an irrational rotation, so the equipotentials near it are nearly
-     * circular and the gradient lines cross them nearly radially — the one host where the two foliations
-     * should look most unlike each other. **If `33.4` reads as nothing anywhere, it should read as
-     * something here.**
-     */
-    preset: {
-      metadata: {
-        name: 'Siegel Disk Contours',
-        version: 2,
-        designResolution: {
-          width: 75,
-          height: 75
-        },
-        tags: [
-          'demo',
-          'attractor',
-          'fractal'
-        ]
-      },
-      generators: {
-        type: 'lissajous',
-        particleCount: 11000,
-        waveSpeed: 0.05,
-        rotation: [
-          0,
-          0,
-          0.25
-        ],
-        angle: [
-          0,
-          0,
-          0
-        ],
-        waves: [
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 90,
-                am: {
-                  base: 10.986328,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 20.182291,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 1,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 9.375,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 98,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          },
-          {
-            speed: 0.05,
-            axes: [
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              },
-              {
-                phase: 0,
-                am: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                },
-                fm: {
-                  base: 0,
-                  amplitude: 0,
-                  frequency: 0
-                }
-              }
-            ]
-          }
-        ],
-        colorBase: [
-          176,
-          152,
-          96
-        ],
-        colorAmp: [
-          56,
-          48,
-          64
-        ],
-        colorFreq: [
-          0.08,
-          0.1,
-          0.12
-        ],
-        colorShift: [
-          0.35,
-          0.2,
-          0.45
-        ]
-      },
-      renderer: {
-        mode: 'star',
-        glow: 1,
-        decayFactor: 0.7,
-        blurRadius: 1,
-        depthSize: 0,
-        streaks: 0
-      },
-      postProcessors: {
-        transMap: {
-          enabled: false,
-          style: 0,
-          beforeParticles: false,
-          sinMagicParams: [
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              1,
-              0,
-              0,
-              0
-            ],
-            [
-              8,
-              0,
-              0,
-              0
-            ]
-          ],
-          sinMagicParams2: [
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ],
-          zoomCenter: {
-            x: 50,
-            y: 50
-          }
-        },
-        bloom: {
-          enabled: false,
-          threshold: 0.8,
-          intensity: 0.3,
-          radius: 5
-        },
-        toneMap: {
-          curve: 'none',
-          exposure: 1,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ]
-        }
-      },
-      overlay: {
-        renderMode: 'liquid',
-        filmLook: 'Customize',
-        customFilmLookParams: {
-          glow: 5.5,
-          depthSize: 0,
-          depthBrightness: 0,
-          depthDof: 0,
-          depthColorShift: 0,
-          lightingMode: 0,
-          lightDir: [
-            0.5,
-            -0.7,
-            0.3
-          ],
-          rimPower: 3,
-          bloomEnabled: true,
-          bloomThreshold: 0.25,
-          bloomIntensity: 0.3,
-          toneMapEnabled: true,
-          toneMapCurve: 'aces',
-          exposure: 2.1,
-          lift: [
-            0,
-            0,
-            0
-          ],
-          gamma: [
-            1,
-            1,
-            1
-          ],
-          gain: [
-            1,
-            1,
-            1
-          ],
-          saturation: 1,
-          vignette: 0,
-          palette: 'none',
-          paletteMapping: 'depth'
-        },
-        palette: 'Prismatic',
-        paletteMapping: 'index',
-        speedFactor: 1.51,
-        attractorIndex: 19,
-        attractorBlend: 1,
-        figureScale: 1.4,
-        particleSize: 0.6,
-        liquid: {
-          isoLevel: 2.7321,
-          kernelWidth: 3.1,
-          edgeSoftness: 0.36,
-          tintSource: 'preset',
-          surfaceRamp: 'liquid',
-          colourMix: 0.85,
-          mixModel: 'pigment',
-          refraction: 0.49,
-          specular: 2,
-          thickness: 0.7,
-          edgeBrightness: 1.1
-        },
-        // ⚠️⚠️ CONVERTED TO CONTOURS 2026-11-01 (owner): this body authored `escapeFlow: 'ray'`,
-        // and the field-lines flow was withdrawn from the UI because the lines get SWALLOWED at the
-        // boundary — which is `33.22`'s replenishment defect, diagnosed and never fixed. **The key is now
-        // ABSENT, and absent resolves to `'contour'`, the engine's default since `33.4`** — so the preset
-        // still renders, with the flow it has rather than the one it was built for. ⚠️ **The name changed in
-        // the same edit (`… Rays` → `… Contours`): a name is a claim about the picture, and this one's was
-        // about to become false.** ⚠️ The ray path is still LIVE in the engine for an imported body.
-      }
-    },
-  },
-  {
-    after: 'Birth of a Black Hole',
-    atEnd: true,   // v8 31.6 — every demo sits at the END of the library (owner, 2026-10-25)
     name: 'Black Hole Relief',
     /*
      * v8 `33.5` — **the per-particle size driven by distance from the Julia set.**
@@ -35623,6 +34442,3785 @@ export const VARIANT_PRESETS: VariantPreset[] = [
         fractalFoldScale: 2,
         fractalFoldLimitDepth: 0.25,
         fractalFoldLimitRate: 4,
+      },
+    },
+  },
+  /**
+   * **Curve Snowflake** -- 2026-11-13 (owner), the NEW `kochSnowflake` rule: the Koch curve round a triangle, a closed six-fold tile, its recursion breathing 3 ↔ 5 so the flake subdivides and settles.
+   *
+   * Look inherited from `Curve Koch Cesaro` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Snowflake',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Snowflake',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'morph', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 50000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'kochSnowflake',
+          recursion: {
+            base: 4,
+            amplitude: 1,
+            frequency: 4.84375,
+          },
+          yaw: {
+            base: 60,
+            amplitude: 0,
+            frequency: 0,
+          },
+          pitch: {
+            base: 60,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 60,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0,
+          centre: [0, 0, 0],
+          twist: {
+            base: 0,
+            amplitude: 0,
+            frequency: 0,
+          },
+          stretch: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [6.119, 2.216, 1],
+        colorShift: [0.497, 0.612, 0.904],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.2,
+        decayFactor: 0.523,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: true,
+        lineWidth: 3,
+        filmLook: 'Customize',
+        palette: 'Cool',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 4,
+        ifsParams: [
+          {
+            angle: 15,
+            scale: 0.95,
+            tx: 0,
+            ty: 0,
+            weight: 1,
+          },
+        ],
+        transMapWarpMix: 0.5,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 0.85,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 7,
+          depthSize: 0.3,
+          depthBrightness: 0.3,
+          depthDof: 0.2,
+          depthColorShift: 0.3,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.1,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.3,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Cool',
+          paletteMapping: 'phase',
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Pentigree** -- 2026-11-13 (owner), the NEW `pentigree` rule: six steps at 72° round a pentagon, the library's only five-fold figure.
+   *
+   * Look inherited from `Curve Island` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Pentigree',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Pentigree',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 34000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'pentigree',
+          recursion: {
+            base: 4,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 72,
+            amplitude: 0,
+            frequency: 0,
+          },
+          pitch: {
+            base: 72,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 72,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0.4,
+          centre: [0, 0, 0],
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.882,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Sunset',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 0,
+        transMapChain: [
+          {
+            style: 0,
+            enabled: true,
+            weight: 1,
+            staticField: {
+              pattern: 'Fine Mesh',
+              strength: 0.5,
+              detail: 1,
+              drift: 0,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'sine',
+              shapeMix: 0,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 0,
+              angleY: 0,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+        ],
+        transMapWarpMix: 0.06,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 0,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.2,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Twindragon** -- 2026-11-13 (owner), the NEW `twindragon` rule: two Heighway dragons back to back, a plane tile; the recursion breathes 10 ↔ 12 (the angle stays at 90°: its bracket is below the useful floor, so a breathing yaw would rebuild every frame).
+   *
+   * Look inherited from `Curve Dragonfold` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Twindragon',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Twindragon',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 42000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'twindragon',
+          recursion: {
+            base: 11,
+            amplitude: 1,
+            frequency: 2,
+          },
+          yaw: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          pitch: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0.3,
+          centre: [0, 0, 0],
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1.884, 1, 1],
+        colorShift: [0.289, 0.413, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.2,
+        decayFactor: 0.605,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 13.5,
+        linesEnabled: false,
+        lineWidth: 0.5,
+        filmLook: 'Plasma',
+        palette: 'Neon',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 5,
+        transMapWarpMix: 0.1,
+        proceduralFlow: {
+          strength: 0.25,
+          scale: 2,
+          curlAmount: 0.6,
+          direction: [0.3, -0.95],
+          radial: 0,
+          evolutionSpeed: 0.5,
+          archetype: 'Smoke Drift',
+        },
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1.2527251618255102,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Fudgeflake** -- 2026-11-13 (owner), the NEW `fudgeflake` rule: three terdragons round a triangle, a three-fold tile, with the Triad's slow ±4.5° breath.
+   *
+   * Look inherited from `Curve Triad` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Fudgeflake',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Fudgeflake',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 36000,
+        waveSpeed: 0.05,
+        rotation: [0.15, 4, -1.22],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'fudgeflake',
+          recursion: {
+            base: 6,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 120,
+            amplitude: 4.5,
+            frequency: 0.07,
+          },
+          pitch: {
+            base: 120,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 120,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0.35,
+          centre: [0, 0, 0],
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.4,
+        decayFactor: 0.8,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'hybrid',
+        splatShear: 'tangent',
+        ribbonWidth: 3.5,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Neon',
+        palette: 'Ocean',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 0,
+        transMapChain: [
+          {
+            style: 0,
+            enabled: true,
+            weight: 1,
+            staticField: {
+              pattern: 'Grid Lattice',
+              strength: 0.1,
+              detail: 0.25,
+              drift: 0,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'square',
+              shapeMix: 1,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 0,
+              angleY: 0,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+        ],
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 0.95,   // the tile reached the canvas edge at its template scale (frame measured, p71h)
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Golden Dragon** -- 2026-11-13 (owner), a `Customize` curve, NOT a named rule (owner 2026-11-13): the golden dragon, two steps of lengths 1 and 0.75 at a 79.9° turn — the exact ratio (1/φ)^(1/φ) = 0.7427 sits on the editor's 1/16 grid as 0.75 and the turn as 2.5 Yaw units of 31.95°, measured to be visually the same figure (`p71-custom.png`).
+   *
+   * Look inherited from `Curve Rosette Chain` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Golden Dragon',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Golden Dragon',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 42000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'customize',
+          recursion: {
+            base: 13,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 31.953125,
+            amplitude: 0,
+            frequency: 0,
+          },
+          pitch: {
+            base: 31.953125,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 31.953125,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0,
+          centre: [0, 0, 0],
+          twist: {
+            base: 0,
+            amplitude: 0,
+            frequency: 0,
+          },
+          stretch: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          custom: {
+            steps: [
+              {
+                kind: 'move',
+                turn: 1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: -2.5,
+                lift: 0,
+                length: 0.75,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+            ],
+            draw: 'path',
+            frame: {
+              rotate: 0,
+              mirror: false,
+            },
+          },
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1.884, 1, 1],
+        colorShift: [0.301, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.2,
+        decayFactor: 0.703,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 1.5,
+        linesEnabled: true,
+        lineWidth: 3,
+        dischargeEnabled: false,
+        dischargeIntensity: 0.78125,
+        dischargeFilament: 2.625,
+        dischargeCrackle: 1,
+        dischargeBranching: 0,
+        filmLook: 'Customize',
+        palette: 'Warm',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 4,
+        ifsParams: [
+          {
+            angle: 45,
+            scale: 0.75,
+            tx: 0,
+            ty: 0,
+            weight: 1,
+          },
+        ],
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 0.45,
+        particleSize: 0.93,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.5,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 1.5,
+          bloomEnabled: false,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.25,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.3,
+          lift: [0, 0, 0],
+          gamma: [0.8, 0.8, 0.8],
+          gain: [1.3, 0.9, 1.4],
+          saturation: 1.6,
+          vignette: 0,
+          palette: 'Warm',
+          paletteMapping: 'temperature',
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Golden Lightning** -- 2026-11-13 (owner), a `Customize` curve, NOT a named rule, ON TRIAL (owner review decides): the golden dragon with its SECOND step walked in reverse — the same two steps (1 and 0.75 at 2.5 Yaw units of 31.95°) branch into a lightning-like dendrite instead of curling into spirals (`p71-custom.png`, `goldenDragonExactYawR`; self-avoiding).
+   *
+   * Look inherited from `Curve Weave Lightning` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Golden Lightning',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Golden Lightning',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 40000,
+        waveSpeed: 0.05,
+        rotation: [0.42, 11.11, -0.3],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'customize',
+          recursion: {
+            base: 10,
+            amplitude: 2,
+            frequency: 15.984375,
+          },
+          yaw: {
+            base: 31.953125,
+            amplitude: 7.5,
+            frequency: 5,
+          },
+          pitch: {
+            base: 31.953125,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 31.953125,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0,
+          centre: [0, 0, 0],
+          twist: {
+            base: 0,
+            amplitude: 0,
+            frequency: 0,
+          },
+          stretch: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          custom: {
+            steps: [
+              {
+                kind: 'move',
+                turn: 1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: -2.5,
+                lift: 0,
+                length: 0.75,
+                reverse: true,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+            ],
+            draw: 'path',
+            frame: {
+              rotate: 0,
+              mirror: false,
+            },
+          },
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [8.831, 1, 1],
+        colorShift: [0.179, 0.397, 0.824],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.497,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 14,
+        linesEnabled: false,
+        lineWidth: 3,
+        dischargeEnabled: false,
+        dischargeIntensity: 1.5,
+        dischargeFilament: 1.5,
+        dischargeCrackle: 0.875,
+        dischargeBranching: 0.625,
+        filmLook: 'Customize',
+        palette: 'Cycle: Solar',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'blend',
+        transMapEnabled: true,
+        transMapStyle: 4,
+        ifsParams: [
+          {
+            angle: 2,
+            scale: 0.98,
+            tx: 0,
+            ty: 0.08,
+            weight: 1,
+          },
+        ],
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1.1013825725753204,
+        particleSize: 2,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 2,
+          depthSize: 0.8,
+          depthBrightness: 0.6,
+          depthDof: 0.4,
+          depthColorShift: 0.5,
+          lightingMode: 1,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.45,
+          bloomIntensity: 0.1,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.2,
+          lift: [0, 0, 0.02],
+          gamma: [1, 0.98, 0.95],
+          gain: [1, 1, 1],
+          saturation: 1.3,
+          vignette: 0.3,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+      },
+    },
+  },
+  /**
+   * **Curve Zigzag Cross** -- 2026-11-13 (owner), a `Customize` curve, NOT a named rule, ON TRIAL (owner review decides): six unit steps at 90° (turns 0, +1, −1, −1, +1, 0) — probed as a Vicsek cross and REFUSED as that, but it is a valid self-avoiding coastline of its own (`p71-custom.png`, `vicsekCrossB`); it may read too close to Koch / Minkowski.
+   *
+   * Look inherited from `Curve Minkowski` (an owner-accepted body); only the curve block, the name and the palette differ.
+   * Authored under `39.A10`'s rules: frame measured, palette declared (`palettecheck`), no curl noise, no `streaks`.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Cylinder',
+    name: 'Curve Zigzag Cross',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Curve Zigzag Cross',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'lsystem', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 40000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        lsystem: {
+          rule: 'customize',
+          recursion: {
+            base: 5,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 90,
+            amplitude: 15,
+            frequency: 11.953125,
+          },
+          pitch: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          roll: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0,
+          centre: [0, 0, 0],
+          twist: {
+            base: 0,
+            amplitude: 0,
+            frequency: 0,
+          },
+          stretch: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          custom: {
+            steps: [
+              {
+                kind: 'move',
+                turn: 0,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: 1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: -1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: -1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: 1,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+              {
+                kind: 'move',
+                turn: 0,
+                lift: 0,
+                length: 1,
+                reverse: false,
+                orient: 0,
+                twistable: false,
+                stretchable: false,
+              },
+            ],
+            draw: 'path',
+            frame: {
+              rotate: 0,
+              mirror: false,
+            },
+          },
+        },
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [2.96, 1, 1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.6,
+        blurRadius: 2,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Sunset',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 0.85,
+        sym3dLayout: 'tetrahedron',
+        sym3dLocal: 2,
+        sym3dRadius: 0,
+        sym3dMirrors: false,
+        sym3dFacing: 'outward',
+        sym3dOn: 'vertices',
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0.2,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0.8,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 1.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.05,
+          bloomIntensity: 0.65,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.4,
+          lift: [0, 0, 0],
+          gamma: [0.8, 0.8, 0.8],
+          gain: [1.3, 0.9, 1.4],
+          saturation: 1.3,
+          vignette: 0,
+          palette: 'Neon',
+          paletteMapping: 'velocity',
+        },
+      },
+    },
+  },
+  /**
+   * **Lorenz Strand** — v8 Phase 37, the flagship (`37.13` #1): `Lorenz Classic` drawn as ONE trajectory — a formless speckle cloud becoming a crisp butterfly with both lobes legible, the `index` palette running as a gradient ALONG the stroke. ⚠️ Three differences from its host `Lorenz Twin Lobes`, stated so the pair is not read as a one-variable comparison: blend 0.95 → 1, `decayFactor` 0.90 → 0.86, `paletteMapping` `velocity` → `index`.
+   *
+   * Body cloned from `Lorenz Twin Lobes`; only the attractor, the layout, the count, the trail, the look and the palette
+   * differ. Values are STARTING POINTS for the owner's review by use.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Lorenz Twin Lobes',
+    name: 'Lorenz Strand',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Lorenz Strand',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'attractor', 'strand', 'review'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 9000,
+        waveSpeed: 0.05,
+        rotation: [5.0600000000000005, 6.7, -8.700000000000001],
+        angle: [15, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 16.479492,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 22.705078,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 12.053572,
+                  amplitude: 21.428572,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 64,
+                  frequency: 1,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [32, 32, 32],
+        colorFreq: [0.9919, 1.372, 1],
+        colorShift: [0.384, 0.279, 0.2],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.86,
+        blurRadius: 2,
+        depthSize: 0.6,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'hybrid',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Cinematic',
+        palette: 'Ocean',
+        paletteMapping: 'index',
+        attractorIndex: 5,
+        attractorBlend: 0.95,
+        attractorLayout: 'strand',
+        attractorArcSpan: 103,
+        attractorAdvance: 9,
+        attractorArcSpanDepth: 25,
+        attractorArcSpanRate: 1.2712615076981553,
+        renderMode: 'blend',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.6,
+        figureScale: 1.3146946654753933,
+        particleSize: 1.11,
+        channelDriver: 'index',
+        channelSize: 0.23,
+        channelAlpha: 0.23,
+        channelLight: 0.22,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        dye: {
+          enabled: true,
+          decayRate: 0.952,
+          opacity: 1,
+          colourSource: 'depth',
+          fixedColour: [1, 0.35, 0.1],
+          injectionRadius: 12,
+          advectionStrength: 1.45,
+          ramp: 'Classic: fire',
+          blendMode: 'over',
+          showFigure: true,
+          mapping: 'depth',
+          cycles: 1,
+        },
+      },
+    },
+  },
+  /**
+   * **Nosé-Hoover Fan** — v8 Phase 37, `37.13` #2: `Nosé-Hoover Flow` as a strand — a multicoloured fan. Chosen because its cloud was already the most ordered of the six, so it shows the strand is not merely repairing the worst case; the FIRST `nose-hoover` preset in the library.
+   *
+   * Body cloned from `Lorenz Twin Lobes`; only the attractor, the layout, the count, the trail, the look and the palette
+   * differ. Values are STARTING POINTS for the owner's review by use.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Lorenz Twin Lobes',
+    name: 'Nosé-Hoover Fan',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Nosé-Hoover Fan',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'attractor', 'strand', 'review'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 9000,
+        waveSpeed: 0.05,
+        rotation: [1.45, 6.7, -7.22],
+        angle: [15, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 16.479492,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 22.705078,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 12.053572,
+                  amplitude: 21.428572,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 64,
+                  frequency: 1,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [32, 32, 32],
+        colorFreq: [0.4225, 1.167, 1],
+        colorShift: [0.301, 0.2, 0.2],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.88,
+        blurRadius: 2,
+        depthSize: 0.6,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: true,
+        lineWidth: 0.5,
+        dischargeEnabled: true,
+        dischargeIntensity: 0.234375,
+        dischargeFilament: 3.125,
+        dischargeCrackle: 0.796875,
+        dischargeBranching: 0,
+        filmLook: 'Cinematic',
+        palette: 'Fire',
+        paletteMapping: 'index',
+        attractorIndex: 12,
+        attractorBlend: 0.95,
+        attractorLayout: 'strand',
+        attractorArcSpan: 116,
+        attractorAdvance: 10,
+        attractorAdvanceDepth: 5,
+        attractorAdvanceRate: 0.6517625403763203,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 7,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.6,
+        figureScale: 1.5442652584441634,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+      },
+    },
+  },
+  /**
+   * **Halvorsen Thread** — v8 Phase 37, `37.13` #3, the single-head stability case: `Halvorsen Knot` at its authored, Euler-unstable step, kept deliberately so the strand's divergence guard is exercised rather than dodged. ⚠️ Its acceptance criterion is DURATION — it must never blank over ten minutes — and a reseed must read as the strand changing course, not vanishing. The FIRST `halvorsen` preset in the library.
+   *
+   * Body cloned from `Lorenz Twin Lobes`; only the attractor, the layout, the count, the trail, the look and the palette
+   * differ. Values are STARTING POINTS for the owner's review by use.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Lorenz Twin Lobes',
+    name: 'Halvorsen Thread',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Halvorsen Thread',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'attractor', 'strand', 'review'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 9000,
+        waveSpeed: 0.05,
+        rotation: [4.09, 4.29, -0.9],
+        angle: [15, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 16.479492,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 22.705078,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 12.053572,
+                  amplitude: 21.428572,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 64,
+                  frequency: 1,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [32, 32, 32],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.2, 0.2, 0.2],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.716,
+        blurRadius: 2,
+        depthSize: 0.6,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Prismatic',
+        paletteMapping: 'age',
+        attractorIndex: 10,
+        attractorBlend: 0.95,
+        attractorLayout: 'strand',
+        attractorArcSpan: 109,
+        attractorAdvance: 16,
+        attractorAdvanceDepth: 6,
+        attractorAdvanceRate: 0.780199185405251,
+        renderMode: 'blend',
+        transMapEnabled: true,
+        transMapStyle: 5,
+        proceduralFlow: {
+          strength: 0.19,
+          scale: 2.5,
+          curlAmount: 0.26,
+          direction: [0, -1],
+          radial: 0,
+          evolutionSpeed: 0.4,
+          archetype: 'Custom',
+        },
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.6,
+        figureScale: 0.8112111277356729,
+        particleSize: 1.32,
+        channelDriver: 'index',
+        channelSize: 0.25,
+        channelAlpha: 0,
+        channelLight: 0.71,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.5,
+          depthSize: 0.7,
+          depthBrightness: 0.8,
+          depthDof: 0.2,
+          depthColorShift: 0.6,
+          lightingMode: 3,
+          lightDir: [0.7, -0.5, 0.2],
+          rimPower: 2,
+          bloomEnabled: true,
+          bloomThreshold: 0.25,
+          bloomIntensity: 0.7,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.3,
+          lift: [0, 0, 0],
+          gamma: [0.9, 0.9, 0.9],
+          gain: [1.2, 1.1, 1],
+          saturation: 1.4,
+          vignette: 0.4,
+          palette: 'Prismatic',
+          paletteMapping: 'velocity',
+        },
+      },
+    },
+  },
+  /**
+   * **Aizawa Overwound** — v8 Phase 37, `37.13` #4, the saturation boundary: a dense, nearly-overlapping torus strand at the length where the Aizawa footprint has PLATEAUED (57 % of its cloud at 48, 61 % at 96 — `p72-span.mjs`), so more length only piles strokes up. Raise `Strand Length` to see the failure mode deliberately. Short trail (0.82) because a long one compounds the overlap. Neon Lines OFF (its host draws them), so the strand is drawn as points.
+   *
+   * Body cloned from `Aizawa Torus Shell`; only the attractor, the layout, the count, the trail, the look and the palette
+   * differ. Values are STARTING POINTS for the owner's review by use.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Aizawa Torus Shell',
+    name: 'Aizawa Overwound',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Aizawa Overwound',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'attractor', 'strand', 'review'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 10000,
+        waveSpeed: 0.05,
+        rotation: [2.46, 7.78, -1.02],
+        angle: [25, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 0,
+                  amplitude: 40,
+                  frequency: 1,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 40,
+                  frequency: 2,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 30,
+                am: {
+                  base: 0,
+                  amplitude: 20,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 3,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 20,
+                  frequency: 4,
+                },
+                fm: {
+                  base: 3,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [32, 32, 32],
+        colorFreq: [1.208, 1, 1],
+        colorShift: [0.775, 0.2, 0.573],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 1.8,
+        decayFactor: 0.82,
+        blurRadius: 2,
+        depthSize: 0.8,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0.5, 0, 0, 0],
+            [6, 0, 0, 0],
+            [0.5, 0, 0, 0],
+            [6, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'hybrid',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 1,
+        filmLook: 'Customize',
+        palette: 'Cycle: Azure',
+        paletteMapping: 'index',
+        attractorIndex: 11,
+        attractorBlend: 0.95,
+        attractorLayout: 'strand',
+        attractorArcSpan: 129,
+        attractorAdvance: 31,
+        attractorAdvanceDepth: 10,
+        attractorAdvanceRate: 1.207580280702148,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 2,
+        transMapChain: [
+          {
+            style: 2,
+            enabled: true,
+            weight: 1,
+            staticField: {
+              pattern: '(Preset)',
+              strength: 0.5,
+              detail: 1,
+              drift: 0.016,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'sine',
+              shapeMix: 0,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 52,
+              angleY: -41,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+        ],
+        transMapWarpMix: 0.31,
+        transMapDispersion: 0.17,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.3,
+        figureScale: 1.2,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0.46,
+          returnForce: 0.8,
+        },
+        cohesion: {
+          strength: 0.6,
+          radius: 16.8,
+          returnForce: 3,
+        },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0.45,
+          depthBrightness: 0.4,
+          depthDof: 0.25,
+          depthColorShift: 0.5,
+          lightingMode: 0,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.15,
+          bloomIntensity: 0.5,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.9,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.05,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+      },
+    },
+  },
+  /**
+   * **Lorenz Strand Morph** — v8 Phase 37, `37.Q1`'s blend demo (owner 2026-11-13): the wave figure and a Lorenz STRAND mixed at partial blend. Both are ordered strokes, so particle i is a point between wave point i and strand point i — the hybrid is still one ordered stroke, which a CLOUD cannot give (its neighbours sit on unrelated orbits). Drag `Blend` from 0 to 1 to morph the wave figure into the butterfly point by point.
+   *
+   * Body cloned from `Lorenz Twin Lobes`; only the attractor, the layout, the count, the trail, the look and the palette
+   * differ. Values are STARTING POINTS for the owner's review by use.
+   * ⚠️⚠️ **2026-11-13: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Lorenz Twin Lobes',
+    name: 'Lorenz Strand Morph',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Lorenz Strand Morph',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'attractor', 'strand', 'review'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 9000,
+        waveSpeed: 0.05,
+        rotation: [7.47, 13.06, -1.09],
+        angle: [15, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 16.479492,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 22.705078,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 12.053572,
+                  amplitude: 21.428572,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 64,
+                  frequency: 1,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [32, 32, 32],
+        colorFreq: [2.051, 1, 1],
+        colorShift: [0.429, 0.996, 0.2],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.846,
+        blurRadius: 2,
+        depthSize: 0.6,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Neon',
+        paletteMapping: 'index',
+        attractorIndex: 5,
+        attractorBlend: 0.9,
+        attractorLayout: 'strand',
+        attractorArcSpan: 83,
+        attractorAdvance: 12,
+        attractorAdvanceDepth: 3,
+        attractorAdvanceRate: 0.5040747837924963,
+        renderMode: 'liquid',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.5,
+        figureScale: 1.3,
+        particleSize: 1.93,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        liquid: {
+          isoLevel: 3.3636,
+          kernelWidth: 0.83,
+          edgeSoftness: 0.54,
+          tintSource: 'palette',
+          surfaceRamp: 'liquid',
+          colourMix: 0.85,
+          mixModel: 'light',
+          refraction: 0.55,
+          specular: 2.75,
+          thickness: 0.9,
+          edgeBrightness: 1.65,
+        },
+        cohesion: {
+          strength: 0.93,
+          radius: 33.5,
+          returnForce: 0,
+        },
+        dye: {
+          enabled: true,
+          decayRate: 0.986,
+          opacity: 0.27,
+          colourSource: 'depth',
+          fixedColour: [1, 0.35, 0.1],
+          injectionRadius: 13,
+          advectionStrength: 1.2,
+          ramp: 'Classic: fire',
+          blendMode: 'over',
+          showFigure: true,
+          mapping: 'depth',
+          cycles: 1,
+        },
+        customFilmLookParams: {
+          glow: 4.5,
+          depthSize: 0.45,
+          depthBrightness: 0.25,
+          depthDof: 0,
+          depthColorShift: 0.2,
+          lightingMode: 3,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.15,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 0.9,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.9,
+          vignette: 0.2,
+          palette: 'Neon',
+          paletteMapping: 'phase',
+        },
       },
     },
   },

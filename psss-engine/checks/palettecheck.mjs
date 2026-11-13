@@ -226,10 +226,8 @@ const AUTHORED_INDEX_PALETTES = {
    * palette body — so the next clone of a declared host is the next entry, and a red here means a demo
    * was added, not that a palette drifted.
    */
-  // ⚠️ RENAMED 2026-11-01 (owner) from `Siegel Disk Rays` when the field-lines flow left the UI
-  // and this body was converted to contours. **The row is keyed by NAME, so the rename had to come
-  // here too — a name is a primary key in five owners and this list is one of them.**
-  'Siegel Disk Contours': 'Prismatic',
+  // (`Siegel Disk Contours`, renamed 11-01 from `Siegel Disk Rays`, was DELETED 2026-11-13 by the owner: a
+  // byte-identical copy of `Julia Siegel Disk River` once converted to contours.)
   /*
    * ⚠️ **AN OWNER-AUTHORED PALETTE, FROM THEIR OWN EXPORT** — `Quader Star Eight_20261028_233853.json`,
    * the finetuned replacement for the preset the specifier authored. This is the clause's FIRST reading
@@ -522,6 +520,27 @@ const AUTHORED_INDEX_PALETTES = {
   'Fractal Butterfly': 'Pastel',
   'Fractal Star': 'Warm',
   'Fractal Lattice': 'Prismatic',
+  // 2026-11-13 (owner) — the four closed-tile rule demos and the `Customize` golden dragon: each takes its LOOK from an
+  // owner-accepted curve demo and authors a DIFFERENT palette from its template (the `39.A10` rule above), all `index`.
+  'Curve Snowflake': 'Cool',
+  'Curve Pentigree': 'Sunset',
+  'Curve Twindragon': 'Neon',
+  'Curve Fudgeflake': 'Ocean',
+  'Curve Golden Dragon': 'Warm',
+  // 2026-11-13 — two more `Customize` demos ON TRIAL (owner review decides whether they stay). ⚠️ Twindragon, Golden Dragon,
+  // Golden Lightning and Zigzag Cross were REPLACED the same day by the owner's finetuned exports (leaf-identical).
+  'Curve Golden Lightning': 'Cycle: Solar',   // the owner's finetuned export, 2026-11-13
+  'Curve Zigzag Cross': 'Sunset',   // the owner's finetuned export, 2026-11-13
+  // 2026-11-13 — v8 Phase 37, the strand demos: each authors its OWN palette under `index`, because a gradient along
+  // the stroke is the free half of the feature (the plan's demo table). Two of the four are the first presets ever
+  // authored on their attractor type (`nose-hoover`, `halvorsen`).
+  // ⚠️ 2026-11-13: `Lorenz Strand`, `Nosé-Hoover Fan` and `Halvorsen Thread` were REPLACED by the owner's finetuned
+  // exports (verbatim) — the first two re-declared below; `Halvorsen Thread` now maps by its Customize look
+  // (`velocity`), so it LEAVES this `index` list.
+  'Lorenz Strand': 'Ocean',
+  'Nosé-Hoover Fan': 'Fire',
+  'Aizawa Overwound': 'Cycle: Azure',
+  'Lorenz Strand Morph': 'Neon',
   // 2026-11-06 — v8 Phase 42 (revised to positions × copies at each), the 3-D Symmetry demos: each restates its
   // PARENT's authored palette unchanged (`Curve Morph`, `Curve Spiral Thicket`, `Curve Breathing Thicket`, `Curve Koch
   // Cesaro`, `Curve Hilbert Opening`, `Curve Tilt`) — the demo is about the arrangement. ⚠️ 2026-11-07: three were

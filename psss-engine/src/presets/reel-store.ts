@@ -95,6 +95,11 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   {
     name: 'Grand Tour',
     // GENERATED — the whole composed library, in library order. Regenerate; do not edit a name by hand.
+    // ⚠️ **REGENERATED 2026-11-13 at 375** (was 378) — the three `… Contours` presets DELETED (owner): each was a
+    // byte-identical copy of its own parent once the 11-01 ray→contour conversion removed their one difference.
+    // ⚠️ **REGENERATED 2026-11-13 at 378** (was 373) — the five Phase 37 strand demos, appended in library order.
+    // ⚠️ **REGENERATED 2026-11-13 at 373** (was 366) — the seven curve demos of that date (two of them on trial) (four new closed-tile rules
+    // and the `Customize` golden dragon), appended in library order at the END (`atEnd`).
     // ⚠️⚠️ **REGENERATED 2026-11-01 at 325** (was 330) — the owner's `Pipes`-FAMILY CONSOLIDATION, taken
     // after a measured similarity census of the sixteen `Pipes` derivatives. SIX entries left and ONE
     // arrived: `Pipes Spread` + `Pipes Taper` + `Pipes Bend` merged into **`Pipes Taper Bend Spread`**
@@ -525,9 +530,6 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Cylinder Viviani',
       'Quader Granny',
       'Cylinder Spherical Spiral',
-      'Black Hole Contours',
-      'Mandelbrot River Contours',
-      'Siegel Disk Contours',
       'Black Hole Relief',
       'Mandelbrot Seahorse Bands',
       'Mandelbrot River Glow',
@@ -592,6 +594,18 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Fractal Butterfly',
       'Fractal Star',
       'Fractal Lattice',
+      'Curve Snowflake',
+      'Curve Pentigree',
+      'Curve Twindragon',
+      'Curve Fudgeflake',
+      'Curve Golden Dragon',
+      'Curve Golden Lightning',
+      'Curve Zigzag Cross',
+      'Lorenz Strand',
+      'Nosé-Hoover Fan',
+      'Halvorsen Thread',
+      'Aizawa Overwound',
+      'Lorenz Strand Morph',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,

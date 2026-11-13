@@ -60,6 +60,7 @@ substantially the original mathematics. The full account is
     - [1.4.2 Discrete maps](#142-discrete-maps)
     - [1.4.3 Escape-time sets — Julia and Mandelbrot](#143-escape-time-sets--julia-and-mandelbrot)
     - [1.4.4 Fitting an attractor into the figure's space](#144-fitting-an-attractor-into-the-figures-space)
+    - [1.4.5 The strand layout](#145-the-strand-layout)
   - [1.5 Extra populations](#15-extra-populations)
   - [1.6 Self-similar curves](#16-self-similar-curves)
     - [The model](#the-model)
@@ -1079,6 +1080,51 @@ attractors does not change how much of the frame is filled. The bounds are compu
 it. ⚠️ That reuse is **a correctness requirement, not an optimisation** — a crossfade between two
 windows lerps the bounds, and a rebuild mid-fade would jump.
 
+#### 1.4.5 The strand layout
+
+`overlay.attractorLayout` chooses how the six integrated flows place their particles. **`cloud`** (the
+default, and every preset that does not author the key) harvests particle `i` from one of 32 reference
+trajectories, so index-adjacent particles sit on unrelated orbits — even coverage, no order. **`strand`**
+(`generators/attractor-strand.ts`) walks **one** trajectory and emits a point every `ds` of **arc length**
+into a ring buffer, so particle `i` is the point `i · ds` behind the head: the ordering the wave figure has,
+on a figure source that never had it. The strand is a window onto an infinite trajectory — an **open**
+figure with two free ends that **scrolls** as the head writes new geometry.
+
+- **The output contract is the cloud's.** The strand writes the same `[−1, 1]` arrays `iterateAttractor`
+  writes, normalised by the same centre and half-extent, so the blend into the wave figure is unchanged.
+  The centre is taken from the cloud's own 32-reference bank at the same particle count, never from the
+  strand's own orbit (a single Lorenz orbit sits in one lobe).
+- **The emitter interpolates inside an integration step and resumes from the emitted point.** A fine step
+  can cover more than `ds` where the flow is fast; emitting at its end would write one point several times.
+  The walk keeps a cursor across frames, so a frame that runs out of emissions mid-step continues from the
+  last emitted point — consecutive particles are therefore exactly `ds` of arc apart, and their chord is at
+  most `ds` (`strandcheck` §A, with the frame-boundary defect seeded).
+- **The head is integrated at `dt / STRAND_FINE`** (4 sub-steps; 16 on Halvorsen, whose authored step is
+  unstable under forward Euler). A non-finite step, an escape past 4 half-extents, or a jump longer than
+  half a half-extent reseeds the head — salted by the emission count — without clearing the buffer: one
+  adjacent pair then straddles two trajectories until it scrolls off, `particleCount / speed` frames later.
+- **Length is read, not re-emitted.** `ds = attractorArcSpan · halfExtent / particleCount`. The buffer is
+  written at the base length and sized for a breathing length's top; a breathing length re-reads it at
+  `span / base` points per particle with linear interpolation, so the strand stretches. A base length or
+  layout change rebuilds it.
+- **Speed is a count of emitted points per 60 Hz frame** (`attractorAdvance`), scaled by the frame time
+  with the fractional remainder carried. 0 freezes the strand exactly.
+- **Coverage depends on length.** Measured against the cloud's footprint at 9 000 particles, a strand of
+  48 half-extents covers about half of Lorenz and Halvorsen and nine-tenths of Nosé-Hoover; Thomas and
+  Aizawa plateau near 55–63 %, because one orbit never visits all of a non-mixing attractor.
+- **Cost:** the build runs the 32-reference bank once (about 10–50 ms) plus the fill; a frame costs about
+  0.1 ms at 9 000 particles.
+- **The preview tiles draw a cheaper tier of the attractor, cloud or strand.** A tile warms the flows with a
+  quarter of the main view's reference budget (200 k steps instead of 800 k: about 3 ms instead of 9–15 at
+  2 000 particles, the same attractor sampled more thinly — 53–115 % of the main view's footprint), builds
+  the Julia and Mandelbrot escape fields on a 64² grid instead of 512² (about 1.5 ms instead of 50–90), and
+  shares ONE warmed starting state per attractor per session: the first tile of an attractor pays the setup,
+  every later tile copies it. The small grids have a cache of their own, so a tile never evicts the main
+  view's grid. The main view passes no tier and is unchanged. ⚠️ The budget cannot go lower: Rössler Wide's
+  tall spike needs long orbits (4 % of its footprint at a sixteenth of the budget).
+- **Only the six ODE types can draw a strand** (`STRAND_CAPABLE`, a total table). On the two maps and the
+  two escape fields the layout row states that inline and the cloud draws.
+
 ### 1.5 Extra populations
 
 Two optional populations are **born** at this stage, from the figure's own particles, and drawn later in
@@ -1153,9 +1199,12 @@ builds rather than by rebuilding every frame:
   ⚠️ **The error is not monotone in recursion on every rule** — on most it grows with depth, on Hilbert 2D
   it falls and on Gosper it peaks at depth 1 — so each width is the **minimum** over every depth in the
   rule's range and over a solve centred on its own demo's sweep.
-  On the space-filling rules the bracket is below the point of usefulness — a deep Hilbert curve is not a
-  near-linear function of its angle at any workable width — so those rules **bypass it and rebuild each
-  frame**, which the Composer states in a note.
+  On the space-filling rules and on the twindragon the bracket is below the point of usefulness — a deep
+  Hilbert curve is not a near-linear function of its angle at any workable width — so those rules **bypass it
+  and rebuild each frame**, which the Composer states in a note.
+- ⚠️ **A closed rule closes at its published angle only.** The four tiles carry their starting shape in the
+  axiom (`F--F--F`, `F-F-F-F-F`, `F+F+`, `F+F+F`), and those turns scale with Yaw like every other turn, so
+  away from the landmark the loop opens.
 
 #### The generator builder — Twist and Stretch
 
@@ -1227,7 +1276,10 @@ chord; the depth-n curve is the same copy composition as the named rules', throu
   the named rule get a Twist row* and *can it seed Customize* — are separate tables, because Hilbert 3D has an
   exact generator but no usable Twist. Hilbert 3D is eight unit moves on the cube lattice with Turn and Lift (no
   roll needed), each copy oriented, drawn through cube centres; Moore is Hilbert 2D's generator on a **starting
-  shape**. Bush 3D is a growth rule (new branches at the tips, stems that lengthen) rather than a self-similar
+  shape**, and so are the four closed tiles: the Koch snowflake (Koch round a triangle), the pentigree (its
+  six-step generator round a pentagon), the twindragon (the dragon generator out along one step and back, a
+  180° turn) and the fudgeflake (the terdragon round a triangle). Each is the one plain-flag member of its exact
+  set, held equal to the turtle by `figurecheck`. Bush 3D is a growth rule (new branches at the tips, stems that lengthen) rather than a self-similar
   subdivision, so it has no generator; `Customize` is offered but disabled there, and a plant-growth editor is a
   future phase.
 - **The starting shape** (the spec's initiator) is an optional second step list walked with the same law but not
@@ -4288,6 +4340,15 @@ properties of those four gates are not guessable from the keys:
   modulator is skipped entirely at depth 0, so emitting it alone would put a dead key into every
   export. An export is mostly runtime-default noise already — **diff programmatically against the
   default constants rather than by eye.**
+
+#### The attractor layout gate
+
+The strand keys ([§1.4.5](#145-the-strand-layout)) are **value-gated on the layout**: a preset on the cloud
+layout exports no strand key at all, so every cloud preset exports exactly the bytes it did before the
+layout existed. On a strand, `attractorLayout`, `attractorArcSpan` and `attractorAdvance` are written, and
+each breathing pair (`…Depth` + `…Rate`) only where its depth is non-zero — the same sub-gate as the figure
+operators above. All seven keys snap in the Mixer. They are not in the bypass's preserved overlay: the
+attractor is a Visual FX feature, so `Apply Visual FX` off drops it, layout included.
 
 ### 10.6 Absence is meaningful
 

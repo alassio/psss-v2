@@ -125,6 +125,16 @@ const EXTRA_SHOTS = [
     preset: 'Fractal Butterfly',
     scrollTo: '4D Extent' },
   /*
+   * v8 Phase 37 — the attractor's Layout and strand rows. ⚠️ A PRESET, for the Fractal Fold's reason and one more: the
+   * four strand rows are HIDDEN on the cloud layout, so only a strand preset shows them at all. `Lorenz Strand` is an
+   * owner body with a breathing length, so the shot holds real authored values. `scrollTo` leaves its target at the
+   * BOTTOM, so the anchor is `Speed Rate`, the last strand row.
+   */
+  // ⚠️ The Attractor section is in the FIGURE group (`gFigure` in visual-fx.ts), not Fields — the spec's wording.
+  { tab: 'visual-fx', file: 'lab-visual-fx-strand', group: 'Figure',
+    preset: 'Lorenz Strand',
+    scrollTo: 'Speed Rate' },
+  /*
    * The cross-tab settings search, open over Visual FX. ⚠️ **`symme` is chosen because it shows all three
    * kinds of row the manual explains**: two controls with the SAME name told apart only by their path
    * (Visual FX's and Sliders' `Symmetry`), and two rows that matched only on their TOOLTIP, each carrying
@@ -978,7 +988,9 @@ async function setAngle(page, pane, ariaLabel, deg) {
 }
 
 async function openTab(page, id) {
-  await page.locator(`.sl-tab-btn[data-tab="${id}"]`).click();
+  // ⚠️ 120 s, as for the Lab click above it: right after a curve preset is picked from the grid the tab click waited
+  // out the default 30 s on a loaded machine under SwiftShader (2026-11-13, the Composer curve shots).
+  await page.locator(`.sl-tab-btn[data-tab="${id}"]`).click({ timeout: 120_000 });
   await page.waitForTimeout(500);
   // ⚠️ **EVERY RECIPE NEEDS THIS AND NONE OF THEM SAYS SO** - see `expandGroups`.
   await expandGroups(page, id);

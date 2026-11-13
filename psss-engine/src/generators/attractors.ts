@@ -126,7 +126,19 @@ export function createAttractorState(count: number): AttractorState {
  * A grown tail cannot simply be left at zero: for the ODE attractors the origin is a FIXED POINT, so those
  * particles would never move.
  */
-export function initAttractorState(state: AttractorState, params: AttractorParams, fromIndex = 0): void {
+/**
+ * v8 Phase 37 follow-up — the TILE TIER's options. ⚠️ **Absent means the main view's exact behaviour**: every
+ * field defaults to the constant it replaces, so a caller that passes nothing runs today's code path bit for bit.
+ * `warmBudget` replaces `ODE_WARM_BUDGET` (integrator steps for the whole harvest); a preview tile passes a
+ * fraction of it, because its one-shot setup must fit a tile's per-frame budget (`grid-tile-renderer.ts`).
+ */
+export interface AttractorTierOpts {
+  warmBudget?: number;
+}
+
+export function initAttractorState(
+  state: AttractorState, params: AttractorParams, fromIndex = 0, tier?: AttractorTierOpts,
+): void {
   const count = state.x.length;
   const type = params.type;
   const start = Math.max(0, Math.min(count, fromIndex));
@@ -163,7 +175,7 @@ export function initAttractorState(state: AttractorState, params: AttractorParam
   } else if (!isFlatAttractor(type)) {
     // The six continuous ODE types. `isFlatAttractor` excludes `julia`/`mandelbrot`, which took the
     // bounds branch above and whose particles are placed by the escape grid, not by integration.
-    warmOdeAttractor(state, params, start, count);
+    warmOdeAttractor(state, params, start, count, tier?.warmBudget ?? ODE_WARM_BUDGET);
   }
 }
 
@@ -449,7 +461,9 @@ const ODE_WARM_PROBE = 200;
  * transient is re-discarded before harvesting resumes. Measured escapes over a 4 000-particle harvest: zero
  * on seven of the eight entries and **3 on `Rössler Wide`**, all recovered.
  */
-function warmOdeAttractor(state: AttractorState, params: AttractorParams, start: number, count: number): void {
+function warmOdeAttractor(
+  state: AttractorState, params: AttractorParams, start: number, count: number, budget: number = ODE_WARM_BUDGET,
+): void {
   if (count <= start) return;
   const half = attractorHalfExtent(params.type) || 1;
   const escape = half * ODE_WARM_ESCAPE;
@@ -466,7 +480,7 @@ function warmOdeAttractor(state: AttractorState, params: AttractorParams, start:
   // and 0.6 ms, and the tail is decorrelated by the 32 ICs rather than by a long walk.
   const stride = Math.max(
     Math.ceil(ODE_WARM_STRIDE_MIN / refCount),
-    Math.min(ODE_WARM_STRIDE_MAX, Math.round(ODE_WARM_BUDGET / Math.max(1, count * refCount))),
+    Math.min(ODE_WARM_STRIDE_MAX, Math.round(budget / Math.max(1, count * refCount))),
   );
   // ⚠️ The sixth argument is `dtScale`, NOT a count — the population size comes from `state.x.length`, so
   // this must stay 1 however many references there are. Passing `refCount` here is the mistake this comment
@@ -700,6 +714,12 @@ const DISCRETE_EMA_BASE = 0.06;
 export interface EscapeFlowOpts {
   escapeFlow?: 'contour' | 'ray';
   outEscape?: Float32Array;
+  /**
+   * v8 Phase 37 follow-up — the escape grid's resolution. Absent = `GRID_SIZE` (512), the main view's. A preview
+   * tile passes a smaller grid: the build is `size²` escape evaluations, and the grid cache keys on the size, so a
+   * tile grid and a main-view grid never stand in for each other.
+   */
+  gridSize?: number;
 }
 
 export function iterateAttractor(
@@ -713,6 +733,7 @@ export function iterateAttractor(
 ): void {
   const ray = opts?.escapeFlow === 'ray';
   const outEscape = opts?.outEscape;
+  const gridSize = opts?.gridSize ?? GRID_SIZE;
   const count = state.x.length;
   const type = params.type;
   const p = params.params;
@@ -744,10 +765,10 @@ export function iterateAttractor(
       iterateNoseHoover(state, count, p[0]!, p[1]! * ts);
       break;
     case 'julia':
-      iterateJuliaFlow(state, count, p[0]!, p[1]!, params.bounds, params.maxIter ?? 256, ts, ray, outEscape);
+      iterateJuliaFlow(state, count, p[0]!, p[1]!, params.bounds, params.maxIter ?? 256, ts, ray, outEscape, gridSize);
       break;
     case 'mandelbrot':
-      iterateMandelbrotFlow(state, count, params.bounds, params.maxIter ?? 256, ts, ray, outEscape);
+      iterateMandelbrotFlow(state, count, params.bounds, params.maxIter ?? 256, ts, ray, outEscape, gridSize);
       break;
   }
 
@@ -1253,6 +1274,14 @@ function collectSeeds(grid: Float32Array, size: number, maxIter: number, bounds:
  */
 const MAX_CACHED_GRIDS = 2;
 const cachedGrids: EscapeGrid[] = [];
+/*
+ * v8 Phase 37 follow-up — ⚠️⚠️ **THE TILE TIER'S SMALL GRIDS LIVE IN A CACHE OF THEIR OWN.** The main view's cache holds
+ * TWO entries, so a handful of Julia/Mandelbrot tiles sharing it would evict the main view's 512² grid on every scroll
+ * and cost it a 50–90 ms rebuild. A grid whose size is not `GRID_SIZE` goes here instead: 32 entries of a 64² grid
+ * are ~0.5 MB, and the main view's two slots are never touched by a tile.
+ */
+const MAX_CACHED_TILE_GRIDS = 32;
+const cachedTileGrids: EscapeGrid[] = [];
 
 /**
  * Bounds tolerance, as a fraction of the view span — so it tightens automatically as the user zooms in
@@ -1281,8 +1310,9 @@ function canReuseGrid(
   fracType: 'julia' | 'mandelbrot',
   params: number[],
   bounds: [number, number, number, number],
+  size: number = GRID_SIZE,
 ): boolean {
-  if (g.fracType !== fracType || g.size !== GRID_SIZE) return false;
+  if (g.fracType !== fracType || g.size !== size) return false;
   if (g.params.length !== params.length) return false;
 
   const span = Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1]);
@@ -1334,20 +1364,24 @@ function blurGrid(grid: Float32Array, size: number, passes: number): void {
   }
 }
 
-function buildEscapeGrid(fracType: 'julia' | 'mandelbrot', params: number[], bounds: [number, number, number, number]): EscapeGrid {
-  for (let i = 0; i < cachedGrids.length; i++) {
-    const g = cachedGrids[i]!;
-    if (canReuseGrid(g, fracType, params, bounds)) {
+function buildEscapeGrid(
+  fracType: 'julia' | 'mandelbrot', params: number[], bounds: [number, number, number, number], gridSize: number = GRID_SIZE,
+): EscapeGrid {
+  const cache = gridSize === GRID_SIZE ? cachedGrids : cachedTileGrids;
+  const cap = gridSize === GRID_SIZE ? MAX_CACHED_GRIDS : MAX_CACHED_TILE_GRIDS;
+  for (let i = 0; i < cache.length; i++) {
+    const g = cache[i]!;
+    if (canReuseGrid(g, fracType, params, bounds, gridSize)) {
       // Promote to most-recently-used so alternating between two configurations keeps both alive.
       if (i > 0) {
-        cachedGrids.splice(i, 1);
-        cachedGrids.unshift(g);
+        cache.splice(i, 1);
+        cache.unshift(g);
       }
       return g;
     }
   }
 
-  const size = GRID_SIZE;
+  const size = gridSize;
   const grid = new Float32Array(size * size);
   const maxIter = computeAdaptiveMaxIter(bounds);
   const dx = (bounds[2] - bounds[0]) / size;
@@ -1380,8 +1414,8 @@ function buildEscapeGrid(fracType: 'julia' | 'mandelbrot', params: number[], bou
     // grid it describes so a tolerance hit reuses both.
     seeds: collectSeeds(grid, size, maxIter, bounds),
   };
-  cachedGrids.unshift(entry);
-  if (cachedGrids.length > MAX_CACHED_GRIDS) cachedGrids.length = MAX_CACHED_GRIDS;
+  cache.unshift(entry);
+  if (cache.length > cap) cache.length = cap;
   return entry;
 }
 
@@ -1605,9 +1639,10 @@ function iterateJuliaFlow(
   dtScale: number,
   ray: boolean,
   outEscape: Float32Array | undefined,
+  gridSize: number = GRID_SIZE,
 ): void {
   void maxIter; // the grid's own adaptive value governs; see computeAdaptiveMaxIter
-  advanceEscapeFlow(s, count, buildEscapeGrid('julia', [cRe, cIm], bounds), dtScale, ray, outEscape);
+  advanceEscapeFlow(s, count, buildEscapeGrid('julia', [cRe, cIm], bounds, gridSize), dtScale, ray, outEscape);
 }
 
 function iterateMandelbrotFlow(
@@ -1617,9 +1652,10 @@ function iterateMandelbrotFlow(
   dtScale: number,
   ray: boolean,
   outEscape: Float32Array | undefined,
+  gridSize: number = GRID_SIZE,
 ): void {
   void maxIter;
-  advanceEscapeFlow(s, count, buildEscapeGrid('mandelbrot', [], bounds), dtScale, ray, outEscape);
+  advanceEscapeFlow(s, count, buildEscapeGrid('mandelbrot', [], bounds, gridSize), dtScale, ray, outEscape);
 }
 
 // Smooth escape count: i - log2(log2(|z|²)) + 4

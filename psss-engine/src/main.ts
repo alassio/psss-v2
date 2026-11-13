@@ -8,7 +8,8 @@ import { compileProgram, TRAIL_SANITISE_GLSL, DIAG_SENTINEL, DIAG_SENTINEL_THRES
 import { PresetManager } from './presets/manager.ts';
 // The version-suffix rule, shared with the import path rather than reimplemented — see `renamePreset`.
 import { nextVersionedName } from './ui/synthesis-lab/export.ts';
-import { LissajousGenerator } from './generators/lissajous.ts';
+import { LissajousGenerator, type AttractorStrandSettings } from './generators/lissajous.ts';
+import { STRAND_SPAN_DEFAULT, STRAND_ADVANCE_DEFAULT, STRAND_CAPABLE } from './generators/attractor-strand.ts';
 import type { GeneratorState, RenderMode, ChannelDriver } from './core/interfaces.ts';
 import { ATTRACTOR_PRESETS } from './generators/attractors.ts';
 import { HDRParticleRenderer } from './renderers/hdr-particle.ts';
@@ -1384,6 +1385,43 @@ async function init() {
     Object.assign(fractalFold, generator.getFractalFold());
   }
   adoptFractalFold(preset?.overlay);
+
+  /*
+   * v8 Phase 37 — the attractor LAYOUT and the strand's six scalars, adopted on every apply path (boot, preset
+   * change, Reset) for the fold's reason: one state object, one hand-off, the engine's CLAMPED values read back so
+   * the panel and every export carry what runs. ⚠️ **Not in `livePreservedOverlay()`**: the attractor is a Visual
+   * FX feature and the bypass strips it by omission, so its layout goes with it.
+   */
+  const attractorStrand: AttractorStrandSettings = {
+    layout: 'cloud', span: STRAND_SPAN_DEFAULT, spanDepth: 0, spanRate: 0,
+    advance: STRAND_ADVANCE_DEFAULT, advanceDepth: 0, advanceRate: 0,
+  };
+  function adoptAttractorStrand(ov: OverlayState | undefined): void {
+    attractorStrand.layout = ov?.attractorLayout ?? 'cloud';
+    attractorStrand.span = ov?.attractorArcSpan ?? STRAND_SPAN_DEFAULT;
+    attractorStrand.spanDepth = ov?.attractorArcSpanDepth ?? 0;
+    attractorStrand.spanRate = ov?.attractorArcSpanRate ?? 0;
+    attractorStrand.advance = ov?.attractorAdvance ?? STRAND_ADVANCE_DEFAULT;
+    attractorStrand.advanceDepth = ov?.attractorAdvanceDepth ?? 0;
+    attractorStrand.advanceRate = ov?.attractorAdvanceRate ?? 0;
+    handAttractorStrand();
+  }
+  function handAttractorStrand(): void {
+    generator.setAttractorStrand(attractorStrand);
+    Object.assign(attractorStrand, generator.getAttractorStrand());
+  }
+  adoptAttractorStrand(preset?.overlay);
+  /**
+   * The export, VALUE-GATED on the layout: a cloud preset exports exactly the bytes it always did. On a strand the
+   * base length and speed are written, and each breathing pair only where its depth is live.
+   */
+  const attractorStrandExport = (): Partial<OverlayState> => (attractorStrand.layout === 'strand' ? {
+    attractorLayout: 'strand',
+    attractorArcSpan: attractorStrand.span,
+    attractorAdvance: attractorStrand.advance,
+    ...(attractorStrand.spanDepth !== 0 ? { attractorArcSpanDepth: attractorStrand.spanDepth, attractorArcSpanRate: attractorStrand.spanRate } : {}),
+    ...(attractorStrand.advanceDepth !== 0 ? { attractorAdvanceDepth: attractorStrand.advanceDepth, attractorAdvanceRate: attractorStrand.advanceRate } : {}),
+  } : {});
   /** The export, gated on the ITERATION COUNT (the operator's own gate) — ONE helper for BOTH export sites. */
   const fractalFoldExport = (): Partial<OverlayState> => (fractalFold.iterations > 0 ? {
     fractalFoldIterations: fractalFold.iterations, fractalFoldLimit: fractalFold.limit,
@@ -5312,6 +5350,7 @@ async function init() {
     adoptInversion(preset.overlay);   // v8 32.7 — ditto
     adoptBoxFold(preset.overlay); // v8 30.2 — same four paths
     adoptFractalFold(preset.overlay); // v8 Phase 38 — the same path, the same obligation
+    adoptAttractorStrand(preset.overlay); // v8 Phase 37 — the attractor layout, the same obligation
     adoptChannels(preset.overlay);  // v8 31.2 — the per-particle channels, same four paths
     adoptDeform4d(preset.overlay);  // v8 31.3 + 31.4 — the fold and the 4D rotation, same four paths
     const newCurl = preset.overlay?.curlNoise ?? DEFAULT_CURL;
@@ -5852,6 +5891,11 @@ async function init() {
     setBoxFoldScale: (v: number) => { boxFold.scale = v; handBoxFold(); },
     getFractalFold: () => ({ ...fractalFold }),
     setFractalFold: (patch) => { Object.assign(fractalFold, patch); handFractalFold(); },
+    // v8 Phase 37 — the attractor layout and the strand; `isStrandActive` is the engine's own three-part gate.
+    getAttractorStrand: () => ({ ...attractorStrand }),
+    setAttractorStrand: (patch) => { Object.assign(attractorStrand, patch); handAttractorStrand(); notifyExternalChange(); },
+    strandCapable: () => { const ap = ATTRACTOR_PRESETS[currentAttractorIndex]; return !!ap && STRAND_CAPABLE[ap.type]; },
+    isStrandActive: () => generator.isStrandActive(),
     /*
      * v8 `31.2` — the live per-particle channels. One getter for the whole operator and one setter per
      * field, the box-fold's shape. ⚠️ **The driver's setter takes a `ChannelDriver`, not a string**, so the
@@ -6489,6 +6533,7 @@ async function init() {
         ...(overlayPaletteMapping !== undefined ? { paletteMapping: overlayPaletteMapping } : {}),
         attractorIndex: currentAttractorIndex,
         attractorBlend: currentBlend,
+        ...attractorStrandExport(),   // v8 Phase 37 — value-gated on the strand layout
         renderMode: currentRenderMode,
         transMapEnabled: currentTransMapEnabled,
         // ⚠️ **`transMapStyle` is emitted ALWAYS, chain or no chain, and that is the whole compatibility
@@ -7201,6 +7246,7 @@ async function init() {
       adoptInversion(ov);   // v8 32.7 — ditto
       adoptTwist(ov);   // v8 30.1 — a Reset must REVERT the deformation, not leave the live one standing
       adoptFractalFold(ov); // v8 Phase 38 — a Reset must REVERT it too
+      adoptAttractorStrand(ov); // v8 Phase 37 — and the attractor layout
       adoptBoxFold(ov); // v8 30.2 — same
       adoptChannels(ov);  // v8 31.2 — and the per-particle channels with it
       adoptDeform4d(ov);  // v8 31.3 + 31.4 — a Reset reverts the fold and the 4D pose too

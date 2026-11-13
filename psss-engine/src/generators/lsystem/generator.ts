@@ -124,6 +124,16 @@ export const LSYSTEM_GENERATORS: Record<RuleKey, GeneratorFlags | null> = {
   minkowski: { reverse: [], orient180: [], twistable: [], stretchable: [], twistRange: [0, 0], stretchRange: [1, 1] },
   moore: null,
   bush3d: null,
+  /*
+   * v8 2026-11-13 — the four CLOSED tiles: NO flags here, because the depth-1 derivation `ruleStructure` performs
+   * from these flags would read the AXIOM's starting shape as part of the generator. Their Customize structure (base
+   * generator + starting shape) lives in `custom.ts` CUSTOM_ONLY_STRUCTURES, exact against the turtle (§K2). No
+   * Twist / Stretch row, as for Koch and Minkowski.
+   */
+  kochSnowflake: null,
+  pentigree: null,
+  twindragon: null,
+  fudgeflake: null,
 };
 
 /**
@@ -141,12 +151,14 @@ export const LSYSTEM_TWIST_BRACKET: Record<RuleKey, number> = {
   dragon: 11.16, levyC: 16.51, knopp: 16.51, plant: 30,
   terdragon: 0, kochQuad: 0, arrowhead: 0, gosper: 0,
   hilbert2d: 0, hilbert3d: 0, peano: 0, moore: 0, bush3d: 0, koch: 0, minkowski: 0,
+  kochSnowflake: 0, pentigree: 0, twindragon: 0, fudgeflake: 0,
 };
 export const LSYSTEM_STRETCH_BRACKET: Record<RuleKey, number> = {
   // Solved 2026-11-05 through the ARC-LENGTH resample the engine uses here; binds at depth 5, stretch 1.52.
   dragon: 0, levyC: 0, knopp: 0, plant: 0.051,
   terdragon: 0, kochQuad: 0, arrowhead: 0, gosper: 0,
   hilbert2d: 0, hilbert3d: 0, peano: 0, moore: 0, bush3d: 0, koch: 0, minkowski: 0,
+  kochSnowflake: 0, pentigree: 0, twindragon: 0, fudgeflake: 0,
 };
 
 /** A small 3-D affine map `p → o + A·p`, row-major `A`. Plain data so the build allocates nothing per leaf. */

@@ -100,6 +100,7 @@ import { FILM_LOOKS, CUSTOMIZE_FILM_LOOK } from '../renderers/film-looks.ts';
 import { getAllPaletteNames } from './palettes.ts';
 import { CRYSTAL_SHAPES } from '../crystal/crystal-config.ts';
 import { ATTRACTOR_PRESETS } from '../generators/attractors.ts';
+import { STRAND_CAPABLE } from '../generators/attractor-strand.ts';
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 // KEYS
@@ -859,14 +860,21 @@ const FIGURE_GROUP: FacetGroup = {
     },
     bool('figure:open', 'Open figure',
       'Presets whose figure does not close into a loop — a secular `Travel` term sweeps it along an axis as '
-      + 'it is drawn, so it is an arc with two free ends. ⚠️ **Its own chip by `33.D10` rather than a clause '
+      + 'it is drawn, or an attractor is drawn as a STRAND (one trajectory, two free ends; v8 Phase 37, `37.D10`), '
+      + 'so it is an arc with two free ends. ⚠️ **Its own chip by `33.D10` rather than a clause '
       + 'in `Deformed`**: *which presets are not a closed loop* is a different question from *which presets '
       + 'bend their figure*, and `30.D18`\'s *one row answers the question a user has* cuts that way here. '
       + '⚠️ **Reads the three ACTIVATION SCALARS and nothing else** — the stage tests all three against 0 '
       + 'and skips the add entirely, so there is no companion field a preset could carry inertly. '
       + '⚠️ The Randomiser can reach this from a closed preset (`travel*` is signed and centre-off), which '
       + 'is the loudest thing it can do to a figure and the reason this chip is worth its own row.',
-      (r) => (r.ov.travelX ?? 0) !== 0 || (r.ov.travelY ?? 0) !== 0 || (r.ov.travelZ ?? 0) !== 0),
+      (r) => (r.ov.travelX ?? 0) !== 0 || (r.ov.travelY ?? 0) !== 0 || (r.ov.travelZ ?? 0) !== 0
+        // v8 Phase 37 (`37.D10`) — a strand on a LIVE attractor whose type can draw one; a strand layout on a map or
+        // an escape field draws the cloud, which is closed in the chip's sense, so it is not counted.
+        // ⚠️ `attractorType` is a widened `string` on this record, so the TOTAL table is read through a lookup that
+        // answers `false` for a word it does not hold rather than through a cast that would hide a new member.
+        || (r.ov.attractorLayout === 'strand' && r.attractorType !== null
+          && Object.entries(STRAND_CAPABLE).some(([t, ok]) => ok && t === r.attractorType))),
     {
       kind: 'enum', id: 'flat3d', label: 'Flat / 3D',
       tip: 'Whether any live slot drives the Z axis. A flat figure lives in one plane however it is rotated.',

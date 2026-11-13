@@ -8,7 +8,13 @@ import { LSYSTEM_GENERATORS } from './lsystem/generator.ts';
 import { resolveCustomRule, CUSTOM_RANGES, type ResolvedCurveRule } from './lsystem/custom.ts';
 import { LSYSTEM_DESIGN_FRACTION } from './lsystem/curve.ts';
 import { resolveSym3d, type Sym3dConfig, type Sym3dOperator } from '../core/symmetry-groups.ts';
-import { createAttractorState, initAttractorState, iterateAttractor, type AttractorState } from './attractors.ts';
+import {
+  createAttractorState, initAttractorState, iterateAttractor, type AttractorState, type AttractorTierOpts,
+} from './attractors.ts';
+import {
+  AttractorStrand, STRAND_CAPABLE, STRAND_SPAN_MIN, STRAND_SPAN_MAX, STRAND_SPAN_DEFAULT,
+  STRAND_ADVANCE_MIN, STRAND_ADVANCE_MAX, STRAND_ADVANCE_DEFAULT, type AttractorLayout, type StrandFrame,
+} from './attractor-strand.ts';
 import type { CurlNoiseConfig, PhysarumConfig, MaterialConfig, BuoyancyConfig, SparkConfig, CrystalRenderConfig, CohesionConfig, LiquidFieldConfig } from '../presets/types.ts';
 import { CrystalPool } from '../crystal/crystal-pool.ts';
 import { curlNoise3DInto } from '../core/curl-noise.ts';
@@ -158,6 +164,26 @@ function buildWaveTable(unifiedWaves: readonly WaveConfig[]): LegacyWaveAxis[][]
 
 /** The curl stage's one 3-slot result buffer (see the curl block in `update()`). */
 const CURL_SCRATCH = new Float64Array(3);
+
+/**
+ * v8 Phase 37 follow-up — the PREVIEW TILE's attractor tier: a cheaper warm-up and escape grid, and an optional
+ * prewarmed starting state from the tiles' shared cache (copied, never shared). Absent = the main view.
+ */
+export interface AttractorTileTier extends AttractorTierOpts {
+  gridSize?: number;
+  prewarmed?: AttractorState;
+}
+
+/** v8 Phase 37 — the strand settings `setAttractorStrand` takes and `getAttractorStrand` reads back. */
+export interface AttractorStrandSettings {
+  layout: AttractorLayout;
+  span: number;
+  spanDepth: number;
+  spanRate: number;
+  advance: number;
+  advanceDepth: number;
+  advanceRate: number;
+}
 
 export class LissajousGenerator implements Generator {
   readonly id = 'lissajous';
@@ -591,6 +617,28 @@ export class LissajousGenerator implements Generator {
   private attractorY: Float32Array = new Float32Array(0);
   private attractorZ: Float32Array = new Float32Array(0);
   private attractorBlend = 0; // 0 = pure waves, 1 = pure attractor
+  /*
+   * v8 Phase 37 — the attractor LAYOUT and the strand's six scalars (`overlay.attractor*`), handed over by
+   * `setAttractorStrand`. ⚠️ **The strand itself is built LAZILY in `update()`** and dropped (set to null) by every
+   * path that replaces the attractor — `init`, `setAttractor` — so a strand can never outlive the attractor it was
+   * walked on (invariant 3: a flag must die with its resource). A count change re-fills it in place instead.
+   */
+  private strandLayout: AttractorLayout = 'cloud';
+  private strandSpan = STRAND_SPAN_DEFAULT;
+  private strandSpanDepth = 0;
+  private strandSpanRate = 0;
+  private strandAdvance = STRAND_ADVANCE_DEFAULT;
+  private strandAdvanceDepth = 0;
+  private strandAdvanceRate = 0;
+  private strand: AttractorStrand | null = null;
+  /*
+   * v8 Phase 37 follow-up — the attractor TIER, set by `setAttractor`'s second argument. ⚠️ **`null` is the main
+   * view: every call below passes `undefined` for it, which is today's exact path.** A preview tile passes a cheaper
+   * warm-up budget and escape-grid size, plus an optional PREWARMED starting state from the tiles' shared cache.
+   */
+  private attractorTier: AttractorTileTier | null = null;
+  private readonly strandFrame: StrandFrame = { span: STRAND_SPAN_DEFAULT, advance: STRAND_ADVANCE_DEFAULT, spanTop: STRAND_SPAN_DEFAULT };
+  private readonly strandBase: StrandFrame = { span: STRAND_SPAN_DEFAULT, advance: STRAND_ADVANCE_DEFAULT, spanTop: STRAND_SPAN_DEFAULT };
 
   init(config: GeneratorConfig, canvasSize: CanvasSize): void {
     this.particleCount = config.particleCount;
@@ -681,6 +729,7 @@ export class LissajousGenerator implements Generator {
       this.attractorState = null;
       this.attractorBlend = 0;
     }
+    this.strand = null;   // v8 Phase 37 — rebuilt lazily against the new attractor and population
   }
 
   resize(newWidth: number, newHeight: number): void {
@@ -857,12 +906,14 @@ export class LissajousGenerator implements Generator {
         centreX: st.centreX, centreY: st.centreY, centreZ: st.centreZ,
       };
       const grown = this.attractorState;
-      if (next > prevCount) initAttractorState(grown, this.attractorParams, prevCount);
+      if (next > prevCount) initAttractorState(grown, this.attractorParams, prevCount, this.attractorTier ?? undefined);
       // The three output arrays are pure per-frame scratch — `iterateAttractor` writes every slot before
       // anything reads it — so they only need the right length.
       this.attractorX = new Float32Array(next);
       this.attractorY = new Float32Array(next);
       this.attractorZ = new Float32Array(next);
+      // v8 Phase 37 — the strand keeps its head and centre and RE-FILLS its buffer for the new count on its next
+      // `step()` (its own count test), so a Particle Number drag neither re-warms the bank nor jumps the figure.
     }
 
     // Physarum headings, grown rather than re-spread: a heading turns by at most `turnSpeed` per frame
@@ -2343,13 +2394,38 @@ export class LissajousGenerator implements Generator {
       // the frame delta before calling `update`), so normalising by 16.667 yields exactly the `dtScale`
       // contract documented on `iterateAttractor`: 1.0 at 60 fps with the slider centred.
       const dtScale = dt > 0 ? dt / 16.667 : 1;
-      iterateAttractor(
-        this.attractorState, this.attractorParams,
-        this.attractorX, this.attractorY, this.attractorZ,
-        dtScale,
-        // v8 33.4/33.5 — both optional, so a non-escape type ignores them entirely.
-        { escapeFlow: this.escapeFlow, outEscape: this.escapes },
-      );
+      // v8 Phase 37 — the STRAND layout, on a type that has a trajectory to order (`STRAND_CAPABLE`). Its two
+      // breathing scalars resolve ONCE per frame through the shipped operator law (`37.D4`), outside the loop.
+      // Everywhere else — and always on the cloud layout — the cloud path runs exactly as before.
+      if (this.strandLayout === 'strand' && STRAND_CAPABLE[this.attractorParams.type]) {
+        const f = this.strandFrame;
+        f.span = this.resolveOp(this.strandSpan, this.strandSpanDepth, this.strandSpanRate, scaledTime,
+          STRAND_SPAN_MIN, STRAND_SPAN_MAX);
+        f.advance = this.resolveOp(this.strandAdvance, this.strandAdvanceDepth, this.strandAdvanceRate, scaledTime,
+          STRAND_ADVANCE_MIN, STRAND_ADVANCE_MAX);
+        // The buffer is laid at the BASE span and sized for the breathing's TOP; the breathing RE-READS it.
+        const b = this.strandBase;
+        b.span = this.strandSpan;
+        b.advance = f.advance;
+        b.spanTop = Math.min(STRAND_SPAN_MAX, this.strandSpan + this.strandSpanDepth);
+        if (this.strand === null) {
+          // A tile hands its tier and (for the centre) the attractor state it already warmed — no second bank.
+          this.strand = new AttractorStrand(this.attractorParams, this.particleCount, b,
+            this.attractorTier ? { tier: this.attractorTier, bank: this.attractorState } : undefined);
+        }
+        this.strand.step(b, dtScale, this.attractorX, this.attractorY, this.attractorZ, this.particleCount);
+        if (f.span !== b.span) this.strand.fill(f.span, this.attractorX, this.attractorY, this.attractorZ, this.particleCount);
+      } else {
+        iterateAttractor(
+          this.attractorState, this.attractorParams,
+          this.attractorX, this.attractorY, this.attractorZ,
+          dtScale,
+          // v8 33.4/33.5 — both optional, so a non-escape type ignores them entirely. The tile tier's smaller
+          // escape grid rides the same options object; absent (the main view) it is the 512² grid.
+          { escapeFlow: this.escapeFlow, outEscape: this.escapes,
+            ...(this.attractorTier?.gridSize !== undefined ? { gridSize: this.attractorTier.gridSize } : {}) },
+        );
+      }
 
       const blend = this.attractorBlend;
       const invBlend = 1 - blend;
@@ -3847,7 +3923,9 @@ export class LissajousGenerator implements Generator {
     return false;
   }
 
-  setAttractor(params: AttractorParams | null): void {
+  setAttractor(params: AttractorParams | null, tier?: AttractorTileTier): void {
+    this.strand = null;   // v8 Phase 37 — a strand never outlives the attractor it was walked on
+    this.attractorTier = tier ?? null;
     if (!params) {
       this.attractorParams = null;
       this.attractorState = null;
@@ -3856,8 +3934,18 @@ export class LissajousGenerator implements Generator {
     }
     this.attractorParams = params;
     this.attractorBlend = params.blend;
-    this.attractorState = createAttractorState(this.particleCount);
-    initAttractorState(this.attractorState, params);
+    const warm = tier?.prewarmed;
+    if (warm && warm.x.length === this.particleCount) {
+      // A tile's shared-cache state: COPIED, so each tile iterates its own population from the same start.
+      this.attractorState = {
+        x: warm.x.slice(), y: warm.y.slice(), z: warm.z.slice(), rx: warm.rx.slice(), ry: warm.ry.slice(),
+        renderReady: warm.renderReady, cursor: warm.cursor,
+        centreX: warm.centreX, centreY: warm.centreY, centreZ: warm.centreZ,
+      };
+    } else {
+      this.attractorState = createAttractorState(this.particleCount);
+      initAttractorState(this.attractorState, params, 0, tier);
+    }
     this.attractorX = new Float32Array(this.particleCount);
     this.attractorY = new Float32Array(this.particleCount);
     this.attractorZ = new Float32Array(this.particleCount);
@@ -3877,6 +3965,38 @@ export class LissajousGenerator implements Generator {
   // same — not in one handler that another code path immediately overwrites.
   setAttractorBlend(blend: number): void {
     this.attractorBlend = Math.max(0, Math.min(1, blend));
+  }
+
+  /**
+   * v8 Phase 37 — the attractor LAYOUT and the strand's scalars, CLAMPED here (the one owner of the bounds). A
+   * layout or base-span change drops the strand so it is rebuilt against the new values; the other four only
+   * re-resolve per frame. ⚠️ **The cloud layout is the identity**: with `'cloud'` nothing on the strand path runs.
+   */
+  setAttractorStrand(c: AttractorStrandSettings): void {
+    const span = Math.max(STRAND_SPAN_MIN, Math.min(STRAND_SPAN_MAX, c.span));
+    const layout: AttractorLayout = c.layout === 'strand' ? 'strand' : 'cloud';
+    if (layout !== this.strandLayout || span !== this.strandSpan) this.strand = null;
+    this.strandLayout = layout;
+    this.strandSpan = span;
+    this.strandSpanDepth = Math.max(0, Math.min(STRAND_SPAN_MAX, c.spanDepth));
+    this.strandSpanRate = Math.max(0, c.spanRate);
+    this.strandAdvance = Math.max(STRAND_ADVANCE_MIN, Math.min(STRAND_ADVANCE_MAX, c.advance));
+    this.strandAdvanceDepth = Math.max(0, Math.min(STRAND_ADVANCE_MAX, c.advanceDepth));
+    this.strandAdvanceRate = Math.max(0, c.advanceRate);
+  }
+
+  /** The clamped values in force, read back by the caller so the panel and every export carry what runs. */
+  getAttractorStrand(): AttractorStrandSettings {
+    return {
+      layout: this.strandLayout, span: this.strandSpan, spanDepth: this.strandSpanDepth, spanRate: this.strandSpanRate,
+      advance: this.strandAdvance, advanceDepth: this.strandAdvanceDepth, advanceRate: this.strandAdvanceRate,
+    };
+  }
+
+  /** True while the STRAND is what is drawn: the strand layout, a strand-capable type, and a live blend. */
+  isStrandActive(): boolean {
+    return this.strandLayout === 'strand' && !!this.attractorParams && !!this.attractorState
+      && this.attractorBlend > 0 && STRAND_CAPABLE[this.attractorParams.type];
   }
 
   /**

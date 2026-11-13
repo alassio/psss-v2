@@ -3,6 +3,9 @@ import { resolveFigureType } from '../../generators/figure-types.ts';
 import { compileProgram } from '../../core/gl-program.ts';
 import type { MaterialConfig } from '../../presets/types.ts';
 import { LissajousGenerator } from '../../generators/lissajous.ts';
+import { ATTRACTOR_PRESETS, createAttractorState, initAttractorState, type AttractorState } from '../../generators/attractors.ts';
+import { STRAND_SPAN_DEFAULT, STRAND_ADVANCE_DEFAULT } from '../../generators/attractor-strand.ts';
+import type { AttractorParams } from '../../core/interfaces.ts';
 import { TranslationMapProcessor } from '../../post-processors/trans-map.ts';
 import { chainFromOverlay, isStyleActive } from '../../post-processors/trans-map-chain.ts';
 import { getColourRampData } from '../../generators/colour-ramps.ts';
@@ -153,6 +156,57 @@ const PARTICLE_DIVISOR = 4;
  * math budget, starving every other tile. A tile is 256x192, where 2 000 particles is already dense.
  */
 const MAX_TILE_PARTICLES = 2000;
+
+/*
+ * v8 Phase 37 follow-up — **the TILE TIER of the attractor: a cheaper warm-up, a smaller escape grid, and ONE shared
+ * starting state per attractor per session** (owner 2026-11-13: *"probe first, then build the cheap approximate
+ * version"*; `p73-tile-probe.mjs`, 2 000 particles):
+ *   - the six ODE flows at `TILE_ATTRACTOR_WARM_BUDGET` = 200 k steps (the main view's 800 k): setup 2.6–3.6 ms (was
+ *     9–15), footprint 98–115 % of the full one and overlapping it 54–98 % — the SAME attractor, sampled more thinly.
+ *     ⚠️ Not lower: `Rössler Wide`'s tall spike needs long orbits (53 % of its footprint at 200 k, 4 % at 50 k).
+ *     ⚠️ `Thomas Cyclone` stays ~14 ms (the fixed 2 000-step transient on 32 references and its sine terms dominate).
+ *   - the two discrete maps warm per PARTICLE and take no budget (7–13 ms flat): left as they are, the cache absorbs it.
+ *   - `julia`/`mandelbrot` on a 64² escape grid (`TILE_ATTRACTOR_GRID`): 1.2–1.8 ms against 52–92 ms at 512².
+ * ⚠️⚠️ **THE CACHE IS WHAT MAKES IT FIT.** The first tile of an attractor pays its setup once; every later tile — and
+ * every re-entry while scrolling — COPIES the cached state in microseconds (`setAttractor`'s `prewarmed`). Keyed by
+ * the attractor's IDENTITY (type, params, bounds) and the particle count, never by preset name.
+ * ⚠️ **A tile's attractor is APPROXIMATE by design** — thinner sampling and a coarser escape field than the main view;
+ * the main view is untouched (no tier is passed there, which is today's exact path, `strandcheck` §C).
+ */
+const TILE_ATTRACTOR_WARM_BUDGET = 200_000;
+const TILE_ATTRACTOR_GRID = 64;
+const tileAttractorCache = new Map<string, AttractorState>();
+/** `main.ts`' `DEFAULT_ATTRACTOR_BLEND`: the blend a preset naming an attractor without one gets. */
+const TILE_DEFAULT_ATTRACTOR_BLEND = 0.6;
+
+/** The attractor a preset drives, resolved in `main.ts`' order: its own `fractal` block, then `overlay.attractorIndex`. */
+function tileAttractorParams(preset: UnifiedPreset): AttractorParams | null {
+  if (preset.fractal) {
+    return {
+      type: preset.fractal.type as AttractorParams['type'], params: preset.fractal.params,
+      blend: preset.fractal.blend, bounds: preset.fractal.bounds,
+    };
+  }
+  const idx = preset.overlay?.attractorIndex ?? -1;
+  const ap = idx >= 0 ? ATTRACTOR_PRESETS[idx] : undefined;
+  if (!ap) return null;
+  return {
+    type: ap.type, params: ap.params, blend: preset.overlay?.attractorBlend ?? TILE_DEFAULT_ATTRACTOR_BLEND,
+    bounds: ap.bounds, ...(ap.maxIter !== undefined ? { maxIter: ap.maxIter } : {}),
+  };
+}
+
+/** The shared warmed starting state for this attractor at this count (built once per session). */
+function tileAttractorState(params: AttractorParams, count: number): AttractorState {
+  const key = `${params.type}|${params.params.join(',')}|${params.bounds.join(',')}|${count}`;
+  let st = tileAttractorCache.get(key);
+  if (!st) {
+    st = createAttractorState(count);
+    initAttractorState(st, params, 0, { warmBudget: TILE_ATTRACTOR_WARM_BUDGET });
+    tileAttractorCache.set(key, st);
+  }
+  return st;
+}
 const TARGET_FPS = 15;
 
 /**
@@ -1284,20 +1338,27 @@ export class GridTileRenderer {
     generator.setSharpnessBreath(ov?.sharpnessDepth ?? 0, ov?.sharpnessRate ?? 0);
 
     /*
-     * ⚠️⚠️ **TILES STILL SET NO ATTRACTOR, AND THAT IS UNDOCUMENTED RATHER THAN DECIDED — stated here so
-     * the next reader does not have to re-derive it.** The word "attractor" appeared NOWHERE in this file
-     * before this comment, so there is no recorded reason; C7 names grading and never mentions the figure.
-     *
-     * The cost is real but it is NOT uniform, which is why this is a question rather than an edit:
-     *   - `julia`/`mandelbrot` build a **512² escape grid**, measured at **23/147/67 ms**. Per tile, with
-     *     up to 56 tiles, that is plainly out of the question.
-     *   - `lorenz`/`clifford`/`dejong`/… integrate per-particle state — affordable, but it needs a warm-up
-     *     and the warm-up budget above is already the thing that made *"56 tiles never finish"*.
-     *   - `cylinderknot` (`33.6`) is a **closed-form function of the index**: no state, no grid, no warm-up.
-     *     It is as cheap as the fold and would be free to include.
-     * **So the honest position is that 38 attractor presets draw the wrong tile, three of them for no
-     * reason at all.** Deciding this is the owner's; it is not smuggled in under a defect fix.
+     * v8 Phase 37 follow-up — **THE TILE'S ATTRACTOR, cloud or strand, on the tile tier** (see `TILE_ATTRACTOR_*`). This
+     * REVERSES the 2026-11-13 morning decision to leave tiles unset (`37.Q4` (b)), on the owner's instruction the same
+     * day: *"it starts looking odd in the preview tiles that attractor presets look completely different."* The gate
+     * that failed then — a one-shot 5–36 ms setup per tile against `MATH_WARM_BUDGET_MS` 4 ms — is met by the cheaper
+     * warm-up and by the shared cache, so a cloud tile and a strand tile are both drawn (never one without the other).
      */
+    const tileAttractor = tileAttractorParams(preset);
+    if (tileAttractor) {
+      const count = generator.getParticleCount();
+      generator.setAttractor(tileAttractor, {
+        warmBudget: TILE_ATTRACTOR_WARM_BUDGET, gridSize: TILE_ATTRACTOR_GRID,
+        prewarmed: tileAttractorState(tileAttractor, count),
+      });
+      generator.setAttractorStrand({
+        layout: ov?.attractorLayout ?? 'cloud',
+        span: ov?.attractorArcSpan ?? STRAND_SPAN_DEFAULT,
+        spanDepth: ov?.attractorArcSpanDepth ?? 0, spanRate: ov?.attractorArcSpanRate ?? 0,
+        advance: ov?.attractorAdvance ?? STRAND_ADVANCE_DEFAULT,
+        advanceDepth: ov?.attractorAdvanceDepth ?? 0, advanceRate: ov?.attractorAdvanceRate ?? 0,
+      });
+    }
 
     // Configure material simulation if preset has material overlay
     const matOverlay = preset.overlay?.material;

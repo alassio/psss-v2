@@ -44,7 +44,11 @@ export type RuleKey =
   | 'knopp'
   | 'bush3d'
   | 'koch'
-  | 'minkowski';
+  | 'minkowski'
+  | 'kochSnowflake'
+  | 'pentigree'
+  | 'twindragon'
+  | 'fudgeflake';
 
 /**
  * One production system plus the metadata the UI and the checkers need.
@@ -115,7 +119,8 @@ export interface LSystemRule {
  *
  * ⚠️⚠️ **FOURTEEN RULES WERE ADMITTED BY THE OWNER (`36.Q3`, 2026-11-02: *"ship all of them without a
  * conditional gate, we will check it in UI later and do a review"*) AND THIRTEEN OF THEM ARE HERE** —
- * plus Koch and Minkowski (Phase 39), so fifteen rules in all. The fourteenth admitted, **`Hill
+ * plus Koch and Minkowski (Phase 39) and the four CLOSED tiles of 2026-11-13 (Koch snowflake, Pentigree,
+ * Twindragon, Fudgeflake), so nineteen rules in all. The fourteenth admitted, **`Hill
  * tetrahedron`, IS NOT AN L-SYSTEM AND IS NOT FAKED**: it is a rep-tile traversal, and Phase 39 MEASURED
  * that no single-generator traversal of its rep-8 dissection is continuous (`p60-hill*.mjs`) — an exact
  * curve needs several alternating rules. ⛔ **OUT-SCOPED to Phase 41 by the owner (2026-11-06, `39.D16`),
@@ -372,7 +377,78 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
     zoomInverse: false,
     provenance: 'v8 39.A5, the Minkowski sausage (Prusinkiewicz & Lindenmayer, fig. 1.10) -- the square-wave '
       + 'coastline, eight segments per step, a silhouette no other shipped rule draws. Its 39.A10 demo carries '
-      + 'the drop condition "reads like a third square maze beside Hilbert 2D / Moore"',
+      + 'the drop condition "reads like a third square maze beside Hilbert 2D / Moore"',
+  },
+  /*
+   * v8 2026-11-13 (owner) — FOUR CLOSED TILES, each an existing generator laid round a STARTING SHAPE in the axiom.
+   * Probed first (`p71-new-curves.mjs`, renders `p71-out/p71-planar.png`): each closes EXACTLY at its published
+   * angle (first-to-last gap 0) and draws every edge once. Each has an EXACT Customize structure — the base
+   * generator plus that starting shape (`custom.ts` CUSTOM_ONLY_STRUCTURES, searched by `p71d-structures.mjs` /
+   * `p71e-twin90.mjs`, held by `figurecheck` §K2). ⚠️ The closure belongs to the PUBLISHED angle: the axiom's turns
+   * scale with Yaw like every other turn, so away from it the loop opens — the engine's angle convention, not a defect.
+   */
+  {
+    key: 'kochSnowflake',
+    name: 'Koch snowflake',
+    axiom: 'F--F--F',
+    productions: { F: 'F+F--F+F' },
+    drawSymbols: '',
+    publishedAngle: 60,
+    angleRange: [20, 88],
+    recursionRange: [1, 6],
+    bracketed: false,
+    closed: true,
+    zoomInverse: false,
+    provenance: 'v8 2026-11-13, the Koch snowflake (Prusinkiewicz & Lindenmayer, fig. 1.9a): the Koch curve on '
+      + 'the three sides of a triangle. Closed and self-avoiding at 60deg (p71). Its anti-snowflake (axiom '
+      + 'F++F++F) was probed and REFUSED: in this turtle it draws a three-armed open figure, not the inward tile',
+  },
+  {
+    key: 'pentigree',
+    name: 'Pentigree',
+    axiom: 'F-F-F-F-F',
+    productions: { F: 'F-F++F+F-F-F' },
+    drawSymbols: '',
+    publishedAngle: 72,
+    angleRange: [50, 95],
+    recursionRange: [1, 4],
+    bracketed: false,
+    closed: true,
+    zoomInverse: false,
+    provenance: 'v8 2026-11-13, the McWorter pentigree: six-segment generator at 72deg round a pentagon -- the '
+      + 'the ONLY five-fold figure. It touches itself at pentagon corners by construction (p71: 261 '
+      + 'shared points at depth 3), never along an edge',
+  },
+  {
+    key: 'twindragon',
+    name: 'Twindragon',
+    axiom: 'F+F+',
+    productions: { F: 'F+G', G: 'F-G' },
+    drawSymbols: '',
+    publishedAngle: 90,
+    angleRange: [45, 135],
+    recursionRange: [6, 13],
+    bracketed: false,
+    closed: true,
+    zoomInverse: false,
+    provenance: 'v8 2026-11-13, the twindragon (Davis & Knuth): two Heighway dragons back to back, a plane TILE. '
+      + 'p71b: F+F+ with F -> F+G, G -> F-G closes exactly with 0 repeated edges at every depth; the textbook '
+      + 'FX+FX+ over the Dragon rule productions does NOT close (gap 0.85 of the extent) and was refused',
+  },
+  {
+    key: 'fudgeflake',
+    name: 'Fudgeflake',
+    axiom: 'F+F+F',
+    productions: { F: 'F+F-F' },
+    drawSymbols: '',
+    publishedAngle: 120,
+    angleRange: [60, 170],
+    recursionRange: [2, 7],
+    bracketed: false,
+    closed: true,
+    zoomInverse: false,
+    provenance: 'v8 2026-11-13, the fudgeflake: three terdragons round a triangle, a three-fold plane tile. '
+      + 'Closed at 120deg (p71); like the terdragon it revisits lattice points by construction',
   },
 ];
 
@@ -466,6 +542,11 @@ export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number
   // v8 `39.A5` — solved 2026-11-05 by the `39.A6` rule (min over every depth and the landmark-centred sweep).
   koch: { yaw: 2.59, multi: 2.59 },        // binds at depth 7 near Cesaro (83 deg) -- p39a5-bracket-new.mjs
   minkowski: { yaw: 2.35, multi: 2.35 },   // binds at depth 5, centre 116 deg
+  // v8 2026-11-13 — the four closed tiles, SOLVED by the same rule (p71f-bracket.mjs, min over every depth and 7 centres).
+  kochSnowflake: { yaw: 1.95, multi: 1.95 },   // binds at depth 6, centre 44 deg
+  pentigree: { yaw: 1.81, multi: 1.81 },       // binds at depth 4, centre 85 deg
+  twindragon: { yaw: 0.47, multi: 0.47 },      // binds at depth 12, centre 51 deg -- BELOW the useful floor: rebuilt per frame
+  fudgeflake: { yaw: 1.68, multi: 1.68 },      // binds at depth 7, centre 84 deg
 };
 
 /**

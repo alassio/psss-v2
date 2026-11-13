@@ -334,6 +334,23 @@ export const CONTROL_TIPS: Record<string, string> = {
   attractorBlend: 'How far to move from the preset’s wave figure toward the attractor: 0 is the preset '
     + 'untouched, 1 the attractor alone. It also fades the Translation Map warp, so a mid value gives an '
     + 'attractor with some of the preset’s character still in it.',
+  // v8 Phase 37 — the attractor layout and the strand. The type precondition stays INLINE in the row (`37.D16`).
+  attractorLayout: 'How the attractor’s particles are arranged. Cloud spreads them over many unrelated orbits '
+    + 'for even coverage. Strand follows ONE trajectory, so neighbouring particles are neighbouring points along '
+    + 'the path: the figure becomes a single moving stroke with two free ends, and a colour mapped by particle '
+    + 'index runs as a gradient along it. Effects that push particles around (curl noise, fluid, physarum) fight '
+    + 'that ordering by nature.',
+  attractorArcSpan: 'How much of the trajectory the strand shows, in multiples of the attractor’s size. Longer '
+    + 'strands show more of the shape; past the point where the path starts retracing itself the strokes pile up '
+    + 'and wash towards white, soonest on Aizawa and Rössler.',
+  attractorArcSpanDepth: 'How far the strand length breathes above and below its setting. The strand stretches '
+    + 'and shrinks rather than being redrawn. 0 holds it still.',
+  attractorArcSpanRate: 'How fast the strand length breathes.',
+  attractorAdvance: 'How fast the strand travels along its trajectory, in new points per frame; 0 freezes it. A '
+    + 'fast strand under a long trail smears into a blur. On a strand the velocity colour and stretch measure '
+    + 'this travel, not the attractor’s own speed.',
+  attractorAdvanceDepth: 'How far the strand speed breathes above and below its setting. 0 holds it steady.',
+  attractorAdvanceRate: 'How fast the strand speed breathes.',
 
   // ---- Curl Noise ----
   curlEnabled: 'Adds a divergence-free turbulent flow to every particle, so the figure churns and eddies '
