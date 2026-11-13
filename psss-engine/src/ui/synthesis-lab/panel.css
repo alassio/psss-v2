@@ -1928,3 +1928,41 @@
 .sl-gen-table--start-lift {
   grid-template-columns: 1.4em 3.6em 3.6em 3.6em 4.2em 4.4em 2.8em 3.6em auto;
 }
+
+/*
+ * v8 2026-11-13 — the preset PICKER the Mixer's deck buttons open (`preset-picker.ts`). Positioned `fixed` over the
+ * tab body's VISIBLE rectangle (set in `place()`), so it fits the screen whatever the tab's scroll position. The
+ * tiles reuse the Reel library's classes (`.sl-reel-browse`, `.sl-reel-tile`), so both pickers look the same.
+ */
+.sl-picker {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #1a1a30;
+  border: 1px solid #3a3a6a;
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+}
+.sl-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sl-picker-title {
+  font-weight: 600;
+  color: #ddd;
+  margin-right: 4px;
+}
+/* The field itself is the grid's `.pg-search`; only its share of the head row is set here. */
+.sl-picker-search { flex: 1; min-width: 160px; }
+.sl-picker-scroll { flex: 1; min-height: 0; }
+.sl-picker-open {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}

@@ -524,6 +524,15 @@ export class PreviewGridPanel {
     if (this.visible) this.scrollToActive();
   }
 
+  /**
+   * v8 2026-11-13 — the names in the order the grid is SHOWING them (its current Sort), as a copy. The Mixer's deck
+   * pickers read this so their tiles follow the grid's order; a copy, because `presetNames` is this panel's own array
+   * and is mutated in place by `applySort`.
+   */
+  getOrderedNames(): string[] {
+    return [...this.config.presetNames];
+  }
+
   getScrollPosition(): number {
     return this.gridContainer?.scrollTop ?? this.savedScrollTop;
   }

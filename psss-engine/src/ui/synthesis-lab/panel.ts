@@ -70,6 +70,13 @@ export interface SynthesisLabConfig {
    * opposite of the `reelControls` rule, because a picker that cannot filter still adds presets to a reel.
    */
   presetFilter?: PresetFilterModel;
+  /**
+   * v8 2026-11-13 — the Mixer's deck PICKERS: their own tile renderer (a FOURTH instance, active only while a picker
+   * is open, so it never competes with the Reel's for the frame budget or its slot pool) and the preview grid's
+   * names in its current Sort. Both optional: without them each deck is the plain dropdown it always was.
+   */
+  mixerTileRenderer?: GridTileRenderer;
+  getGridOrderedNames?: () => string[];
 }
 
 /**
@@ -378,7 +385,13 @@ export class SynthesisLabPanel {
     this.registry.register(new MixerTab(
       presetNames, getPreset, sendToEvolution, vfx ? () => vfx.getSnapshot() : undefined,
       // The header's own reset, so the Mixer's `Reset` button is the SAME operation, not a copy of it.
-      () => this.resetCurrentTab()));
+      () => this.resetCurrentTab(),
+      // v8 2026-11-13 — the deck pickers, when the host supplies a tile renderer and the grid's order.
+      this.config.mixerTileRenderer && this.config.getGridOrderedNames ? {
+        tileRenderer: this.config.mixerTileRenderer,
+        getSortedNames: this.config.getGridOrderedNames,
+        filter: this.config.presetFilter ?? null,
+      } : null));
     this.registry.register(new RandomiserTab(stats, sendToEvolution));
     // v8 26.8 — the strip is applied ENGINE-side, so the tab is handed the host's setter rather than
     // reaching for it: a panel built without `visualFxControls` then simply has no toggle, instead of a

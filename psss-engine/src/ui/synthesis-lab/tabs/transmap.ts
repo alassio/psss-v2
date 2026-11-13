@@ -280,6 +280,23 @@ interface TermRow {
   freq: HTMLInputElement;
 }
 
+/**
+ * v8 2026-11-13 — the `(Preset)` regime's Strength gain, as one sentence: `strength / 0.5` for the shift half and
+ * `strength2 / 0.5` for the zoom half (only on Zoom Combined, style 3, where table 2 is read), the factors
+ * `resolveStaticWaves` multiplies the AUTHORED terms by. Empty at the neutral 0.5 on every half that is read.
+ */
+export function describeTableGain(sf: { strength: number; strength2: number }, zoomHalf: boolean): string {
+  const g1 = sf.strength / STATIC_FIELD_DEFAULTS.strength;
+  const g2 = sf.strength2 / STATIC_FIELD_DEFAULTS.strength2;
+  const live1 = g1 !== 1, live2 = zoomHalf && g2 !== 1;
+  if (!live1 && !live2) return '';
+  const x = (g: number): string => `\u00d7${g.toFixed(2)}${g < 0 ? ' (inverted)' : ''}`;
+  const parts: string[] = [];
+  if (live1) parts.push(`Strength ${sf.strength.toFixed(2)}: the shift amplitudes below act ${x(g1)}`);
+  if (live2) parts.push(`${live1 ? 'the' : 'Zoom Strength ' + sf.strength2.toFixed(2) + ': the'} zoom amplitudes act ${x(g2)}`);
+  return `${parts.join('; ')} \u2014 the rows show them as authored.`;
+}
+
 export class TransMapTab implements TabModule {
   readonly id: TabId = 'transmap';
   private state: ExplorationState | null = null;
@@ -348,6 +365,13 @@ export class TransMapTab implements TabModule {
    * bake's `warning === null`, never a second predicate here (invariant 25 — the description owns the gate).
    */
   private termNote: HTMLElement | null = null;
+  /**
+   * v8 2026-11-13 (owner) — **what Strength does to a `(Preset)` table**, which the rows cannot show: they are the
+   * AUTHORED terms, and the engine multiplies them by `strength / 0.5` while drawing (`resolveStaticWaves`), never
+   * writing the product back. Hidden on a named pattern (the rows are the bake there, Strength already inside them)
+   * and at the neutral 0.5 (×1.00 says nothing). Filled in `refreshDerived()`, so a Strength DRAG updates it.
+   */
+  private gainNote: HTMLElement | null = null;
   private readoutEl: HTMLElement | null = null;
 
   /**
@@ -486,6 +510,7 @@ export class TransMapTab implements TabModule {
     this.resetBtn = null;
     this.reapplyBtn = null;
     this.termNote = null;
+    this.gainNote = null;
     this.readoutEl = null;
     this.entrySnapshot = null;
     this.redoSnapshot = null;
@@ -1439,6 +1464,10 @@ export class TransMapTab implements TabModule {
       this.termNote = document.createElement('p');
       this.termNote.className = 'sl-tab-desc sl-transmap-term-note';
       sec.appendChild(this.termNote);
+      // v8 2026-11-13 — the Strength gain on a `(Preset)` table, above the rows it multiplies (see `gainNote`).
+      this.gainNote = document.createElement('p');
+      this.gainNote.className = 'sl-tab-desc sl-transmap-gain-note';
+      sec.appendChild(this.gainNote);
     }
 
     for (const pane of PANES) {
@@ -2013,6 +2042,14 @@ export class TransMapTab implements TabModule {
      * ONE call site.
      */
     this.syncShapeNotices(layer);
+
+    if (this.gainNote) {
+      // ⚠️ The regime test is the BAKE's existence, the same one the term note uses: a bake exists only on a named
+      // pattern, where Strength is already inside the shown rows. One predicate for both lines (invariant 25).
+      const text = shown.bake ? '' : describeTableGain(staticFieldOf(layer), layer.style === 3);
+      this.gainNote.textContent = text;
+      this.gainNote.style.display = text ? '' : 'none';
+    }
 
     if (this.termNote) {
       // ⚠️ The note is `StaticFieldBake.warning`'s own sentence and its gate is that sentence's existence, so

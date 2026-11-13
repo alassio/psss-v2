@@ -764,6 +764,8 @@ const mixSnap = () => page.evaluate((MX) => {
       s.querySelector('.sl-mix-src-btn.active')?.textContent ?? '-').join(''),
     locked: c.querySelectorAll('.sl-mix-cat-chip.locked').length,
     deckB: sels[1]?.value ?? null,
+    // v8 2026-11-13 — the select is HIDDEN behind the deck picker's button, so what the user SEES is the button.
+    deckBShown: c?.querySelector('button[aria-label="Choose the preset for Deck B"]')?.textContent ?? null,
     line: c.querySelector('.sl-mix-source-line')?.textContent ?? null,
   };
 }, MX);
@@ -852,16 +854,17 @@ if (await loadByTile(MIX_LOOK)) {
   await page.locator(`${MX} button[aria-label="Reset the Mixer to how it was on entry"]`).click();
   await page.waitForTimeout(1800);
   const after = await mixSnap();
-  const noB = (s) => (s === null ? null : JSON.stringify({ ...s, deckB: undefined }));
+  const noB = (s) => (s === null ? null : JSON.stringify({ ...s, deckB: undefined, deckBShown: undefined }));
   chk('after Reset the Mixer is IDENTICAL to how it was on entry — preview, rows, master, locks, sentence',
     noB(after) !== null && noB(after) === noB(entry),
     noB(after) === noB(entry) ? `"${after?.line}"`
       : `entry ${noB(entry)} | after ${noB(after)}`);
 
   chk('...and Deck B stays chosen AND SHOWN, so a new mix can start from the same pair',
-    after !== null && after.deckB === MIX_FIG,
-    `dropdown reads "${after?.deckB}"; ⚠️ before 2026-11-04 the re-render rebuilt it with no default, so it `
-    + 'showed EMPTY while the Mixer still held the old Deck B');
+    after !== null && after.deckB === MIX_FIG && (after.deckBShown ?? '').startsWith(MIX_FIG),
+    `dropdown reads "${after?.deckB}", picker button "${after?.deckBShown}"; ⚠️ before 2026-11-04 the re-render `
+    + 'rebuilt it with no default, so it showed EMPTY while the Mixer still held the old Deck B — and since the deck '
+    + 'PICKER (2026-11-13) the select is hidden, so the BUTTON is the shown half');
 
   await page.locator(`${MX} button[aria-label="Figure from B, look from A"]`).click();
   await page.waitForTimeout(1500);
@@ -1301,6 +1304,78 @@ console.log('\n=== AA. v8 performance pass — the grid animates only the tiles 
     aa.live !== null && aa.live <= aa.intersecting && aa.scrollTop > 0,
     `live ${aa.live}, intersecting ${aa.intersecting}, scrollTop ${aa.scrollTop} (scrollTop > 0: the boot jump that caused the leak happened)`);
   await ctxAA.close();
+}
+
+console.log('\n=== AB. v8 2026-11-13 — the Mixer deck PICKER: the grid\'s order, a name search, and a pick that writes the deck ===\n');
+/*
+ * ⚠️ **The order clause is only non-vacuous on a NON-DEFAULT sort**: the library order is close to alphabetical, so a
+ * picker that sorted by name itself would pass under `Order ▲`. The grid is set to `Name ▼` first and the clause
+ * also asserts that order is NOT the alphabetical one.
+ * ⚠️ **The pick must write the deck's own `<select>`** (still the one control, hidden): the clause reads the SELECT's
+ * value, not the button, so a picker that only relabelled its button fails.
+ */
+{
+  const ctxAB = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  const pAB = await ctxAB.newPage();
+  const abErrs = [];
+  pAB.on('pageerror', (e) => abErrs.push(String(e)));
+  await pAB.goto((process.env.DEMO_URL ?? 'http://localhost:5190/') + '?testhook=1', { waitUntil: 'load' });
+  await pAB.waitForSelector('.pg-sort-select', { timeout: 60000 });
+  await pAB.locator('.pg-sort-select').selectOption('name-desc');
+  await pAB.waitForTimeout(800);
+  const gridOrder = await pAB.evaluate(() => [...document.querySelectorAll('.pg-grid [data-preset]')].map((t) => t.dataset.preset));
+  // Into the Lab and the Mixer, the way `capture-ui.mjs` does it.
+  await pAB.locator('button', { hasText: /^Lab$/ }).first().click({ timeout: 120000 }).catch(() => {});
+  await pAB.locator('.sl-tab-btn[data-tab="mixer"]').click({ timeout: 120000 });
+  await pAB.waitForTimeout(1200);
+  const MXB = '.tab-content[data-tab="mixer"]';
+  /*
+   * ⚠️ **A Deck A pick must reach the MAIN PREVIEW even with Deck B still EMPTY** (owner 2026-11-13: it did not — the
+   * crossfade returns early without both decks). Read through `?testhook=1`; the particle count is the discriminator
+   * (the boot preset `Aurora Borealis` 20000, `Curve Thicket` 50000). Taken FIRST, while Deck B is unset.
+   */
+  const ptsBefore = await pAB.evaluate(() => window.__psss?.particleCount ?? null);
+  await pAB.locator(`${MXB} button[aria-label="Choose the preset for Deck A"]`).click();
+  await pAB.waitForTimeout(800);
+  await pAB.locator('.sl-picker .sl-reel-tile[data-preset="Curve Thicket"]').click();
+  await pAB.waitForTimeout(1500);
+  const ptsAfter = await pAB.evaluate(() => window.__psss?.particleCount ?? null);
+  chk('a Deck A pick with Deck B EMPTY shows that preset in the main preview',
+    ptsBefore !== null && ptsAfter === 50000 && ptsAfter !== ptsBefore,
+    `particles ${ptsBefore} -> ${ptsAfter} (Curve Thicket has 50000)`);
+  await pAB.locator(`${MXB} button[aria-label="Choose the preset for Deck B"]`).click();
+  await pAB.waitForTimeout(1500);
+  const pickOrder = await pAB.evaluate(() => [...document.querySelectorAll('.sl-picker .sl-reel-tile')].map((t) => t.dataset.preset));
+  const alpha = [...gridOrder].sort((a, b) => a.localeCompare(b));
+  chk('the picker shows EVERY grid preset in the grid\'s CURRENT sort (Name ▼), not an order of its own',
+    pickOrder.length > 100 && JSON.stringify(pickOrder) === JSON.stringify(gridOrder)
+    && JSON.stringify(pickOrder) !== JSON.stringify(alpha),
+    `${pickOrder.length} tiles, first "${pickOrder[0]}" (grid "${gridOrder[0]}", A-to-Z would start "${alpha[0]}")`);
+  await pAB.locator('.sl-picker .pg-search').fill('lorenz');
+  await pAB.waitForTimeout(500);
+  const shown = await pAB.evaluate(() => [...document.querySelectorAll('.sl-picker .sl-reel-tile')]
+    .filter((t) => t.style.display !== 'none').map((t) => t.dataset.preset));
+  chk('...the name search narrows the tiles to the matching names only',
+    shown.length > 0 && shown.length < pickOrder.length && shown.every((n) => n.toLowerCase().includes('lorenz')),
+    `${shown.length} shown: ${shown.join(', ')}`);
+  const target = shown[0];
+  await pAB.locator(`.sl-picker .sl-reel-tile[data-preset="${target}"]`).click();
+  await pAB.waitForTimeout(1200);
+  const res = await pAB.evaluate((MXB) => ({
+    open: document.querySelector('.sl-picker') !== null,
+    sel: document.querySelectorAll(`${MXB} select`)[1]?.value ?? null,
+    btn: document.querySelector(`${MXB} button[aria-label="Choose the preset for Deck B"]`)?.textContent ?? null,
+  }), MXB);
+  chk('...and a pick CLOSES the picker and writes the deck\'s own select (the one control), which the button then shows',
+    !res.open && res.sel === target && (res.btn ?? '').startsWith(target ?? '\u0000'),
+    `picked "${target}": select "${res.sel}", button "${res.btn}", open ${res.open}`);
+  await pAB.locator(`${MXB} button[aria-label="Choose the preset for Deck A"]`).click();
+  await pAB.waitForTimeout(600);
+  await pAB.keyboard.press('Escape');
+  await pAB.waitForTimeout(300);
+  chk('...and Escape closes it without a pick', (await pAB.locator('.sl-picker').count()) === 0
+    && abErrs.length === 0, abErrs.length ? abErrs[0] : 'no page error');
+  await ctxAB.close();
 }
 
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);

@@ -77,6 +77,11 @@ const problems = [];
  */
 const EXTRA_SHOTS = [
   /*
+   * v8 2026-11-13 — the Mixer's deck PICKER open over the tab, searched for `curve` so the picture shows the search
+   * narrowing the tiles. Its steps are in `PREP['lab-mixer-picker']`.
+   */
+  { tab: 'mixer', file: 'lab-mixer-picker' },
+  /*
    * ---- Visual FX: ONE GROUP PER SHOT ----
    *
    * ⚠️ **`group` REPLACED `scrollTo` FOR THIS TAB AND THE DIFFERENCE IS WHAT THE READER SEES.** The old
@@ -590,6 +595,16 @@ function report(file, box, note = '') {
  */
 const PREP = {
   /*
+   * The deck picker: open it, type a search, and WAIT for the tiles — each is a live renderer and under SwiftShader
+   * they fill one by one (measured: 2 of 3 still black after 5 s), so a short wait photographs empty frames.
+   */
+  'lab-mixer-picker': [
+    ['click', 'button[aria-label="Choose the preset for Deck B"]'],
+    ['wait', 1500],
+    ['fill', '.sl-picker .pg-search', 'curve'],
+    ['wait', 45000],
+  ],
+  /*
    * ⚠️ **The one state on the Composer that no scroll or group can reach: a level switched OFF.** The
    * level checkbox lives on the slot's own HEAD, not in a `.sl-vfx-row`, so `setControl` cannot address
    * it and `enable` is no use - a raw click on its accessible name is the only route.
@@ -638,6 +653,10 @@ async function prep(page, file) {
       await page.waitForTimeout(a);
     } else if (kind === 'key') {
       await page.keyboard.press(a);
+    } else if (kind === 'fill') {
+      const loc = page.locator(a).first();
+      if (await loc.count() === 0) { problems.push(`${file}: prep fill ${a} matched nothing`); continue; }
+      await loc.fill(b);
     } else if (kind === 'blur') {
       await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     }

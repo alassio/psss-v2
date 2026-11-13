@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.10.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.10.0](https://github.com/alassio/psss-v2/releases/tag/v1.10.0)** — **New since v1.8.11: attractors drawn as one flowing strand, four new closed self-similar curves, and attractors in the preview tiles.** A Lorenz, Rössler, Thomas, Halvorsen, Aizawa or Nosé-Hoover attractor can now be drawn as a single stroke that travels along its own path, with its colour running along it; the Koch snowflake, the pentigree, the twindragon and the fudgeflake join the curve library; and the preview grid now shows every attractor preset as its attractor rather than as its wave figure. Twelve new demo presets show them off.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.10.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.11.0.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.11.0](https://github.com/alassio/psss-v2/releases/tag/v1.11.0)** — **New since v1.10.0: choose the Mixer's decks from live preview tiles, two new presets, and clearer Transmap Strength feedback.** Each Mixer deck now opens a picker with a search field, the preview grid's filter and live tiles in the grid's current order. A Deck A choice now shows in the main view straight away. *Jagged Glass* and *Skin of a Snake* join the library.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.11.0)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)

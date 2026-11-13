@@ -8,6 +8,9 @@ import {
 } from '../../../exploration/overlay-rules.ts';
 import { deepCopy } from '../../../exploration/state.ts';
 import { TAB_TIPS, LOCK_CATEGORY_TIPS } from '../tooltips.ts';
+import { PresetPicker } from '../preset-picker.ts';
+import type { GridTileRenderer } from '../../preview-grid/grid-tile-renderer.ts';
+import type { PresetFilterModel } from '../../preview-grid/filter-model.ts';
 
 /**
  * v8 Phase 23.5 — one row per category, **built from `CATEGORY_LOCKS` and never hand-written six** (23.D4).
@@ -40,6 +43,17 @@ interface CategoryRow {
   srcBtns: Record<'A' | 'follow' | 'B', HTMLElement | null>;
 }
 
+/**
+ * v8 2026-11-13 (owner) — what the Mixer needs to open its deck PICKERS: a tile renderer of its own, the preview
+ * grid's names in its current sort, and the shared facet filter. Optional: without it each deck is the plain
+ * dropdown it always was (a host with no tile renderer must degrade, not lose the tab).
+ */
+export interface MixerPickerConfig {
+  tileRenderer: GridTileRenderer;
+  getSortedNames: () => string[];
+  filter: PresetFilterModel | null;
+}
+
 export class MixerTab implements TabModule {
   readonly id: TabId = 'mixer';
   private state: ExplorationState | null = null;
@@ -64,6 +78,13 @@ export class MixerTab implements TabModule {
    * not a silent one.
    */
   private deckBSelect: HTMLSelectElement | null = null;
+  /*
+   * v8 2026-11-13 — the deck pickers. ⚠️ **The `<select>` stays the deck's ONE control** (hidden when a picker
+   * exists): a pick writes it and fires its `change`, so the deck handlers, the checks that set the select, and
+   * the settings search's `<option>` index all keep working. The button only shows the select's value.
+   */
+  private picker: PresetPicker | null = null;
+  private deckButtons: { select: HTMLSelectElement; button: HTMLButtonElement }[] = [];
   /**
    * The PANEL's reset for this tab, handed in rather than re-implemented.
    *
@@ -90,7 +111,17 @@ export class MixerTab implements TabModule {
     sendToEvolution?: () => void,
     getLiveOverlay?: () => OverlayState,
     resetToEntry?: () => void,
+    pickerConfig: MixerPickerConfig | null = null,
   ) {
+    if (pickerConfig) {
+      this.picker = new PresetPicker({
+        tileRenderer: pickerConfig.tileRenderer,
+        getNames: pickerConfig.getSortedNames,
+        getPreset,
+        filter: pickerConfig.filter,
+        keyPrefix: 'mixer-pick-',
+      });
+    }
     this.presetNames = presetNames;
     this.getPreset = getPreset;
     this.sendToEvolution = sendToEvolution ?? null;
@@ -106,6 +137,8 @@ export class MixerTab implements TabModule {
 
   private render(): void {
     const el = this.container!;
+    this.picker?.close();
+    this.deckButtons = [];
     el.innerHTML = '';
 
     const desc = document.createElement('p');
@@ -122,7 +155,14 @@ export class MixerTab implements TabModule {
       const preset = this.getPreset(name);
       if (preset && this.state) {
         this.state.deckA = deepCopy(preset);
-        this.applyCrossfade();
+        /*
+         * ⚠️ v8 2026-11-13 (owner) — **a new Deck A must reach the main preview even with NO Deck B.**
+         * `applyCrossfade()` returns early without both decks, so before this a Deck A pick changed nothing on
+         * screen until a Deck B was chosen. With no Deck B the blend at any crossfader position IS Deck A, so it
+         * is shown as is; with a Deck B the blend already carries it.
+         */
+        if (this.state.deckB) this.applyCrossfade();
+        else this.state.setWorkingPreset(deepCopy(preset), 'deck-a');
       }
     }, activeName);
     this.deckASelect = deckASelect;
@@ -479,7 +519,36 @@ export class MixerTab implements TabModule {
       if (select.value) onSelect(select.value);
     });
     section.appendChild(select);
+
+    // v8 2026-11-13 — the PICKER: a button showing the deck's preset that opens search + filter + live tiles.
+    if (this.picker) {
+      const button = document.createElement('button');
+      button.className = 'sl-dropdown sl-picker-open';
+      button.title = tip;
+      button.setAttribute('aria-label', `Choose the preset for Deck ${label}`);
+      button.addEventListener('click', () => {
+        if (!this.container || !this.picker) return;
+        this.picker.open(this.container, `Deck ${label}: pick a preset`, select.value, (name) => {
+          select.value = name;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      });
+      // The select is hidden, never removed: it is still the control (see `deckButtons`).
+      select.style.display = 'none';
+      select.addEventListener('change', () => this.syncDeckButtons());
+      section.appendChild(button);
+      this.deckButtons.push({ select, button });
+      this.syncDeckButtons();
+    }
     return { section, select };
+  }
+
+  /** Every deck button shows its select's value — called after any write to a select, programmatic ones included. */
+  private syncDeckButtons(): void {
+    for (const { select, button } of this.deckButtons) {
+      const label = select.selectedOptions[0]?.textContent ?? '';
+      button.textContent = `${label} \u25BE`;   // the empty option's own text when nothing is chosen
+    }
   }
 
   private applyCrossfade(): void {
@@ -519,6 +588,7 @@ export class MixerTab implements TabModule {
     const activeName = this.state.workingPreset?.metadata.name ?? '';
     if (!activeName) return;
     this.deckASelect.value = activeName;
+    this.syncDeckButtons();   // a programmatic write fires no `change`
     // Always sync deckA to the current working preset on tab entry,
     // even if the dropdown value didn't change (preset content may differ).
     const libPreset = this.getPreset(activeName);
@@ -545,13 +615,14 @@ export class MixerTab implements TabModule {
     const activeName = entryPreset.metadata.name;
     if (this.deckASelect) {
       this.deckASelect.value = activeName;
+      this.syncDeckButtons();   // a programmatic write fires no `change`
     }
     const preset = this.getPreset(activeName);
     if (preset) this.state.deckA = deepCopy(preset);
   }
 
-  deactivate(): void {}
-  dispose(): void { this.container = null; this.state = null; }
+  deactivate(): void { this.picker?.close(); }
+  dispose(): void { this.picker?.dispose(); this.container = null; this.state = null; }
 
   private addSendToEvoButton(parent: HTMLElement): void {
     if (!this.sendToEvolution) return;

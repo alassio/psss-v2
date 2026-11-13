@@ -2735,7 +2735,7 @@ line at the foot of the tab, and not the notice, is what tells you whether anyth
 
 | Control | Effect |
 |---|---|
-| **Strength** | Overall size of the warp. **0.5 is neutral** — the preset's terms used exactly as authored — so above it the field is stronger than the preset intended and below it weaker. **0 sits in the middle of the track, not at its end**, and means no warp; below 0 the same field is **inverted**, every offset pointing the opposite way at the same size |
+| **Strength** | Overall size of the warp. **0.5 is neutral** — the preset's terms used exactly as authored — so above it the field is stronger than the preset intended and below it weaker. **0 sits in the middle of the track, not at its end**, and means no warp; below 0 the same field is **inverted**, every offset pointing the opposite way at the same size. On **(Preset)** the term rows keep showing the authored values, and a line above them states the factor Strength multiplies them by (*Strength 0.75: … act ×1.50*); on a named pattern the rows already include it |
 | **Drift** | How fast the whole field slides, in grid cells per second. It moves the field **rigidly**: the shape and the size never change, only where it sits. 0 holds it still, which is what almost every preset in the library does |
 
 > **The line at the bottom of the tab reports the result in pixels.** Because that is a size, only the
@@ -2878,6 +2878,19 @@ chip, its **A ⇄ B** buttons, a *follow* tick and its own fader.*
 
 Load two presets as **Deck A** and **Deck B**. Deck A is filled with the preset you came in with; Deck B
 you choose.
+
+**Choosing a deck's preset.** Click a deck's button and a picker opens over the Mixer: every preset as a
+live preview tile, in the **same order as the preview grid** (its current **Sort**). Type in the search
+field to narrow the tiles by name, or open **Filter** for the same filter chips the preview grid uses. A
+filter you set here also filters the preview grid, and the other way round. The name search is the
+picker's own. Click a tile to load it into the deck. **Close** or **Esc** leaves without changing anything.
+A new **Deck A** shows in the main view straight away, even before a Deck B is chosen. Once both decks are
+set, the main view shows the blend at the crossfader's position.
+
+![The deck picker open over the Mixer, searched for "curve": the search field, the Filter drawer's summary line and the matching presets as live tiles](manual-images/lab-mixer-picker.png)
+
+*The deck picker. The search has narrowed the library to the 33 presets whose name contains "curve".
+The line under the search shows the active search as a chip and the count of tiles shown.*
 
 **Take one part from the other deck.** The two buttons at the top are the quickest way to use the
 Mixer, and the most common:

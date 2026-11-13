@@ -96,7 +96,9 @@ const HEAD_CLASSES = ['sl-vfx-group-head', 'sl-vfx-sub-head'];
  * total: anything labelled is indexed unless it is named here, so a new tab cannot be missed by
  * omission. A new non-settings surface inside a tab has to be added to this list deliberately.
  */
-const SKIP_SUBTREES = '.pg-filter-drawer, .pg-fd-summary, .sl-search-results';
+// `.sl-picker` (v8 2026-11-13): the Mixer's deck picker is a CHOOSER of presets, not settings — its tile names and
+// buttons would otherwise be indexed as controls while it is open.
+const SKIP_SUBTREES = '.pg-filter-drawer, .pg-fd-summary, .sl-search-results, .sl-picker';
 
 /** Is this element a gate -- something that can switch a sibling block off? */
 function isGate(el: Element): boolean {

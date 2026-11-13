@@ -38224,4 +38224,643 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       },
     },
   },
+  /**
+   * **Jagged Glass** — the owner's own preset (2026-11-13), derived from `Rippled Rays Of Light 3` and exported as "Rippled Rays Of Light 3 v2".
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S EXPORT, TAKEN VERBATIM — only `metadata.name` was set to the owner's name. Do not re-tune it.**
+   */
+  {
+    after: 'Rippled Rays Of Light 3',
+    name: 'Jagged Glass',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Jagged Glass',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'water'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 18000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0.2],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 30,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 30,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 54,
+                am: {
+                  base: 16,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 12,
+                  amplitude: 12,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 16,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 12,
+                  amplitude: 12,
+                  frequency: 2,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 3.5714285,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 12,
+                  amplitude: 2,
+                  frequency: 3,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 5,
+                am: {
+                  base: 3.125,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 18,
+                  amplitude: 6,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 4.1666665,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 18,
+                  amplitude: 6,
+                  frequency: 2,
+                },
+              },
+              {
+                phase: 32,
+                am: {
+                  base: 3.5714285,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 18,
+                  amplitude: 6,
+                  frequency: 3,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [0.2, 0.3, 0.1],
+        colorShift: [0.5, 0.11, 0.13],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.94,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: true,
+          style: 2,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0.1, 0, 0, 0],
+            [16, 0, 0, 0],
+            [0.1, 0, 0, 0],
+            [16, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 0,
+            y: 0,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'liquid',
+        transMapEnabled: true,
+        transMapStyle: 2,
+        transMapChain: [
+          {
+            style: 2,
+            enabled: true,
+            weight: 1,
+            zoomCenter: {
+              x: 50,
+              y: 50,
+            },
+            staticField: {
+              pattern: '(Preset)',
+              strength: 0.75,
+              detail: 1,
+              drift: 0.065,
+              pattern2: '(Preset)',
+              strength2: 0.5,
+              zoomBias: 0,
+              shape: 'sawtooth',
+              shapeMix: 1,
+              shape2: 'sine',
+              shapeMix2: 0,
+              angleX: 0,
+              angleY: 0,
+              angleX2: 0,
+              angleY2: 0,
+            },
+          },
+          {
+            style: 6,
+            enabled: false,
+            weight: 1,
+          },
+        ],
+        transMapWarpMix: 0.5,
+        transMapDispersion: 0.5,
+        fluidFeedback: {
+          persist: 0.95,
+          amplify: 1,
+          dispersion: 0,
+          fieldDecay: 0.981,
+          glowBoost: 0,
+        },
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.5,
+        figureScale: 1,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        material: {
+          preset: 'LiquidLight',
+          splatRadius: 2,
+          coreBrightness: 1.3,
+          haloStrength: 0,
+          falloffExponent: 1.6,
+          thermalLag: 0.3,
+          emissionIntensity: 1.5,
+          heatMode: 'velocity',
+          heatGain: 0.92,
+          blendMode: 'additive',
+          colourRamp: 'liquid',
+          velocityStretch: 0.54,
+        },
+        liquid: {
+          isoLevel: 0.1166,
+          kernelWidth: 0.85,
+          edgeSoftness: 0.15,
+          tintSource: 'preset',
+          surfaceRamp: 'liquid',
+          colourMix: 0.85,
+          mixModel: 'light',
+          refraction: 0.49,
+          specular: 0.8,
+          thickness: 0.5,
+          edgeBrightness: 0.6,
+        },
+        customFilmLookParams: {
+          glow: 4,
+          depthSize: 0.9,
+          depthBrightness: 0.7,
+          depthDof: 0.9,
+          depthColorShift: 0.2,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 5,
+          bloomEnabled: true,
+          bloomThreshold: 0.45,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.27,
+          lift: [0, 0.02, 0.05],
+          gamma: [1, 1.05, 1.1],
+          gain: [0.94, 0.98, 1.04],
+          saturation: 0.75,
+          vignette: 0.25,
+          palette: 'Ocean',
+          paletteMapping: 'position',
+        },
+      },
+    },
+  },
+  /**
+   * **Skin of a Snake** — the owner's own preset (2026-11-13), derived from `Chain Warp Refract` and exported as "Chain Warp Refract".
+   * ⚠️⚠️ **THE BODY IS THE OWNER'S EXPORT, TAKEN VERBATIM — only `metadata.name` was set to the owner's name. Do not re-tune it.**
+   */
+  {
+    after: 'Chain Warp Refract',
+    name: 'Skin of a Snake',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Skin of a Snake',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'transmap', 'chain', 'review'],
+      },
+      generators: {
+        type: 'lsystem',
+        particleCount: 30000,
+        waveSpeed: 0.05,
+        rotation: [0.12, 5.25, -0.33000000000000007],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 20,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [0.8736, 0.1, 0.1],
+        colorShift: [0.1, 0.2, 0.3],
+        lsystem: {
+          rule: 'hilbert3d',
+          recursion: {
+            base: 3,
+            amplitude: 0,
+            frequency: 0,
+          },
+          yaw: {
+            base: 90,
+            amplitude: 0,
+            frequency: 0,
+          },
+          pitch: {
+            base: 90,
+            amplitude: 4,
+            frequency: 0.9,
+          },
+          roll: {
+            base: 90,
+            amplitude: 4.5,
+            frequency: 0.55,
+          },
+          descend: {
+            base: 1,
+            amplitude: 0,
+            frequency: 0,
+          },
+          smoothness: 0.25,
+          centre: [0, 0, 0],
+        },
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.2,
+        decayFactor: 0.9,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: true,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Legacy Graded',
+        palette: 'Cycle: Neutral',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: true,
+        transMapStyle: 0,
+        transMapChain: [
+          {
+            style: 0,
+            enabled: true,
+            weight: 0.6,
+            staticField: {
+              pattern: 'Turbulent Weave',
+              strength: 0.7,
+              detail: 1.5,
+              drift: 0.2,
+            },
+          },
+          {
+            style: 7,
+            enabled: true,
+            weight: 0.8,
+            refraction: {
+              strength: 0.9,
+              reach: 4,
+              invert: false,
+              source: 'density',
+            },
+          },
+        ],
+        transMapWarpMix: 0.8,
+        transMapDispersion: 0.3,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1.1013825725753204,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+      },
+    },
+  },
 ];

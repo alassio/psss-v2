@@ -309,8 +309,11 @@ ok();
 // makes `read()` throw instead of producing a finding. The quiet half is the OTHER side — `TAB_TIPS`
 // entries that were only read by the deleted tab become unread, which is what §H's second direction is
 // for. **Delete a tab's `TAB_TIPS` keys in the same edit that drops it from here.**
+// ⚠️ `preset-picker.ts` (v8 2026-11-13) is NOT a tab but reads `TAB_TIPS` for the Mixer's deck pickers — a shared
+// widget a tab OPENS, so it is listed by its own path rather than through the tab-name map.
 const TAB_FILES = ['mixer', 'randomiser', 'sliders', 'evolution', 'history', 'composer', 'transmap', 'reel']
-  .map(n => `ui/synthesis-lab/tabs/${n}.ts`);
+  .map(n => `ui/synthesis-lab/tabs/${n}.ts`)
+  .concat(['ui/synthesis-lab/preset-picker.ts']);
 
 /** Every string literal appearing in a `NAME['...']` subscript across `files`. */
 function subscriptLiterals(name, files) {
@@ -447,6 +450,8 @@ const UI_FILES = [
   // a paragraph. Its measured texts are two short ones; the variable half is composed at runtime and is
   // invisible to `INLINE_SINK` by the same rule as `transmap.ts`'s readouts above.
   'ui/preview-grid/filter-drawer.ts',
+  // v8 2026-11-13 — the Mixer's deck picker writes a placeholder and a button label.
+  'ui/synthesis-lab/preset-picker.ts',
 ];
 
 /**

@@ -1129,6 +1129,12 @@ export const TAB_TIPS: Record<string, string> = {
     + 're-syncs to it whenever you re-enter the tab.',
   'mixer.deckB': 'The preset the crossfader blends TO, at the far right. Nothing happens until both decks '
     + 'hold a preset.',
+  // v8 2026-11-13 — the preset picker the deck buttons open.
+  'picker.search': 'Type part of a name to narrow the tiles below. It combines with the Filter chips.',
+  'picker.searchClear': 'Clear the name search.',
+  'picker.close': 'Close without changing the deck. Escape does the same.',
+  'picker.tile': 'Click to load this preset into the deck. The tiles follow the grid’s current sort, and the '
+    + 'Filter chips here are the grid’s own, so a chip ticked here also narrows the grid.',
   /*
    * ⚠️ **"Interpolates every numeric parameter" WAS THE OLD COPY AND IT WAS FALSE** — CLAUDE.md's *Mixer
    * coverage* row says so in as many words, and v8 23.0 measured it: `interpolatePreset` wrote 20 of the 46

@@ -4054,6 +4054,7 @@ async function init() {
       evoTileRenderer.tick(dt, tileThrottle);
       historyTileRenderer.tick(dt, tileThrottle);
       reelTileRenderer.tick(dt, tileThrottle);
+      mixerTileRenderer.tick(dt, tileThrottle);
       previewGrid.tick(dt, tileThrottle);
       perfHud?.end('tiles');
       perfHud?.frame(rawFrameMs);
@@ -5640,6 +5641,14 @@ async function init() {
    */
   const reelTileRenderer = new GridTileRenderer(gl);
   reelTileRenderer.init();
+  /*
+   * v8 2026-11-13 — a FOURTH tile renderer, for the Mixer's deck pickers. ⚠️ Its own instance rather than the Reel's:
+   * the Reel keeps up to 96 slots acquired while hidden, against a pool of 128, so a shared picker could evict them
+   * and freeze the Reel's tiles silently. It is ACTIVE only while a picker is open (`PresetPicker` toggles it), so
+   * its `tick` costs nothing otherwise — the frame budget is never split with another live renderer.
+   */
+  const mixerTileRenderer = new GridTileRenderer(gl);
+  mixerTileRenderer.init();
 
   // VisualFxControls — bridge between the Visual FX Lab tab and the render-loop state
   //
@@ -7836,6 +7845,9 @@ async function init() {
     reelStore,
     reelControls,
     presetFilter,
+    // v8 2026-11-13 — the Mixer's deck pickers. A closure: the preview grid is built just below.
+    mixerTileRenderer,
+    getGridOrderedNames: () => previewGrid.getOrderedNames(),
   });
 
   if (preset) labPanel.init(preset, rightPanel);
@@ -8056,6 +8068,7 @@ async function init() {
       tiles: () => [
         { label: 'grid', stats: previewGrid.getTileStats() },
         { label: 'reel', stats: reelTileRenderer.getStats() },
+        { label: 'mixer', stats: mixerTileRenderer.getStats() },
         { label: 'evo', stats: evoTileRenderer.getStats() },
         { label: 'hist', stats: historyTileRenderer.getStats() },
       ],

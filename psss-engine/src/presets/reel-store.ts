@@ -95,6 +95,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   {
     name: 'Grand Tour',
     // GENERATED — the whole composed library, in library order. Regenerate; do not edit a name by hand.
+    // ⚠️ **REGENERATED 2026-11-13 at 377** (was 375) — the owner's `Jagged Glass` and `Skin of a Snake`, appended at the END.
     // ⚠️ **REGENERATED 2026-11-13 at 375** (was 378) — the three `… Contours` presets DELETED (owner): each was a
     // byte-identical copy of its own parent once the 11-01 ray→contour conversion removed their one difference.
     // ⚠️ **REGENERATED 2026-11-13 at 378** (was 373) — the five Phase 37 strand demos, appended in library order.
@@ -606,6 +607,8 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Halvorsen Thread',
       'Aizawa Overwound',
       'Lorenz Strand Morph',
+      'Jagged Glass',
+      'Skin of a Snake',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
@@ -633,7 +636,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   },
   {
     name: 'Materials',
-    // GENERATED (92) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
+    // GENERATED (93) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
     // `'None'` (invariant 18: a material's inactive state is the STRING `'None'`, not absence).
     presets: [
       "Anima Electrica",
@@ -728,6 +731,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       "Curve Fold Discharge",
       "Liquid Maze",
       "Fractal Cross",
+      "Jagged Glass",
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
