@@ -38,14 +38,14 @@ import type { WaveConfig, LSystemConfig } from '../../core/interfaces.ts';
 // NOTHING at runtime and contain no `enum` and no constructor parameter property, so the chain stays
 // loadable. **Do not add an import here that reaches the DOM or a GL type.**
 import {
-  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, type RuleKey,
+  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE,
 } from '../../generators/lsystem/rules.ts';
 import { walkTurtle } from '../../generators/lsystem/turtle.ts';
 // v8 `39.A8` — imports only its siblings, so the Node-loadable chain survives (see the note above).
-import { buildGenerator, LSYSTEM_GENERATORS } from '../../generators/lsystem/generator.ts';
+import { buildGenerator, generatorFlagsFor } from '../../generators/lsystem/generator.ts';
 // v8 `39.C` — the one resolver for `Customize`; imports only lsystem siblings, so the Node chain survives.
 import { resolveCustomRule, buildCustom, CUSTOM_RANGES } from '../../generators/lsystem/custom.ts';
-import { captureExtent } from '../../generators/lsystem/curve.ts';
+import { captureExtent, buildPose } from '../../generators/lsystem/curve.ts';
 /*
  * v8 `34.1` — **the wave law is SHARED with the generator and this file no longer owns a copy of it.**
  *
@@ -496,7 +496,7 @@ export function computeCurveScore(cfg: LSystemConfig, plane: ScorePlane): ScoreR
    * the engine's own identities (`?? 0`, `?? 1`) and only where the rule HAS the row, so every preset without
    * them draws exactly as before. A cell rule's angles are held at the lattice, as in `resolveGenerated`.
    */
-  const gen = LSYSTEM_GENERATORS[rule.key as RuleKey];
+  const gen = generatorFlagsFor(rule);
   const clampTo = (v: number, r: readonly [number, number]): number => Math.min(r[1], Math.max(r[0], v));
   let customWalk: { xyz: Float64Array; count: number; truncated: boolean } | null = null;
   if (resolved.kind === 'custom') {
@@ -514,9 +514,16 @@ export function computeCurveScore(cfg: LSystemConfig, plane: ScorePlane): ScoreR
   const built = customWalk === null && gen !== null && (tw !== 0 || st !== 1)
     ? buildGenerator(rule, gen, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base, tw, st)
     : null;
+  /*
+   * v8 Phase 41 — a BUILDER rule (the two tetrahedra) has no turtle walk: it goes through `buildPose`, the engine's own
+   * route, or the diagram is EMPTY (found on the first screenshot of the tetra). A stochastic rule passes its seed, so
+   * the diagram shows the same specimen as the figure.
+   */
   const walk = customWalk !== null ? customWalk : built !== null
     ? { xyz: built.xyz, count: built.count, truncated: false }
-    : walkTurtle(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base);
+    : rule.builder !== undefined
+      ? buildPose(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base)
+      : walkTurtle(rule, Math.floor(recursion), cfg.yaw.base, cfg.pitch.base, cfg.roll.base, Math.floor(cfg.seed ?? 1));
 
   // Normalised by its own extent, which is the same canonical fit the engine's figure source uses, so
   // the diagram and the figure agree in shape even though they differ in absolute scale.

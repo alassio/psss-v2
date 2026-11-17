@@ -507,6 +507,8 @@ const INVENTED = {
    * as a private word, so a later reader does not 'fix' it by renaming the chip.
    */
   'Self-similar curve': 'the figure-type registry label, shipped via the Composer dropdown; outside the src/ui corpus that section C scans',
+  // v8 Phase 41 (41.S7) — the growing-curve chip. The Composer row is labelled `Growth`; the chip names the result, a curve that grows.
+  'Grows': 'the Phase 41 chip for a curve whose Growth is on; the Composer row says Growth, the chip names what the preset does',
   // v8 Phase 30. The Visual FX section ships the NOUN, `Deformation`; a filter chip needs the
   // adjective, because every row in its group answers *presets that ARE this* (`Sparks`, `Crystals`,
   // `Buoyancy`). ⚠️ **Declared rather than renamed, and the alternative was considered**: calling the

@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.11.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.11.0](https://github.com/alassio/psss-v2/releases/tag/v1.11.0)** — **New since v1.10.0: choose the Mixer's decks from live preview tiles, two new presets, and clearer Transmap Strength feedback.** Each Mixer deck now opens a picker with a search field, the preview grid's filter and live tiles in the grid's current order. A Deck A choice now shows in the main view straight away. *Jagged Glass* and *Skin of a Snake* join the library.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.11.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.13.0.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.13.0](https://github.com/alassio/psss-v2/releases/tag/v1.13.0)** — **New since v1.11.0: plants that grow, two tetrahedron curves, plants that grow outward under 3-D Symmetry, and Customize for every plant.** Eight plants from *The Algorithmic Beauty of Plants* join the curves, and any curve can now grow on screen — a plant generation by generation from its trunk, the others unfolding in place. The Sierpinski and Hill tetrahedra are new curves. 3-D Symmetry can hold each copy by its root, so plants burst outward from one point. And Customize now edits a plant's own rules as rows of symbols. 22 new presets show it all.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.13.0)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)
@@ -45,7 +45,7 @@ page. A frame like the one above is a click away in it.
 > repository.
 
 3D particles travelling along one of two kinds of figure — modulated sine waves (3D Lissajous figures)
-or self-similar fractal curves such as Hilbert, dragon and Koch — projected to 2D, trailed, warped and
+or self-similar fractal curves such as Hilbert, dragon and Koch, and plants that grow on screen — projected to 2D, trailed, warped and
 colour-graded. It runs in a browser, and on Windows it can also be installed as a real screensaver.
 
 **PSSS was created by Andreas Kardin (*mephzara*)** — the idea, the name, the mathematics and most of the
@@ -114,7 +114,7 @@ specifications were actually extracted from. It is kept separate rather than pub
 |---|---|
 | `main.ts` | The frame loop and all the wiring between the parts. |
 | `core/` | Shader compilation, projection, rotation, noise, shared types. |
-| `generators/` | What makes the particles move and take colour: waves, attractors, self-similar curves (and their Customize generators), materials, crystals, sparks. |
+| `generators/` | What makes the particles move and take colour: waves, attractors, self-similar curves (their Customize generators and the plants' production editor, the plants, the two tetrahedra and growth), materials, crystals, sparks. |
 | `renderers/` | How a particle becomes pixels: the main particle pass, ribbons, neon lines, film looks. |
 | `post-processors/` | Whole-image stages: the warp chain, Electric Discharge, bloom, tone mapping, the fluid and dye fields. |
 | `presets/` | The preset library, its format, migration of older presets, and the reel store. |

@@ -167,7 +167,11 @@ branching tree — while still being a single line you could draw without liftin
 The famous members of this family have names: the **Hilbert** curve, which visits every cell of a cube
 exactly once; the **dragon** and **terdragon**; the **Koch** curve and **snowflake**; the **Gosper** island; the
 **Sierpiński** arrowhead; the **Minkowski** sausage; the **pentigree**; the **twindragon** and **fudgeflake**
-tiles. PSSS ships nineteen of them.
+tiles; two curves built from **tetrahedra** — the **Sierpinski Tetrahedron**, a lacy shell of nested pyramids,
+and the **Hill Tetrahedron**, a single line that fills a lopsided tetrahedron completely; and ten **plants**
+from the classic book *The Algorithmic Beauty of Plants*, from weeds and sprigs to a 3-D bush and a flowering
+plant. PSSS ships twenty-nine of them, and any of them can **grow** on screen — a plant generation by
+generation from the trunk outwards, the other curves unfolding in place.
 
 What makes them useful here rather than merely pretty is one property that is easy to miss: **the angle
 the rule turns at is not part of the rule.** Run the Koch production at its published 90° and you get
@@ -906,6 +910,7 @@ are functions **of** where a point is, unlike the flow and turbulence controls f
 | **3-D Radius** | How far the positions are from the centre. At 0 every copy sits on the centre and they overlap into one symmetric solid; from about 1.5 they separate into distinct copies. The whole arrangement is scaled back so it keeps the figure's size |
 | **3-D Mirrors** | Appears once **Copies at Each** is 2 or more: mirrors every second copy at a position, so a pair becomes a figure and its mirror image |
 | **Facing** | **Outward** turns each copy to face away from the centre, so a ring reads as a wreath and a sphere as a shell; **Parallel** keeps every copy the way the original faces |
+| **Grow from** | Where each copy is held. **Figure centre** turns every copy about the middle of the figure — so a growing plant's copies start on the outside and grow in through each other. **Curve start** puts every copy's starting point on the centre and, with **Outward**, points its stem along its position, so the copies grow **outward from one point**; with a **3-D Radius** they sprout from the points of the solid instead. Self-similar curves only — on any other figure the row is greyed out |
 | **Twist** (X / Y / Z) | Wrings the figure about each axis, by an angle proportional to how far along that axis a point sits — so the near and far ends turn opposite ways. One full turn from the centre to the edge of the figure's own box per 1.00. **Needs a figure with depth**: on a flat one it correctly does nothing. |
 | **Taper** (X / Y / Z) | Scales the figure's cross-section along each axis, so it **flares open at one end and pinches shut at the other** — a tube becomes a cone, a trumpet or a spindle. The readout says *flare* or *pinch* because the sign is the gesture. Centre is off, and the slider snaps to it |
 | **Bend** (X / Y / Z) | **Curves the figure's axis**, like bending a pipe into an arc. The readout also prints `r`, the radius of curvature, because that is the quantity the limit is about — the range stops short of the point where the figure would turn inside out |
@@ -952,12 +957,28 @@ figure's speed), and **Scale Breath** and **Scale Rate**, both Off here.*
 > which is the other picture 3-D Symmetry makes. Because none of them draws Neon Lines, the depth cues work on
 > them: `Hilbert Tetra` and `Tilt Octahedron` use them to bring the near copies forward.
 
-![The Deformation section with 3-D Symmetry set to Cube: On, Copies at Each, Radius, Facing and the copies line](manual-images/lab-visual-fx-sym3d.png)
+> **To make a plant grow out of the centre, choose Grow from: Curve start.** Under **Figure centre** a plant's
+> root sits at the bottom of each copy, so the roots land on a shell around the middle and the copies grow
+> inward and cross. **Curve start** brings every root to the centre: `Plant Burst` (twelve Fork Trees from one
+> point, along the icosahedron's vertices), `Plant Corner Cube` (Fir Shoots sprouting from the corners of a
+> tiny cube, just off the centre), `Plant Rosette` (forty Wind Weeds, a pair on each of the dodecahedron's twenty
+> vertices, bursting like a dandelion head) and `Curve Dragon Burst` (six
+> dragons unfolding along the three axes). As they wither, they shrink back into the centre. A **3-D Radius**
+> moves the starting points out onto the solid; it cannot bring them together on its own.
+
+![The Deformation section with 3-D Symmetry set to Cube: On, Copies at Each, Radius, Facing, Grow from and the copies line](manual-images/lab-visual-fx-sym3d.png)
 
 *The **Deformation** section with **3-D Symmetry** set to **Cube**: its rows appear below it — **On**, **Copies
-at Each**, **3-D Radius** and **Facing** (the two Positions rows are absent, as they belong to the Ring and the
-Sphere, and **3-D Mirrors** waits for a second copy at each position) — and the line under them multiplies the
+at Each**, **3-D Radius**, **Facing** and **Grow from** — greyed here, as the figure is a wave, not a curve (the two
+Positions rows are absent, as they belong to the Ring and the Sphere, and **3-D Mirrors** waits for a second copy at
+each position) — and the line under them multiplies the
 copies out: *8 positions × 1 = 8 copies*. The section's badge counts it as one active operator.*
+
+![3-D Symmetry on Plant Burst: Icosahedron, Facing Outward and Grow from Curve start](manual-images/lab-visual-fx-sym3d-growfrom.png)
+
+*The same rows on `Plant Burst`, a plant: **3-D Symmetry** **Icosahedron** on its **Vertices**, **Facing**
+**Outward** and **Grow from** **Curve start** — live here, because the figure is a curve — so twelve Fork Trees grow
+out of one point.*
 
 > **The bright creases are the point.** A fold sends many separate stretches of one curve to the same place,
 > and overlapping particles are what makes a region bright — so the chambers arrive outlined in light. If the
@@ -2208,6 +2229,10 @@ angle and recursion range, and the Recursion and Yaw rows with their wobble pair
 | **Stretch** | Grows or shrinks the branches at every level at once, while the trunk keeps its length. 1× is the rule as published. Shown only on a rule with branches (**Plant**). |
 | **Descend** | Travels *into* the curve, revealing finer structure as you go. It is **not** Figure Scale: the figure does not get bigger, it gets deeper. Available on **Hilbert 2D**, **Hilbert 3D** and **Peano** — the rules whose structure can be indexed backwards — and absent on the rest. On Peano each step into the curve is a factor of three rather than two. |
 | **Smoothness** | Rounds the curve's corners toward a spline. At 0 the stroke is exactly as the rule draws it. Raising it also makes deeper recursions readable instead of solid. |
+| **Growth** | Animates the curve growing (see *Growth, plants and the tetrahedra* below). **Off** — the curve is simply there. **Grow once** — it grows from a seed to its Recursion and stays grown. **Loop** — it grows, holds, withers back and starts again. **Loop, new plant each time** — every regrowth is a new specimen (offered on plants). |
+| **Growth time**, **Pause** | How long one growth takes (and the wither), and how long the curve rests fully grown — and again as a seed — before turning round. Shown while Growth is on. |
+| **Taper** | Makes the particles smaller from the trunk towards the tips, like a real plant's branches. 0 is off. Shown on the branching rules. It shows on the particle and splat renderings only; under Neon Lines or Ribbons the plant stays even. |
+| **Seed** | Which specimen of the **Wild Plant** you see. The same number always gives the same plant; **New** picks a random sibling. Shown on the Wild Plant only. |
 
 ![The Curve section on Hilbert 3D, with the Pitch, Roll and Descend rows](manual-images/lab-composer-curve-3d.png)
 
@@ -2231,6 +2256,117 @@ wobbling angle rebuilds this rule's curve every frame.*
   stroke every frame when an angle moves, because their shape is not a smooth function of the angle at any useful
   step. Recursion and Smoothness are unaffected on every rule.
 
+##### Growth, plants and the tetrahedra
+
+**Growing.** With **Growth** on, the curve is not simply there — it grows. A **plant** grows **generation by
+generation**: first the trunk rises, then all its branches sprout together, then their side branches, and the
+leaves and flowers open last. On a loop the plant **withers back** the same way, tips first, until only the seed
+is left. Every other curve **unfolds in place**: it starts as a single stroke whose ends never move, and every
+segment folds into the next level — a strip of paper opening into the dragon, an edge bending into the
+tetrahedron, a Hilbert cube filling in — and then folds back.
+Every time a preset is shown it **starts again from the seed**, so in the reel and the screensaver each growing
+preset is seen growing. The preview grid shows growing presets **fully grown**, so the grid stays readable.
+
+- Picking a plant rule switches Growth on (**Loop, new plant each time**, 12 s to grow, 4 s pause) and sets a
+  Taper; picking any other rule switches it off.
+- Growth pauses while **Descend** is above 1×: the zoom and the growth both drive the recursion. The tab says so.
+- The **Speed** setting slows growth with everything else.
+
+![The Growth section on Plant Wild: Loop, new plant each time, Growth time, Pause, Taper and Seed](manual-images/lab-composer-growth.png)
+
+*`Plant Wild` in the Composer: the **Wild Plant** rule, and below the curve rows the **Growth** section — **Loop,
+new plant each time**, 12 s to grow, a 2 s pause before it regrows, a **Taper** of 0.60 so the twigs are finer
+than the trunk, and the **Seed** that picks the first specimen (**New** draws another).*
+
+**The plants.** Ten rules are plants, read from the book *The Algorithmic Beauty of Plants*: **Plant**, **Sprig**,
+**Thicket Weed**, **Fork Tree**, **Fir Shoot** and **Wind Weed** are flat 2-D plants; **Wild Plant** is the book's
+random plant — each **Seed** is a different specimen of the same species; **Flowering Plant** has leaves and
+five-petal flowers; **Bush 3D** is the book's three-dimensional bush; and **Coral Bush** is the earlier, looser
+reading of that bush, kept because the preset `Growing Corals` is built on it. Leaves and flowers are drawn as
+**outlines**, like everything else in the figure.
+
+**The tetrahedra.** The **Sierpinski Tetrahedron** walks a regular tetrahedron through its four corner copies at
+half size — the middle stays empty, so it is a lacy shell of nested pyramids rather than a solid. Seen straight down
+one of its axes it reads as a square lattice. The **Hill Tetrahedron** is the tetrahedron that *can* fill space —
+one sixth of a cube — and its curve is a single continuous line through all of its pieces. Both are built from
+tetrahedra placed in 3-D, so they have no Yaw, Pitch, Roll or Twist rows and cannot be customized, and neither has
+Descend.
+
+![The Composer on Curve Tetra Pyramids: the Sierpinski Tetrahedron in the three Shape planes and its curve rows](manual-images/lab-composer-tetra.png)
+
+*`Curve Tetra Pyramids`: the **Shape** diagram shows the tetrahedron curve from its three sides, and the **Curve**
+section goes straight from the Recursion rows to **Smoothness** — there are no angle rows on this rule. Its Recursion
+breathes by one level, so the corner copies keep subdividing and merging.*
+
+##### How a plant's rules work — `Plant Fork Tree`, step by step
+
+Every plant is a short **rule set**: an **axiom**, the symbols it starts from, and a few **productions**, which
+say what each symbol becomes. At every level of **Recursion** every symbol that has a production is replaced by it,
+all at once; symbols without one stay as they are. The finished string is then read from left to right by a
+*turtle* that draws as it goes. The demo **`Plant Fork Tree`** uses the book's Fork Tree, and it is the example
+here. Open it and choose **Customize** to see these exact rules as chips.
+
+| | Fork Tree |
+|---|---|
+| **Axiom** | `X` |
+| **X →** | `F[+X]F[-X]+X` |
+| **F →** | `FF` |
+| **Angle (Yaw)** | 20° |
+
+**What the turtle reads.**
+
+| Symbol | The turtle |
+|---|---|
+| `F` | draws one step forward — a piece of stem |
+| `f` | steps forward without drawing (inside a leaf it traces the leaf's outline) |
+| `+` / `−` | turns left / right by the **Yaw** angle |
+| `&` / `^` | tilts down / up by the **Pitch** angle (3-D plants) |
+| `/` / `\` | rolls one way / the other by the **Roll** angle (3-D plants) |
+| `\|` | turns round (180°) |
+| `[` … `]` | a **branch**: remember where you are, draw what is inside, then return to that point |
+| `{` … `}` | a **leaf** or petal: the moves inside trace a closed outline |
+| a capital letter (`X`) | draws nothing — a **bud**, a placeholder that the next level rewrites |
+
+**Level by level.** Fork Tree starts from a single bud and draws nothing until the first rewrite:
+
+| Level | The string | What it draws |
+|---|---|---|
+| 0 | `X` | nothing — one bud |
+| 1 | `F[+X]F[-X]+X` | a stem of two pieces with a bud on a branch to the left, a bud on a branch to the right, and a bud at the top, turned slightly left |
+| 2 | `FF[+F[+X]F[-X]+X]FF[-F[+X]F[-X]+X]+F[+X]F[-X]+X` | each bud has become a small fork of its own, and every older stem piece has doubled (`F` → `FF`) |
+| 3 | 156 symbols | 38 stem pieces on 26 branches |
+| 6 | 4 607 symbols | 1 330 stem pieces on 728 branches — the demo's **Recursion** |
+
+**Why a plant is not a fractal curve.** On the Koch curve or the dragon every segment is replaced by a smaller copy
+of the whole shape, so the figure gains detail but keeps its size. A plant has two kinds of rule working together:
+the **bud** `X` sprouts new branches at the tips, while `F → FF` makes every existing stem twice as long at each
+level. The old wood grows longer while new shoots appear at the edge, the way a real plant grows. That is also why
+the generator editor (above) cannot describe Fork Tree: no single shape is repeated inside itself.
+
+**How the demo's settings act on these rules.**
+
+- **Recursion 6** is the number of rewrites. Each extra level roughly triples the branches, and the Recursion row
+  stops where the engine can still draw the plant.
+- **Yaw 20°** is the turn of every `+` and `−`. Widen it and the branches splay out; narrow it and the tree closes
+  up like a broom.
+- **Growth: Loop, new plant each time** grows the plant **by branch order**, following the brackets. Everything
+  outside any bracket is the trunk and grows first; then every branch one bracket deep; then the branches inside
+  those; and so on. At level 6 Fork Tree's drawn branches reach five brackets deep, so it grows in six steps. With
+  **Growth time** 12 s each order gets about 2 s, and then the plant withers back tips first.
+- **Taper 0.6** thins each branch order in turn: the trunk keeps its full size, and the deepest twigs keep 40 % of
+  it.
+- In the demo, **3-D Symmetry** then repeats the whole plant around the centre, two copies on each corner of a
+  tetrahedron. The rules above describe one plant; the arrangement is added afterwards.
+
+**Two other kinds of rule.** **Wild Plant** shows a *random* rule: its `F` has three alternatives,
+`F[+F]F[-F]F`, `F[+F]F` and `F[-F]F`, each picked a third of the time for every `F` at every level. The **Seed**
+decides the picks, so each seed is a different specimen of the same species. **Flowering Plant** shows a *leaf*
+rule: its leaf `L` is `['{+f-ff-f+|+f-ff-f}]`, a branch whose braces trace the leaf's outline with pen-up `f`
+moves, so the leaf is drawn as a closed loop.
+
+**Changing the rules.** `Plant Custom Fork` is Fork Tree with one production edited: `X → F[+X]F[-X][+X]X` adds a
+third branch at every fork. See *Customize on a plant* below to make edits of your own.
+
 ##### Customize — editing the generator
 
 Every rule is drawn the same way: a short **generator** — a few straight steps — is repeated, each step
@@ -2243,9 +2379,10 @@ lets you edit that generator directly.
   named rule again.
 - **Choosing a named rule again replaces your edits**, with no confirmation, exactly as picking a named
   Film Look replaces a customized one.
-- **Customize works on every rule except Bush 3D.** Bush 3D is a *growth* rule — each level adds branches
-  at the tips and lengthens the stems — rather than one shape repeated inside itself, so it has no generator
-  to edit; a plant-growth editor is planned as a future phase. On Bush 3D the entry is greyed out and says so.
+- **Customize works on every curve except the two tetrahedra**, which are built from tetrahedra placed in 3-D
+  that one repeated walk cannot describe — there the entry is greyed out and says why. On a **plant**, Customize
+  opens a different editor, for the plant's own *productions* (see *Customize on a plant* below); on **Plant**,
+  **Sprig** and **Thicket Weed** an **Edit as** switch offers this generator editor as well.
 
 Under the rows, a **Generator** table lists the steps, one per row:
 
@@ -2319,6 +2456,52 @@ last good shape until you fix it, and the line says why. **Density** says how ev
 space, which is how evenly it is lit: *even*, *uneven*, or *clumpy* where pieces pile on top of each other
 and glow brighter there. Every named rule reads *even* or *uneven*.
 
+##### Customize on a plant — editing its productions
+
+A plant is not one shape repeated inside itself: it is a few **productions**, rules that rewrite each symbol at
+every level. Fork Tree, for example, starts from **X**; at each level every **X** becomes `F[+X]F[-X]+X` — a
+stem, a branch to the left, a stem, a branch to the right, a turn — and every **F** becomes `FF`, so the stems
+lengthen as the branches multiply (*How a plant's rules work*, above, walks through it level by level).
+**Customize** on a plant lets you edit those rules directly.
+
+- **Choosing Customize changes nothing on screen.** It starts from the plant's own productions and the line under
+  the Rule says *Same productions as …* until you edit; your first edit makes it *Custom productions*, and undoing
+  it brings the plant's name back. Growth, Taper and Seed work exactly as on the named plant.
+- **Each rule is a row of symbols.** The **Axiom** is what the plant starts from; below it each letter's row says
+  what that letter becomes. Click between two symbols to place the caret, then add symbols from the palette under
+  the rows, or type them. **Backspace** and **Delete** remove a symbol; deleting a bracket keeps what is inside it.
+- **The symbols**: **F** draws a stem, **f** moves without drawing (inside a leaf it traces the outline), **+** and
+  **−** turn by the Yaw angle, **&** and **^** tilt, **/** and **\\** roll, **|** turns round, **[ ]** makes a
+  branch and **{ }** a leaf outline. Brackets and braces always come in pairs. Capital letters are placeholders that
+  draw nothing themselves; give one its own row with **+ Production**.
+- **Random plants.** **+ Alternative** turns a row into a choice: each time the letter is rewritten one alternative
+  is picked by its **weight**, so every **Seed** grows a different specimen of the same plant. Type a share between
+  0.05 and 0.95 and the others make room for it; the percentage beside each is its share.
+- **What is refused, and why.** An edit that would leave the plant drawing nothing, put a leaf inside a leaf, or
+  grow too large to draw even at one level is not taken — the line under the palette says why, and the plant keeps
+  its last good shape. The Recursion row's range follows the plant: a production that multiplies quickly lowers
+  the deepest level the engine can draw.
+- **Two editors on three plants.** **Plant**, **Sprig** and **Thicket Weed** are also generators, so their
+  Customize shows **Edit as**: **Productions** (opened first) or **Generator** (the table above). Switching starts
+  the other editor from the plant again and replaces your edits, with no confirmation.
+
+![The production editor on Fork Tree: the Axiom X, the X and F rows as chips, + Production and the symbol palette](manual-images/lab-composer-productions.png)
+
+*Customize chosen on `Plant Fork Tree`: the line under the Rule says *Same productions as Fork Tree*, and under the
+growth rows the **Productions** editor holds the **Axiom** **X**, the **X** row `F[+X]F[−X]+X` and the **F** row
+`FF` as coloured chips — draw in green, turns in blue, branches in amber, letters in violet — then **+ Production**
+and the palette, greyed until you click into a row.*
+
+![The production editor on Wild Plant: the F row with three random alternatives, their weights and shares](manual-images/lab-composer-productions-random.png)
+
+*On `Plant Wild` the **F** row is random: three alternatives, each with its **weight** (0.33, 0.33, 0.34) and its
+share (33 %, 33 %, 34 %) — the **Seed** row above picks which specimen grows.*
+
+![Customize on Sprig: the Edit as row above the Productions editor](manual-images/lab-composer-editas.png)
+
+*`Plant Sprig` under Customize: Sprig is also a generator, so **Edit as** sits above its **Productions** — here on
+**Productions**, its single row `F → F[+F]F[−F][F]`; choosing **Generator** opens the step table instead.*
+
 > **Worked examples, one per thing to look at.** Many presets ship on this figure type; these each show
 > one row doing its job:
 >
@@ -2341,7 +2524,12 @@ and glow brighter there. Every named rule reads *even* or *uneven*.
 > | the **same Customize steps with one copy reversed** | `Curve Golden Lightning` — the golden dragon's two steps with the second walked backwards: the spirals become a branching, lightning-like dendrite |
 > | a **Customize** coastline under **3-D Symmetry** | `Curve Zigzag Cross` — six unit steps at right angles (turns 0, +1, −1, −1, +1, 0) breathing their angle, repeated round the vertices of a tetrahedron |
 > | a **Customize** starting from a 3-D rule | `Chaos to Order` — the Hilbert 3-D lattice under Customize, drawn as cells, its Twist breathing so the lattice folds out of disorder into order and back |
-> | **Bush 3D** growing, as a surface | `Growing Corals` — the growth rule with its Recursion breathing, so branches sprout and recede, drawn as Liquid under a 3-D Symmetry of overlapping copies |
+> | a **plant's productions**, edited | `Plant Custom Fork` (a third branch in Fork Tree's X), `Plant Custom Wild` (new weights and a fourth random alternative) and `Plant Custom Bloom` (a six-petal flower) |
+> | **Coral Bush** breathing, as a surface | `Growing Corals` — the coral bush with its Recursion breathing, so branches sprout and recede, drawn as Liquid under a 3-D Symmetry of overlapping copies |
+> | a **plant growing** from its trunk, a new specimen each time | `Plant Fork Tree` (pairs on a tetrahedron's corners, held by the figure centre, so the copies grow in through each other) |
+> | a curve **unfolding** level by level | `Curve Dragon Unfold` (the dragon), `Curve Hilbert Fill` (a cube filling in), `Curve Tetra Unfold` and `Curve Hill Unfold` |
+> | the **tetrahedron curves** | `Curve Tetra Pyramids` (the nested pyramids turning), `Curve Tetra Lattice` (tumbling through its views, a square lattice whenever it faces you down an axis) and `Curve Hill Tetrahedron` (one line filling the Hill tetrahedron) |
+> | copies **growing out of the centre** (3-D Symmetry, **Grow from: Curve start**) | `Plant Burst`, `Plant Corner Cube`, `Plant Rosette` and `Curve Dragon Burst`; and the plants `Plant Wild` (the random plant — each regrowth a sibling — in pairs on the icosahedron's 20 faces), `Plant Wind Weed` (pairs on the cube's corners), `Plant Sprig` (the dodecahedron's 20 vertices), `Plant Fir Shoot` (a sphere of 16), `Plant Thicket Weed` (a sphere of 24), `Plant Flowering` (leaves and five-petal flowers, in pairs on the octahedron's 6 vertices) and `Plant Bush 3D` (the book's 3-D bush, a ring of 6) |
 > | a curve under a **liquid surface** | `Liquid Maze` — the Hilbert 3-D lattice of `Curve Subdivide`, its recursion breathing, drawn as liquid |
 > | what the **different rules** look like | `Curve Lattice` (a cube-filling lattice), `Curve Gasket` (a triangle), `Curve Island` (a coastline), `Curve Thicket` (a branching plant), `Curve Triad` (a triangular grid, the only rule that turns at 120°), `Curve Dragonfold` (a folded ribbon) and `Curve Minkowski` (a square-wave coastline) |
 

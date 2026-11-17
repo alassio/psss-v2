@@ -214,6 +214,23 @@ export function interpolatePreset(
           stretch: lerpMV(liveA.stretch ?? { base: 1, amplitude: 0, frequency: 0 },
             liveB.stretch ?? { base: 1, amplitude: 0, frequency: 0 }),
         } : {}),
+        /*
+         * v8 Phase 41 (`41.S7`) — **`growth` and `seed` SNAP with the rule's winner** (categorical, invariant 16 — a
+         * half-way mode or a half-way specimen is not a state), present iff that deck authors them. **`growthTime`,
+         * `growthPause` and `taper` LERP** one-sided, each absent side read at its identity / default (12 s, 4 s, 0),
+         * by the same rule as `twist`: a key neither deck has never appears, and each endpoint is that deck exactly.
+         */
+        ...(ruleWinner.growth !== undefined ? { growth: ruleWinner.growth } : {}),
+        ...(ruleWinner.seed !== undefined ? { seed: ruleWinner.seed } : {}),
+        ...(oneSidedKeep(liveA.growthTime, liveB.growthTime, t) ? {
+          growthTime: (liveA.growthTime ?? 12) + ((liveB.growthTime ?? 12) - (liveA.growthTime ?? 12)) * t,
+        } : {}),
+        ...(oneSidedKeep(liveA.growthPause, liveB.growthPause, t) ? {
+          growthPause: (liveA.growthPause ?? 4) + ((liveB.growthPause ?? 4) - (liveA.growthPause ?? 4)) * t,
+        } : {}),
+        ...(oneSidedKeep(liveA.taper, liveB.taper, t) ? {
+          taper: (liveA.taper ?? 0) + ((liveB.taper ?? 0) - (liveA.taper ?? 0)) * t,
+        } : {}),
       };
     } else {
       // ⚠️ Only one deck (or neither) carries a curve, so there is nothing to blend TOWARD. The block

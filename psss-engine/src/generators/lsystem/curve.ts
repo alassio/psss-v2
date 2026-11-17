@@ -11,7 +11,9 @@
  */
 
 import type { LSystemRule } from './rules.ts';
-import { walkTurtle } from './turtle.ts';
+import { walkTurtle, type BranchData } from './turtle.ts';
+import { buildTetra } from './tetra.ts';
+import { buildHill } from './hill.ts';
 
 /**
  * The figure's half-extent as a fraction of the preset's own design box.
@@ -297,8 +299,17 @@ export function buildPose(
   yawDeg: number,
   pitchDeg: number,
   rollDeg: number,
-): { xyz: Float64Array; count: number; truncated: boolean; transform: ExtentTransform } {
-  const t = walkTurtle(rule, depth, yawDeg, pitchDeg, rollDeg);
+  seed = 0,
+): { xyz: Float64Array; count: number; truncated: boolean; transform: ExtentTransform; branch: BranchData | null } {
+  /*
+   * v8 Phase 41 (`41.S3`) — a BUILDER rule's list comes from its own exact builder, not the turtle; it has no branch
+   * tree (`branch: null`), so growth UNFOLDS it by recursion rather than extending it (`41.S5`).
+   */
+  if (rule.builder === 'tetra' || rule.builder === 'hill') {
+    const b = rule.builder === 'tetra' ? buildTetra(depth) : buildHill(depth);
+    return { xyz: b.xyz, count: b.count, truncated: false, transform: captureExtent(b.xyz, b.count), branch: null };
+  }
+  const t = walkTurtle(rule, depth, yawDeg, pitchDeg, rollDeg, seed);
   // Copy out of the growable sink so the caller owns a tight buffer and the sink can be collected.
   const xyz = t.xyz.slice(0, t.count * 3);
   // ⚠️⚠️ **RETURNED RAW, WITH ITS TRANSFORM ALONGSIDE AND NOT APPLIED — the third mechanism, and the
@@ -311,7 +322,8 @@ export function buildPose(
   // Raw positions are sums of rotated unit vectors and respond to an angle far more linearly than a
   // fitted figure does, so the lerp is accurate where it matters AND the figure stays framed.
   const transform = captureExtent(xyz, t.count);
-  return { xyz, count: t.count, truncated: t.truncated, transform };
+  // v8 Phase 41 — the branch tree only where there IS branching; an unbranched list needs none (growth unfolds it).
+  return { xyz, count: t.count, truncated: t.truncated, transform, branch: rule.bracketed ? t.branch : null };
 }
 
 /**

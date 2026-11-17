@@ -95,6 +95,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   {
     name: 'Grand Tour',
     // GENERATED — the whole composed library, in library order. Regenerate; do not edit a name by hand.
+    // ⚠️ **REGENERATED 2026-11-14 at 392** (was 377) — the 15 Phase 41 demos (3 Sierpinski Tetrahedron, 2 Hill Tetrahedron, 8 plants, 2 growth).
     // ⚠️ **REGENERATED 2026-11-13 at 377** (was 375) — the owner's `Jagged Glass` and `Skin of a Snake`, appended at the END.
     // ⚠️ **REGENERATED 2026-11-13 at 375** (was 378) — the three `… Contours` presets DELETED (owner): each was a
     // byte-identical copy of its own parent once the 11-01 ray→contour conversion removed their one difference.
@@ -609,6 +610,28 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Lorenz Strand Morph',
       'Jagged Glass',
       'Skin of a Snake',
+      'Curve Tetra Pyramids',
+      'Curve Tetra Lattice',
+      'Curve Tetra Unfold',
+      'Plant Sprig',
+      'Plant Thicket Weed',
+      'Plant Fork Tree',
+      'Plant Fir Shoot',
+      'Plant Wind Weed',
+      'Plant Wild',
+      'Plant Flowering',
+      'Plant Bush 3D',
+      'Curve Dragon Unfold',
+      'Curve Hilbert Fill',
+      'Curve Hill Tetrahedron',
+      'Curve Hill Unfold',
+      'Plant Burst',
+      'Plant Corner Cube',
+      'Plant Rosette',
+      'Curve Dragon Burst',
+      'Plant Custom Fork',
+      'Plant Custom Wild',
+      'Plant Custom Bloom',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
@@ -636,7 +659,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   },
   {
     name: 'Materials',
-    // GENERATED (93) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
+    // GENERATED (97) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
     // `'None'` (invariant 18: a material's inactive state is the STRING `'None'`, not absence).
     presets: [
       "Anima Electrica",
@@ -732,6 +755,10 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       "Liquid Maze",
       "Fractal Cross",
       "Jagged Glass",
+      "Curve Tetra Pyramids",
+      "Plant Fir Shoot",
+      "Plant Flowering",
+      "Plant Custom Bloom",
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,

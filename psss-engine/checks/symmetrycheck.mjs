@@ -152,7 +152,7 @@ console.log('\n=== C. the operator (lissajous.ts) ===\n');
 
 console.log('\n=== D. the wiring ===\n');
 {
-  const KEYS = ['sym3dLayout', 'sym3dPositions', 'sym3dOn', 'sym3dLocal', 'sym3dRadius', 'sym3dMirrors', 'sym3dFacing'];
+  const KEYS = ['sym3dLayout', 'sym3dPositions', 'sym3dOn', 'sym3dLocal', 'sym3dRadius', 'sym3dMirrors', 'sym3dFacing', 'sym3dAnchor'];
   const main = strip(read('main.ts'));
   chk('ONE reader, adopted on BOTH preset apply paths (applyPresetChange and Reset)',
     (main.match(/adoptSym3d\((preset\.overlay|ov)\);/g) ?? []).length === 2 && KEYS.every((k) => main.includes(`ov?.${k} ??`)), '');
@@ -163,7 +163,7 @@ console.log('\n=== D. the wiring ===\n');
     (main.match(/\.\.\.sym3dExport\(\),/g) ?? []).length === 1 && /sym3d\.layout !== 'off' \?/.test(main)
     && lpo.length > 0 && !/sym3d|symmetryFold/.test(lpo), '');
   const tiles = strip(read('ui/preview-grid/grid-tile-renderer.ts'));
-  chk('the preview tiles forward all seven keys (a tile without them shows a different SHAPE — 33.21\'s failure)',
+  chk('the preview tiles forward all eight keys (a tile without them shows a different SHAPE — 33.21\'s failure)',
     /generator\.setSymmetry3d\(\{/.test(tiles) && KEYS.every((k) => tiles.includes(`overlay?.${k} ??`)), '');
   const rules = strip(read('exploration/overlay-rules.ts'));
   const snapped = KEYS.filter((k) => k !== 'sym3dRadius');
@@ -205,6 +205,106 @@ console.log('\n=== E. the demos ===\n');
   const over = demos.filter((d) => d.preset.generators.particleCount > MAXP).map((d) => d.name);
   chk('no demo asks for more particles than the Particle Number track can show', over.length === 0 && MAXP > 0,
     over.length ? `over ${MAXP}: ${over.join(', ')}` : `track max ${MAXP}`);
+}
+
+console.log('\n=== F. Grow from: Curve start (owner 2026-11-17) ===\n');
+{
+  /*
+   * Under `Figure centre` every copy turns about the figure's middle, so a plant's root lands on a shell and the copies
+   * grow INWARD through each other — the owner's report. `Curve start` moves each copy's root (particle 0) to its
+   * position and, under Outward, turns its stem (root → figure centre) along it. ⚠️ Measured on a REAL curve through
+   * the stage's own method, in model space (`getState()` is screen space); each property's calibration is the formula
+   * the defect would be — the centre branch, a missing stem turn, the centre branch's fit.
+   */
+  const { LissajousGenerator } = await import('../src/generators/lissajous.ts');
+  const FG = await import('../src/generators/lsystem/figure.ts');
+  const LR = await import('../src/generators/lsystem/rules.ts');
+  const N = 4800, W = 100, H = 100, half = 0.5 * Math.min(W, H);
+  const rule = LR.LSYSTEM_RULE_BY_KEY.forkTree;
+  const fig = new Float64Array(N * 3);
+  FG.resolveFigure(FG.createFigureCache(), { rule, recursion: rule.defaultRecursion ?? rule.recursionRange[1], yaw: rule.publishedAngle,
+    pitch: rule.publishedAngle, roll: rule.publishedAngle, multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0,
+    stretch: 1, anglesAnimated: false, twistAnimated: false, stretchAnimated: false, generator: null, custom: null, growth: null, seed: 1 }, fig, N);
+  const root = [fig[0] * 0.45 * 100, fig[1] * 0.45 * 100, fig[2] * 0.45 * 100];
+  const stage = (c) => {
+    const g = new LissajousGenerator();
+    g.designW = W; g.designH = H; g.particleCount = N; g.positions = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) g.positions[i] = fig[i] * 0.45 * Math.min(W, H);
+    const r0 = [g.positions[0], g.positions[1], g.positions[2]];
+    const op = S.resolveSym3d(c);
+    g.replicateFromStart(op);
+    return { g, op, r0 };
+  };
+  // where copy c sends a model point v, from the stage's own per-copy matrix and translation
+  const send = (g, op, c, v) => { const C = g.s3Mats, T = g.s3Trans, m = c * 9, d = c * 3, f = 1 / (2 + op.radius);
+    return [0, 1, 2].map((a) => (C[m + a * 3] * v[0] + C[m + a * 3 + 1] * v[1] + C[m + a * 3 + 2] * v[2] + T[d + a]) * f); };
+  const want = (op, c) => [0, 1, 2].map((a) => op.dirs[c * 3 + a] * op.radius * half / (2 + op.radius));
+  const angle = (s, p) => Math.acos(Math.min(1, (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) / Math.hypot(...s) / Math.hypot(...p))) * 180 / Math.PI;
+  const CASES = [['cube', 'outward', 0], ['icosahedron', 'outward', 1], ['ring', 'outward', 3], ['octahedron', 'parallel', 0.5]];
+  let rootErr = 0, stemErr = 0, reach = 0;
+  for (const [layout, facing, radius] of CASES) {
+    const { g, op, r0 } = stage({ ...S.SYM3D_DEFAULTS, layout, positions: 6, facing, radius, anchor: 'start' });
+    for (let c = 0; c < op.copies; c++) {
+      const r = send(g, op, c, r0), w = want(op, c);
+      rootErr = Math.max(rootErr, Math.hypot(r[0] - w[0], r[1] - w[1], r[2] - w[2]));
+      if (facing === 'outward') { const o = send(g, op, c, [0, 0, 0]); stemErr = Math.max(stemErr, angle([o[0] - r[0], o[1] - r[1], o[2] - r[2]], op.dirs.subarray(c * 3, c * 3 + 3))); }
+    }
+    for (let i = 0; i < N; i++) reach = Math.max(reach, Math.hypot(g.positions[i * 3], g.positions[i * 3 + 1], g.positions[i * 3 + 2]) / half);
+  }
+  chk('every copy\'s ROOT lands exactly on its position (the centre at Radius 0), on four layouts, both facings',
+    rootErr < 1e-9, `worst ${rootErr.toExponential(2)} model units`);
+  // ⚠️ 1e-4°, not tighter: acos near 1 turns a 1e-16 rounding into ~1e-6° (it failed correct code at 1e-6); the defect is > 10°.
+  chk('...under Outward every copy\'s STEM points along its position, so the copies grow outward', stemErr < 1e-4, `worst ${stemErr.toExponential(2)}°`);
+  chk('...and the arrangement stays inside the design box at every Radius (the fit 1 / (2 + radius))', reach <= 1, `reach ${reach.toFixed(3)} half-boxes`);
+  // Calibrations: the defects, as formulas, on the same figure.
+  const opC = S.resolveSym3d({ ...S.SYM3D_DEFAULTS, layout: 'cube', anchor: 'start' });
+  let centreRoot = 0;
+  for (let c = 0; c < opC.copies; c++) {   // the CENTRE branch: turned about the middle, the root rides along
+    const M = opC.mats.subarray(c * 9, c * 9 + 9);
+    centreRoot = Math.max(centreRoot, Math.hypot(...[0, 1, 2].map((a) => M[a * 3] * root[0] + M[a * 3 + 1] * root[1] + M[a * 3 + 2] * root[2])));
+  }
+  seed('§F the Figure-centre formula leaves the roots OFF the centre (the inward growth the owner saw)', centreRoot > 0.1 * half);
+  let noTurn = 0;
+  for (let c = 0; c < opC.copies; c++) {   // the start anchor WITHOUT the stem turn: the stem stays sideways
+    const M = opC.mats.subarray(c * 9, c * 9 + 9), s = [-root[0], -root[1], -root[2]];
+    noTurn = Math.max(noTurn, angle([0, 1, 2].map((a) => M[a * 3] * s[0] + M[a * 3 + 1] * s[1] + M[a * 3 + 2] * s[2]), opC.dirs.subarray(c * 3, c * 3 + 3)));
+  }
+  seed('§F without the stem turn the stems are NOT along their positions', noTurn > 10);
+  { const { g } = stage({ ...S.SYM3D_DEFAULTS, layout: 'ring', positions: 6, radius: 3, anchor: 'start' });
+    let r = 0; for (let i = 0; i < N; i++) r = Math.max(r, Math.hypot(g.positions[i * 3], g.positions[i * 3 + 1], g.positions[i * 3 + 2]) / half);
+    seed('§F the Figure-centre fit 1 / (1 + radius) would leave the box', r * (2 + 3) / (1 + 3) > 1); }
+
+  // Through the engine: on a curve the two anchors differ; on a figure with no start they are bit-identical.
+  const { VARIANT_PRESETS } = await import('../src/presets/variant-presets.ts');
+  const frame = (p, anchor) => { const g = new LissajousGenerator();
+    g.init({ ...p.generators, particleCount: 3000, designResolution: p.metadata.designResolution }, { width: 1024, height: 768 });
+    g.setSymmetry3d({ ...S.SYM3D_DEFAULTS, layout: 'cube', anchor }); g.update(16.667);
+    return Float64Array.from(g.getState().positions.subarray(0, 9000)); };
+  const nDiff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) n++; return n; };
+  const curvePreset = VARIANT_PRESETS.find((v) => v.name === 'Plant Fork Tree').preset;
+  // ⚠️ The wave figure CARRIES a dormant curve block (a type switch keeps it, by design): without one, the null
+  // block alone gated the stage and a deleted figure-type test went unseen (seeded 2026-11-17, MISSED until this).
+  const wave0 = VARIANT_PRESETS.find((v) => (v.preset.generators.type ?? 'lissajous') === 'lissajous').preset;
+  const wavePreset = { ...wave0, generators: { ...wave0.generators, lsystem: curvePreset.generators.lsystem } };
+  const dw = nDiff(frame(wavePreset, 'start'), frame(wavePreset, 'centre'));
+  const dc = nDiff(frame(curvePreset, 'start'), frame(curvePreset, 'centre'));
+  chk('a figure with no start (waves) draws bit-identically under either anchor; a curve does not (so the test can fail)',
+    dw === 0 && dc > 1000, `wave ${dw} slots differ, curve ${dc}`);
+
+  const main = strip(read('main.ts'));
+  chk('the anchor is exported only when it is Curve start (every older symmetry preset exports the same bytes)',
+    /\.\.\.\(sym3d\.anchor !== 'centre' \? \{ sym3dAnchor: sym3d\.anchor \} : \{\}\)/.test(main), '');
+  const vfx = strip(read('ui/synthesis-lab/tabs/visual-fx.ts'));
+  chk('the Grow from row is greyed on every figure that is not a curve',
+    /this\.sym3dAnchorSelect\.disabled = this\.controls\.getFigureType\(\) !== 'lsystem'/.test(vfx), '');
+  const starts = VARIANT_PRESETS.filter((v) => v.preset.overlay?.sym3dAnchor === 'start');
+  const notCurve = starts.filter((v) => v.preset.generators.type !== 'lsystem').map((v) => v.name);
+  chk('the demos show Curve start, on curves only, with a plant AND a non-plant curve, at Radius 0 AND above',
+    starts.length > 0 && notCurve.length === 0
+    && starts.some((v) => LR.LSYSTEM_RULE_BY_KEY[v.preset.generators.lsystem.rule]?.plant === true)
+    && starts.some((v) => LR.LSYSTEM_RULE_BY_KEY[v.preset.generators.lsystem.rule]?.plant !== true)
+    && starts.some((v) => (v.preset.overlay.sym3dRadius ?? 0) === 0) && starts.some((v) => (v.preset.overlay.sym3dRadius ?? 0) > 0),
+    starts.map((v) => `${v.name} (${v.preset.generators.lsystem?.rule}, r ${v.preset.overlay.sym3dRadius ?? 0})`).join(', ') + (notCurve.length ? ` | NOT a curve: ${notCurve}` : ''));
 }
 
 console.log(`\nsymmetrycheck: ${pass} passed, ${fail} failed${calibFail ? `, ${calibFail} CALIBRATION FAILURES` : ''}`);

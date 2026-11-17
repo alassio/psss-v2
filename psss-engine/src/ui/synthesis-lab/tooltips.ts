@@ -79,6 +79,11 @@ export const CONTROL_TIPS: Record<string, string> = {
     + 'are at least 2 copies at each position.',
   sym3dFacing: 'Outward turns each copy to face away from the centre, so a ring reads as a wreath and a sphere as a '
     + 'shell. Parallel keeps every copy the way the original faces.',
+  sym3dAnchor: 'Where each copy is held. Figure centre turns every copy about the middle of the figure, so a plant\'s '
+    + 'copies grow in from the outside and through each other. Curve start puts every copy\'s starting point on the '
+    + 'centre, and with Outward points its stem along its position, so the copies grow outward from one point — or, '
+    + 'with a 3-D Radius, from the points of the solid. Self-similar curves only: other figures have no start, and the '
+    + 'row is greyed out.',
 
   // ---- Deformation (v8 Phase 30) ----
   /*
@@ -1623,9 +1628,44 @@ export const TAB_TIPS: Record<string, string> = {
   'composer.customize': 'Customize: edit the generator — the few straight steps the rule repeats inside every '
     + 'step, level after level, which is all a rule is. It starts from the rule you were on and changes nothing '
     + 'until you edit a step. ⚠ Choosing a named rule again replaces your edits, with no confirmation.',
-  'composer.customizeUnavailable': 'Bush 3D cannot be customized: it is a GROWTH rule — each level adds branches at '
-    + 'the tips and lengthens the stems — not a shape repeated inside itself, so it has no generator to edit. A '
-    + 'plant-growth editor is planned as a future phase. Pick another rule first.',
+  // v8 Phase 44 — every PLANT is customizable now (its productions); only the tetrahedra keep a reason.
+  'composer.customizePlant': 'Customize: edit this plant\'s PRODUCTIONS — the rows that rewrite each symbol at every '
+    + 'level (X → F[+X]F[-X]+X). It starts from the plant you were on and changes nothing until you edit. ⚠ Choosing a '
+    + 'named rule again replaces your edits, with no confirmation.',
+  'composer.customizeUnavailableTetra': 'The two tetrahedron curves cannot be customized: each is built from tetrahedra '
+    + 'placed in 3-D, and their turns cannot be written as one repeated walk. Pick another rule first.',
+  // ---- v8 Phase 44 — the production editor ----
+  'composer.editAs': 'Plant, Sprig and Thicket Weed can be edited two ways: as PRODUCTIONS (the symbols that rewrite '
+    + 'each level) or as a GENERATOR (the few steps every segment is replaced by). Switching starts the other editor '
+    + 'from the plant again — your edits are replaced, with no confirmation.',
+  'composer.productions': 'The plant\'s own rules. It starts from the AXIOM; at every level each symbol with a row is '
+    + 'replaced by that row. F draws a stem, + and − turn, & ^ / \\ tilt and roll, [ ] makes a branch and { } a leaf.',
+  'composer.prodAxiom': 'What the plant starts from — level 0. Click a gap to place the caret, then add symbols from the '
+    + 'palette or type them.',
+  'composer.prodRow': 'This symbol\'s production: at every level each of these symbols is replaced by the row. Click a '
+    + 'gap or type to edit; Backspace and Delete remove; deleting a bracket keeps what is inside it.',
+  'composer.prodAddProduction': 'Give a letter its own production. A letter that has none passes through unchanged and '
+    + 'draws nothing.',
+  'composer.prodAddAlternative': 'Make this production RANDOM: each occurrence picks one alternative by weight, so every '
+    + 'Seed grows a different specimen of the same plant. Up to four.',
+  'composer.prodWeight': 'How often this alternative is picked, relative to the others; the percentage beside it is its '
+    + 'share of the picks.',
+  'composer.prodRemove': 'Remove this production — its letter then passes through unchanged and draws nothing.',
+  'composer.prodRemoveAlt': 'Remove this alternative; with only one left the production is no longer random.',
+  'composer.prodPalette': 'The symbols. Click one to insert it at the caret of the row you are editing, or type it there. '
+    + 'Brackets and braces always insert as a pair.',
+  // ---- v8 Phase 41 — growth, taper and seed ----
+  'composer.growth': 'Animates the curve growing. Plants grow from the trunk outwards and wither back tips-first; '
+    + 'other curves unfold level by level. Grow once: grows and stays grown. Loop: grows, holds, withers and '
+    + 'starts again. Loop, new plant each time: each regrowth is a new specimen (on the Wild Plant). Every time the '
+    + 'preset is shown it starts again from the seed.',
+  'composer.growthTime': 'How long one growth takes, from the seed to fully grown — and again for the wither.',
+  'composer.growthPause': 'How long the curve rests fully grown, and again as a seed, before turning round.',
+  'composer.taper': 'Makes the particles smaller from the trunk towards the tips, like a real plant\'s branches. 0 '
+    + 'is off. ⚠ Shows on the particle and splat renderings only — under Neon Lines or Ribbons the plant stays even.',
+  'composer.seed': 'Which specimen of the Wild Plant is drawn: the same number always gives the same plant, and '
+    + 'another number a sibling of the same species.',
+  'composer.seedNew': 'Pick a random seed — a new specimen of the same plant.',
   'composer.customizeNote': 'The steps the rule repeats. Read them as a walk: each row turns, then walks one '
     + 'segment; recursion then replaces every segment with a smaller copy of the whole walk. While the table is '
     + 'still exactly a named rule\'s, the figure IS that rule; the first edit makes it your own curve, and '
@@ -2017,4 +2057,31 @@ export const DIALOG_TIPS: Record<string, string> = {
   'bundle.allSuffix': 'Import every preset, giving each clashing name the next free " v<n>" suffix. Nothing '
     + 'already in the library is overwritten.',
   'bundle.cancel': 'Import nothing. Escape and a click outside the dialog do the same.',
+};
+
+/**
+ * v8 Phase 44 (`44.B5.4`) — **one tooltip per production symbol**, the chips' and the palette's titles. ⚠️ Not a
+ * `TAB_TIPS` entry per symbol: a chip's title is read by its symbol, and `tipcheck` §H forbids a non-literal
+ * `TAB_TIPS` subscript. `figurecheck` §T holds this table to `PRODUCTION_SYMBOLS` in both directions.
+ */
+export const PRODUCTION_SYMBOL_TIPS: Record<string, string> = {
+  F: 'F — draw forward one step: a stem.',
+  G: 'G — draw forward one step, like F.',
+  f: 'f — move forward without drawing; inside a leaf it traces the outline.',
+  '+': '+ — turn left by the Yaw angle.',
+  '-': '− — turn right by the Yaw angle.',
+  '&': '& — tilt down by the Pitch angle.',
+  '^': '^ — tilt up by the Pitch angle.',
+  '/': '/ — roll one way by the Roll angle.',
+  '\\': '\\ — roll the other way by the Roll angle.',
+  '<': '< — roll, like /.',
+  '>': '> — roll, like \\.',
+  '|': '| — turn round (180°).',
+  '[': '[ — start a branch: what follows grows out from here.',
+  ']': '] — end the branch and return to where it started.',
+  '{': '{ — start a leaf: the f moves that follow trace its outline.',
+  '}': '} — close the leaf back to where it started.',
+  '!': '! — the book\'s stem-width mark; it has no effect here.',
+  "'": "' — the book's colour mark; it has no effect here.",
+  letter: 'A letter: replaced by its own production at every level; it draws nothing itself.',
 };

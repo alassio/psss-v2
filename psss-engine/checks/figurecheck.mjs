@@ -30,7 +30,18 @@ const rawText = readFileSync(join(ROOT, 'public/psss_presets.json'), 'utf8');
 const rawLib = JSON.parse(rawText.slice(rawText.indexOf('{')).replace(/;\s*$/, ''));
 const L = await import('../src/generators/lsystem/rules.ts');
 const { LSYSTEM_RULES, LSYSTEM_RULE_BY_KEY, LSYSTEM_ANGLE_BRACKET, LSYSTEM_MIN_USEFUL_BRACKET_DEG, LSYSTEM_DEFAULT_RULE, ruleAngleUsage } = L;
-const { walkTurtle } = await import('../src/generators/lsystem/turtle.ts');
+const { walkTurtle: turtleWalk } = await import('../src/generators/lsystem/turtle.ts');
+const { buildTetra } = await import('../src/generators/lsystem/tetra.ts');
+const { buildHill } = await import('../src/generators/lsystem/hill.ts');
+/*
+ * v8 Phase 41 — **every rule's list, through the SAME route the engine takes** (`curve.ts`' `buildPose`): a BUILDER rule
+ * (the Sierpinski Tetrahedron) has no turtle and an empty axiom, so walking it with the turtle would measure a one-point
+ * list and read Infinity. Same result shape as `walkTurtle`, so every clause below measures the tetra too.
+ */
+const walkTurtle = (r, d, y, p, ro, s) => {
+  if (r.builder !== undefined) { const b = r.builder === 'tetra' ? buildTetra(d) : buildHill(d); return { xyz: b.xyz, count: b.count, truncated: false, unclosedBrackets: 0 }; }
+  return turtleWalk(r, d, y, p, ro, s);
+};
 
 let pass = 0, fail = 0, calibFail = 0;
 const chk = (n, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${x ? '   ' + x : ''}`); ok ? pass++ : fail++; };
@@ -334,7 +345,10 @@ console.log('\n=== D. v8 36.4/36.5 — the rule library, and the invariants only
   // arc-length resampling ONLY while every segment has equal length. So that is now a property of the
   // RULE SET and not of the resampler, and it must be asserted rather than assumed.
   const unequal = [];
+  // v8 Phase 41 — a rule that DECLARES `unequalSteps` is resampled by arc length (`figure.ts`), so it is exempt BY ITS FLAG;
+  // the flag being honoured is asserted in §P9. Every other rule must still have one segment length.
   for (const r of LSYSTEM_RULES) {
+    if (r.unequalSteps === true) continue;
     const depth = Math.min(r.recursionRange[1], r.recursionRange[0] + 1);
     const a = r.publishedAngle;
     const t = walkTurtle(r, depth, a, a, a);
@@ -397,7 +411,8 @@ console.log('\n=== E. v8 36.15 — the facet catalogue covers the registry, in B
 
   // The other direction: a chip naming a type the registry does not hold.
   const orphan = chipKeys.filter((k) => k.startsWith('figure:')
-    && !['figure:attractor', 'figure:open', 'figure:curve'].includes(k));
+    // v8 Phase 41 — `figure:grows` names no figure TYPE: it is a property of the curve type (its Growth), so it is listed here.
+    && !['figure:attractor', 'figure:open', 'figure:curve', 'figure:grows'].includes(k));
   chk('...and no `figure:` chip names something the registry does not hold', orphan.length === 0, `[${orphan}]`);
 
   // And it must actually MATCH. A predicate over a shorter list reads exactly like a correct one.
@@ -442,7 +457,14 @@ console.log('\n=== F. v8 36.19 — THE DENSITY INSTRUMENT, which no checker had 
   let worst = 0, worstAt = '';
   const rows = [];
   const byFamily = { bracketed: [], plain: [] };
+  /*
+   * ⚠️ v8 Phase 41 — ONE NAMED EXEMPTION, structural and the book's: Sprig (ABOP fig. 1.24b, `F[+F]F[-F][F]`) ends every
+   * node with a straight `[F]` branch that lies EXACTLY over the next stem segment, so consecutive particles coincide and
+   * the 1st-percentile chord is 0 — a property of the published rule (its picture has the same overlap), not of the walk.
+   */
+  const COINCIDENT_BY_DESIGN = new Set(['sprig']);
   for (const r of LSYSTEM_RULES) {
+    if (COINCIDENT_BY_DESIGN.has(r.key)) continue;
     for (const depth of [r.recursionRange[0], Math.min(r.recursionRange[1], r.recursionRange[0] + 2)]) {
       const pose = buildPose(r, depth, r.publishedAngle, r.publishedAngle, r.publishedAngle);
       for (const c of COUNTS) {
@@ -949,6 +971,12 @@ console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one 
   const fullLen = (r, d) => { let s = r.axiom; for (let i = 0; i < d; i++) { let o = ''; for (const c of s) o += r.productions[c] ?? c; s = o; } return s.length; };
   let falseFlags = 0, realMissed = 0, realOk = 0;
   for (const r of LSYSTEM_RULES) {
+    /*
+     * v8 Phase 41 — K1 tests the truncation FLAG's logic, which no rule owns, so two kinds of rule are skipped BY NAME:
+     * a BUILDER rule has an empty axiom (the loop below would never end) and a STOCHASTIC rule's productions are lists,
+     * which this independent re-implementation would concatenate as text.
+     */
+    if (r.builder !== undefined || L.isStochasticRule(r)) continue;
     for (let d = r.recursionRange[1]; d <= r.recursionRange[1] + 1; d++) {
       const e = expandRule(r, d);
       if (e.truncated && e.text.length === fullLen(r, d)) falseFlags++;
@@ -957,9 +985,11 @@ console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one 
     const e = expandRule(r, d + 1);
     if (e.truncated) realOk++; else realMissed++;
   }
+  // v8 Phase 41 — the denominator is the rules TESTED (builder and stochastic rules are skipped above, by name).
+  const k1Tested = LSYSTEM_RULES.filter((r) => r.builder === undefined && !L.isStochasticRule(r)).length;
   chk('K1: "truncated" is never raised over a COMPLETE expansion, and still raised where a level is skipped',
-    falseFlags === 0 && realMissed === 0 && realOk === LSYSTEM_RULES.length,
-    `${falseFlags} false flags up to rMax+1; ${realOk}/${LSYSTEM_RULES.length} real skips flagged`);
+    falseFlags === 0 && realMissed === 0 && realOk === k1Tested,
+    `${falseFlags} false flags up to rMax+1; ${realOk}/${k1Tested} real skips flagged`);
   // Seed: the OLD rule (flag whenever the string passes the budget, last level included).
   let oldFalse = 0;
   for (const r of LSYSTEM_RULES) for (let d = r.recursionRange[1]; d <= r.recursionRange[1] + 2; d++) {
@@ -986,7 +1016,7 @@ console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one 
     }
   }
   chk('K2: every seedable rule seeds, and the seed draws the RULE through the generator path (frame applied)',
-    seedable.length >= 12 && refused === 0 && mismatch === 0 && worst < 1e-9,
+    seedable.length >= 20 && refused === 0 && mismatch === 0 && worst < 1e-9,
     `${seedable.length} seedable rules, worst ${worst.toExponential(2)} of the extent, ${refused} refused, ${mismatch} count mismatches`);
   const noSeed = LSYSTEM_RULES.filter((r) => !C.customSeedable(r.key)).map((r) => r.key);
   chk('K2b: a rule with NO exact generator cannot seed Customize (the option is disabled with its reason)',
@@ -1079,21 +1109,31 @@ console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one 
 
   // K11 — the demo makes the format clause non-vacuous: at least one library preset is GENUINELY custom and valid.
   const carriers = VARIANT_PRESETS.filter((x) => x.preset.generators.lsystem?.rule === C.CUSTOM_RULE_KEY);
+  // ⚠️ v8 Phase 44: a carrier holds a GENERATOR or a plant's PRODUCTIONS; a productions carrier is genuine when it
+  // resolves to an EDITED (synthesized) plant — its own clauses are §T's.
   const genuine = carriers.filter((x) => {
     const r = C.resolveCustomRule(x.preset.generators.lsystem);
+    if (x.preset.generators.lsystem.custom?.kind === 'productions') return r.kind === 'named' && r.rule.synthesized === true;
     if (r.kind !== 'custom') return false;
     const ls = x.preset.generators.lsystem;
     return C.walkCustom(r.gen, ls.yaw.base, ls.pitch.base, ls.stretch?.base ?? 1).validation.ok;
   });
   chk('K11: the library carries a GENUINELY custom, valid generator (spec 39.C7 — the clauses above are not vacuous)',
-    genuine.length >= 1 && genuine.length === carriers.length, carriers.map((x) => x.name).join(', ') || 'NONE');
+    genuine.length >= 1 && genuine.length === carriers.length
+    && carriers.some((x) => x.preset.generators.lsystem.custom?.kind === 'productions')
+    && carriers.some((x) => x.preset.generators.lsystem.custom?.kind !== 'productions'),
+    `${genuine.length}/${carriers.length}: ${carriers.map((x) => x.name).join(', ') || 'NONE'}`);
   const stale = VARIANT_PRESETS.filter((x) => x.preset.generators.lsystem?.custom !== undefined
     && x.preset.generators.lsystem.rule !== C.CUSTOM_RULE_KEY).map((x) => x.name);
   chk('K11b: `custom` is present IFF the rule is `customize` across the library (spec §3.5)', stale.length === 0,
     stale.length ? `stale: ${stale.join(', ')}` : 'none stale');
 
-  // K12 — the density bands are calibrated on the library: no named rule reads clumpy.
-  const dens = LSYSTEM_RULES.map((r) => {
+  /*
+   * K12 — the density bands are calibrated on the library: no named rule reads clumpy. ⚠️ v8 Phase 41: over the rules
+   * that can ENTER `Customize` only — the readout is shown in the generator editor, which an unseedable rule (the plants,
+   * whose long internodes read uneven by design, and the tetra) can never open.
+   */
+  const dens = LSYSTEM_RULES.filter((r) => C.customSeedable(r.key)).map((r) => {
     const d = Math.min(r.recursionRange[1], Math.max(r.recursionRange[0], 4)), a = r.publishedAngle;
     const w = walkTurtle(r, d, a, a, a);
     return [r.key, C.customDensity(w.xyz, w.count)];
@@ -1148,11 +1188,648 @@ console.log('\n=== K. v8 39 Stage C — Customize: the seed, the no-op, the one 
   chk('K15: Descend does nothing on a generator WITH a starting shape (the index window is no longer spatial)',
     moRes.kind === 'custom' && moRes.tile !== null && zdiff === 0, `${moRes.kind}, tile ${moRes.tile?.tile}; descend 4 vs 1 differ by ${zdiff}`);
 
-  // K16 — Bush 3D stays disabled, and its reason says WHY (a growth rule), not just "no generator".
+  /*
+   * K16 — the UNSEEDABLE rules are exactly Coral Bush (`bush3d`) and the nine Phase 41 rules (the eight growth rules and
+   * the tetra builder), and each kind's reason says WHY: a plant is a GROWTH rule, the tetra has no generator at all.
+   * ⚠️ v8 Phase 41 widened this from "Bush 3D is the ONE" — the set is listed by name, so a tenth is a decision, not drift.
+   */
   const tipSrc = readFileSync(join(ROOT, 'src/ui/synthesis-lab/tooltips.ts'), 'utf8');
-  chk('K16: Bush 3D is the ONE unseedable rule, and its reason names the growth rule and the future phase',
-    LSYSTEM_RULES.filter((r) => !C.customSeedable(r.key)).map((r) => r.key).join() === 'bush3d'
-    && /'composer\.customizeUnavailable': 'Bush 3D cannot be customized: it is a GROWTH rule[\s\S]*?future phase/.test(tipSrc), '');
+  // ⚠️ v8 Phase 44 (`44.A1`): Sprig and Thicket Weed LEFT this list — they seed the generator editor now (exact, §K2).
+  const UNSEEDABLE = ['bush3d', 'sierpinskiTetra', 'hillTetra', 'forkTree', 'firShoot', 'windWeed', 'wildPlant',
+    'floweringPlant', 'bush3dBook'];
+  const unseed = LSYSTEM_RULES.filter((r) => !C.customSeedable(r.key)).map((r) => r.key);
+  chk('K16: the generator-unseedable rules are exactly Coral Bush, the six growth-symbol plants and the two tetrahedra, each kind with its own reason',
+    unseed.join() === UNSEEDABLE.join()
+    // ⚠️ v8 Phase 44: a PLANT is no longer refused — it opens the production editor — so its old reason is GONE and the
+    // productions tip stands in its place; only the tetrahedra keep a refusal.
+    && !/'composer\.customizeUnavailable':/.test(tipSrc) && /'composer\.customizePlant': 'Customize: edit this plant/.test(tipSrc)
+    && /'composer\.customizeUnavailableTetra': 'The two tetrahedron curves cannot be customized/.test(tipSrc),
+    `[${unseed}]`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== P. v8 Phase 41 — the book plants, the Sierpinski Tetrahedron, growth, taper, seed (41.S10) ===\n');
+{
+  const T = await import('../src/generators/lsystem/turtle.ts');
+  const FG = await import('../src/generators/lsystem/figure.ts');
+  const GR = await import('../src/generators/lsystem/growth.ts');
+  const TT = await import('../src/generators/lsystem/tetra.ts');
+  const { interpolatePreset } = await import('../src/exploration/interpolate.ts');
+  const R = L.LSYSTEM_RULE_BY_KEY;
+
+  /*
+   * §P1 — BOOK PARITY. ⚠️⚠️ **THIS TABLE IS TYPED FROM THE BOOK'S PAGES, NOT IMPORTED FROM `rules.ts`** (*The Algorithmic
+   * Beauty of Plants*, ch. 1, pp. 25–30; `abop-ch1.pdf`): a parity clause that read its expectation from the
+   * module under test would agree with any typo. Book symbols mapped exactly as `rules.ts` documents (∧ → ^, the
+   * flowering plant's words → letters P I S L K D E, colour marks → ').
+   */
+  const BOOK = {
+    sprig: { w: 'F', p: { F: 'F[+F]F[-F][F]' }, d: 20, n: 5 },
+    thicketWeed: { w: 'F', p: { F: 'FF-[-F+F+F]+[+F-F-F]' }, d: 22.5, n: 4 },
+    forkTree: { w: 'X', p: { X: 'F[+X]F[-X]+X', F: 'FF' }, d: 20, n: 7 },
+    firShoot: { w: 'X', p: { X: 'F[+X][-X]FX', F: 'FF' }, d: 25.7, n: 7 },
+    windWeed: { w: 'X', p: { X: 'F-[[X]+X]+F[+FX]-X', F: 'FF' }, d: 22.5, n: 5 },
+    floweringPlant: { w: 'P', d: 18, n: 5, p: {
+      P: 'I+[P+K]--//[--L]I[++L]-[PK]++PK', I: 'FS[//&&L][//^^L]FS', S: 'SFS', L: "['{+f-ff-f+|+f-ff-f}]",
+      K: "[&&&D'/E////E////E////E////E]", D: 'FF', E: "['^F][{&&&&-f+f|-f+f}]" } },
+    bush3dBook: { w: 'A', d: 22.5, n: 7, p: {
+      A: "[&FL!A]/////'[&FL!A]///////'[&FL!A]", F: 'S/////F', S: 'FL', L: "[''''^^{-f+f+f-|-f+f+f}]".replace("''''", "'''") } },
+  };
+  const parity = (key, book) => {
+    const r = R[key];
+    if (!r) return `${key} missing`;
+    if (r.axiom !== book.w) return `${key} axiom ${r.axiom}`;
+    if (r.publishedAngle !== book.d) return `${key} angle ${r.publishedAngle}`;
+    const ks = Object.keys(book.p);
+    if (Object.keys(r.productions).sort().join() !== ks.sort().join()) return `${key} symbols`;
+    for (const k of ks) if (r.productions[k] !== book.p[k]) return `${key} ${k}: ${r.productions[k]}`;
+    return null;
+  };
+  const bad = Object.keys(BOOK).map((k) => parity(k, BOOK[k])).filter(Boolean);
+  chk('§P1 every book plant equals the definition READ OFF the book (axiom, productions, angle)', bad.length === 0, `[${bad}]`);
+  // the stochastic plant: §1.7's three weighted productions
+  const wp = R.wildPlant?.productions?.F;
+  const wpOk = Array.isArray(wp) && wp.length === 3 && wp.map((c) => `${c.p}:${c.to}`).join('|')
+    === '0.33:F[+F]F[-F]F|0.33:F[+F]F|0.34:F[-F]F' && R.wildPlant.axiom === 'F';
+  chk('§P1 the Wild Plant is §1.7\'s stochastic system: three productions at .33/.33/.34', wpOk, '');
+  seed('§P1 parity sees one changed bracket', [parity('sprig', { ...BOOK.sprig, p: { F: 'F[+F]F[-F]F' } })].filter(Boolean).length,
+    'a production differing from the book by one bracket must be reported');
+  // The recursion tops: the book's n, unless 41.P1's measured cost lowered it (Bush 3D: 7 -> 5, recorded in its provenance).
+  const tops = Object.keys(BOOK).filter((k) => R[k].recursionRange[1] !== BOOK[k].n
+    && !(k === 'bush3dBook' && R[k].recursionRange[1] === 5 && /capped at 5/.test(R[k].provenance)));
+  chk('§P1 each recursion top is the book\'s n, or a MEASURED lower cap that its provenance states', tops.length === 0, `[${tops}]`);
+
+  // §P2 — Coral Bush is the PRE-PHASE rule, unchanged (only its label moved), with its braces still ignored.
+  const CORAL = { A: '[&FL!A]/////[&FL!A]///////[&FL!A]', F: 'S/////F', S: 'FL', L: '[---^^{-f+f+f-|-f+f+f}]' };
+  const coralSame = (r) => r.axiom === 'A' && Object.keys(CORAL).every((k) => r.productions[k] === CORAL[k])
+    && Object.keys(r.productions).length === 4 && r.polygons !== 'outline' && r.publishedAngle === 23;
+  chk('§P2 Coral Bush (`bush3d`) is the pre-phase rule byte for byte, braces still ignored, relabelled only',
+    coralSame(R.bush3d) && R.bush3d.name === 'Coral Bush', `name ${R.bush3d.name}`);
+  seed('§P2 the corrected leaf is NOT Coral Bush', coralSame({ ...R.bush3d, productions: { ...R.bush3d.productions, L: "['''^^{-f+f+f-|-f+f+f}]" } }) ? 0 : 1,
+    'swapping the book\'s leaf into Coral Bush must break the clause');
+
+  /*
+   * §P3 — THE STOCHASTIC HASH. Same seed ⇒ same plant; 64 CONSECUTIVE seeds ⇒ the FIRST choice takes every branch and
+   * the plants differ; a deterministic rule ignores the seed. ⚠️ Calibrated against a SEQUENTIAL mulberry32 stream, the
+   * defect class *Verify* records (correlated first draws across nearby seeds).
+   */
+  const key = (r, d, s) => T.expandRule(r, d, s).text;
+  chk('§P3 the same seed gives the same plant', key(R.wildPlant, 5, 7) === key(R.wildPlant, 5, 7), '');
+  const firstChoice = (pick) => { const seen = new Set(); for (let s = 0; s < 64; s++) seen.add(pick(s)); return seen.size; };
+  const hashFirst = (s) => T.expandRule(R.wildPlant, 1, s).text;
+  chk('§P3 64 consecutive seeds take ALL THREE first productions (no first-draw correlation)', firstChoice(hashFirst) === 3,
+    `${firstChoice(hashFirst)} distinct first choices`);
+  const distinct = new Set(); for (let s = 0; s < 64; s++) distinct.add(key(R.wildPlant, 4, s));
+  chk('§P3 ...and 64 consecutive seeds give (nearly) 64 different plants', distinct.size >= 60, `${distinct.size} distinct of 64`);
+  chk('§P3 a deterministic rule ignores the seed', key(R.sprig, 4, 0) === key(R.sprig, 4, 9999) && key(R.plant, 4, 3) === key(R.plant, 4, 0), '');
+  /*
+   * ⚠️ The calibration plants a stream whose FIRST DRAW IS ITS OWN SEED, scaled (`seed / 2^32`) — the correlated-first-
+   * draw class at its plainest. (A bare mulberry32 seeded 1…8 was tried first and is NOT one-sided — 0.627 0.734 0.720
+   * 0.924 0.690 0.526 0.012 0.156 — so the correlation *Verify* records belongs to `mixercheck`'s own seeding, and planting
+   * it here would have been a seed that cannot fail.)
+   */
+  const streamFirst = (s) => { const u = s / 4294967296; return u < 0.33 ? 0 : u < 0.66 ? 1 : 2; };
+  seed('§P3 a stream whose first draw is its own seed fails the first-draw clause on 64 consecutive seeds',
+    firstChoice(streamFirst) < 3 ? 1 : 0, 'the correlated-first-draw defect must be visible to the clause');
+  seed('§P3 a constant hash gives one plant for every seed', firstChoice(() => 'same') < 3 ? 1 : 0, '');
+
+  // §P4 — LEAF OUTLINES: a `{…}` is a CLOSED loop inside one continuous stroke (adjacent chords bounded; 37's ordering rule).
+  const leafRule = (mode) => ({ ...R.sprig, key: 'sprig', axiom: 'F[{-f+f+f-|-f+f}]F', productions: {}, polygons: mode });
+  const maxChord = (w) => { let m = 0; for (let i = 1; i < w.count; i++) { const a = (i - 1) * 3, b = i * 3; m = Math.max(m, Math.hypot(w.xyz[b] - w.xyz[a], w.xyz[b + 1] - w.xyz[a + 1], w.xyz[b + 2] - w.xyz[a + 2])); } return m; };
+  const wOut = T.walkTurtle(leafRule('outline'), 0, 60, 60, 60);
+  // the leaf: F (point 1), then f f f f f (points 2..6), then the closing point back to point 1's position
+  const closePt = 7, startPt = 1;
+  const closed = wOut.count > closePt && Math.hypot(wOut.xyz[closePt * 3] - wOut.xyz[startPt * 3], wOut.xyz[closePt * 3 + 1] - wOut.xyz[startPt * 3 + 1], wOut.xyz[closePt * 3 + 2] - wOut.xyz[startPt * 3 + 2]) < 1e-12;
+  chk('§P4 an outline leaf closes back to its first vertex, inside the stroke', closed, `count ${wOut.count}`);
+  for (const k of ['floweringPlant', 'bush3dBook']) {
+    const w = T.walkTurtle(R[k], 3, R[k].publishedAngle, R[k].publishedAngle, R[k].publishedAngle);
+    chk(`§P4 ${R[k].name}: no adjacent chord longer than one step (one continuous stroke)`, maxChord(w) <= 1 + 1e-9, `max ${maxChord(w).toFixed(6)}`);
+  }
+  // ⚠️ The legacy reading does not teleport (its pen-up moves emit nothing) — it draws NO leaf, which is the defect.
+  seed('§P4 the legacy reading (braces ignored, f pen-up) draws no leaf at all',
+    T.walkTurtle(leafRule('legacy'), 0, 60, 60, 60).count < wOut.count ? 1 : 0, 'a missing leaf must be visible to the clause');
+
+  // §P5 — THE TETRA: 4^d + 1 points, self-avoiding, turns ⊂ {60°, 90°}, one segment length, endpoints p0 → p3.
+  const turnSet = (b) => { const s = new Set(); for (let i = 2; i < b.count; i++) { const a = [0, 1, 2].map((q) => b.xyz[(i - 1) * 3 + q] - b.xyz[(i - 2) * 3 + q]); const c = [0, 1, 2].map((q) => b.xyz[i * 3 + q] - b.xyz[(i - 1) * 3 + q]); const cos = (a[0] * c[0] + a[1] * c[1] + a[2] * c[2]) / (Math.hypot(...a) * Math.hypot(...c)); s.add(Math.round(Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI)); } return [...s].sort((x, y) => x - y); };
+  let countsOk = true; for (let d = 0; d <= 7; d++) if (TT.buildTetra(d).count !== 4 ** d + 1) countsOk = false;
+  chk('§P5 the tetra has exactly 4^d + 1 points at every depth 0–7', countsOk, '');
+  const t5 = TT.buildTetra(5);
+  const seen5 = new Set(); for (let i = 0; i < t5.count; i++) seen5.add(`${t5.xyz[i * 3]},${t5.xyz[i * 3 + 1]},${t5.xyz[i * 3 + 2]}`);
+  chk('§P5 ...self-avoiding (no point visited twice, depth 5)', seen5.size === t5.count, `${seen5.size} of ${t5.count}`);
+  chk('§P5 ...turning by 60° and 90° only (v1001, depth 4)', turnSet(TT.buildTetra(4)).join() === '60,90', `[${turnSet(TT.buildTetra(4))}]`);
+  const lens = new Set(); for (let i = 1; i < t5.count; i++) lens.add(Math.hypot(t5.xyz[i * 3] - t5.xyz[i * 3 - 3], t5.xyz[i * 3 + 1] - t5.xyz[i * 3 - 2], t5.xyz[i * 3 + 2] - t5.xyz[i * 3 - 1]).toFixed(12));
+  chk('§P5 ...every segment one length, from p0 to p3', lens.size === 1 && t5.xyz[0] === 1 && t5.xyz[1] === 1 && t5.xyz[2] === 1
+    && t5.xyz[(t5.count - 1) * 3] === -1 && t5.xyz[(t5.count - 1) * 3 + 2] === 1, `${lens.size} lengths`);
+  seed('§P5 the variant v0000 has 120° turns (the clause sees a wrong variant)', turnSet(TT.buildTetra(4, [0, 0, 0, 0])).includes(120) ? 1 : 0, '');
+  seed('§P5 a dropped point breaks the count', (TT.buildTetra(3).count - 1) !== 4 ** 3 + 1 ? 1 : 0, '');
+
+  /*
+   * §P6 — GROWTH. Off and absent are the same branch; g = 1 IS the static figure; g = 0 is the seed at the root; the
+   * grown TOUR's length rises monotonically (measured before the resample, which undersamples a long list); no adjacent
+   * chord exceeds the static figure's (no teleport); wither mirrors grow; unfold reaches the recursion exactly.
+   */
+  const N = 6000;
+  const pose = (k, g, extra = {}) => { const r = R[k]; const a = r.publishedAngle; return { rule: r, recursion: r.defaultRecursion ?? r.recursionRange[1], yaw: a, pitch: a, roll: a, multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 1, anglesAnimated: false, twistAnimated: false, stretchAnimated: false, generator: null, custom: null, growth: g, seed: 1, ...extra }; };
+  const solve = (k, g, extra) => { const c = FG.createFigureCache(); const o = new Float64Array(N * 3); FG.resolveFigure(c, pose(k, g, extra), o, N); return { o, c }; };
+  const same = (a, b) => { for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false; return true; };
+  const chordMax = (o) => { let m = 0; for (let i = 1; i < N; i++) { const a = (i - 1) * 3, b = i * 3; m = Math.max(m, Math.hypot(o[b] - o[a], o[b + 1] - o[a + 1], o[b + 2] - o[a + 2])); } return m; };
+  const tourLen = (c) => { const n = c.loAtAngleLo.count, x = c.growList; let s = 0; for (let i = 1; i < n; i++) { const a = (i - 1) * 3, b = i * 3; s += Math.hypot(x[b] - x[a], x[b + 1] - x[a + 1], x[b + 2] - x[a + 2]); } return s; };
+  const GROWERS = ['plant', 'sprig', 'forkTree', 'floweringPlant', 'bush3dBook', 'bush3d', 'sierpinskiTetra', 'dragon', 'hilbert3d'];
+  const g1 = GROWERS.filter((k) => !same(solve(k, null).o, solve(k, 1).o) || !same(solve(k, null).o, solve(k, undefined).o));
+  chk('§P6 growth absent, null and g = 1 all draw the STATIC figure bit for bit', g1.length === 0, `[${g1}]`);
+  const g0 = ['plant', 'forkTree', 'bush3dBook'].filter((k) => { const o = solve(k, 0).o; for (let i = 3; i < o.length; i++) if (o[i] !== o[i % 3]) return true; return false; });
+  chk('§P6 at g = 0 a plant is the seed: every particle at the root', g0.length === 0, `[${g0}]`);
+  const monoBad = [], chordBad = [];
+  for (const k of ['plant', 'sprig', 'thicketWeed', 'forkTree', 'windWeed', 'floweringPlant', 'bush3dBook']) {
+    let prev = -1; const stat = chordMax(solve(k, null).o);
+    for (let j = 1; j < 20; j++) {
+      const { o, c } = solve(k, j / 20);
+      const L2 = tourLen(c); if (L2 + 1e-9 < prev) monoBad.push(`${k}@${j / 20}`); prev = L2;
+      // A chord can never exceed the particle SPACING along the visible tour (a straight line is no longer than its arc),
+      // so a jump across a collapsed frontier — a teleport — is exactly what would break this. The grown tour is RAW, so
+      // its length is carried into the output's frame by the full list's transform (the one the figure is framed by).
+      const spacing = (L2 / c.loAtAngleLo.transform.scale) / N;
+      if (chordMax(o) > spacing * 1.0001 + 1e-12) chordBad.push(`${k}@${j / 20}`);
+    }
+  }
+  chk('§P6 the grown tour\'s length rises monotonically with g (7 plants, 19 steps)', monoBad.length === 0, `[${monoBad.slice(0, 4)}]`);
+  chk('§P6 ...and no adjacent chord ever exceeds the particle spacing along the visible tour (the stroke never teleports)', chordBad.length === 0, `[${chordBad.slice(0, 4)}]`);
+  const tl = { time: 12, pause: 4 };
+  let mirror = true; for (let x = 0.5; x < 12; x += 0.5) {
+    const up = GR.growthProgress('loop', 12 - x, tl.time, tl.pause).g, down = GR.growthProgress('loop', 12 + 4 + x, tl.time, tl.pause).g;
+    if (Math.abs(up - down) > 1e-12) mirror = false;
+  }
+  chk('§P6 the wither is the grow run backwards (tips first), and the timeline holds and rests', mirror
+    && GR.growthProgress('loop', 13, 12, 4).g === 1 && GR.growthProgress('loop', 29, 12, 4).g === 0
+    && GR.growthProgress('once', 99, 12, 4).g === 1 && GR.growthProgress('off', 5, 12, 4).g === null, '');
+  chk('§P6 loopNew advances the seed by one per cycle; the other modes keep the stored seed',
+    GR.effectiveSeed('loopNew', 7, GR.growthProgress('loopNew', 70, 12, 4).cycle) === 9 && GR.effectiveSeed('loop', 7, 3) === 7, '');
+  const near = solve('dragon', 0.999999).o, stat = solve('dragon', null).o;
+  let dmax = 0; for (let i = 0; i < near.length; i++) dmax = Math.max(dmax, Math.abs(near[i] - stat[i]));
+  chk('§P6 unfold converges on the static figure as g → 1 (dragon, g = 1 − 1e-6)', dmax < 1e-3, `max ${dmax.toExponential(2)}`);
+  seed('§P6 a frontier just short of the tips is NOT the static figure (the g = 1 clause can fail)',
+    same(solve('plant', 1 - 1e-3).o, solve('plant', null).o) ? 0 : 1, 'routing g = 1 through the mechanism would show here');
+
+  /*
+   * §P7 — TAPER. The figure publishes each particle's branch depth in [0, 1]: 0 on the trunk, 1 at the deepest tips; the
+   * factor `max(TAPER_FLOOR, 1 − taper·depth)` is then non-increasing in depth and exactly 1 at taper 0. Never on an
+   * unbranched rule.
+   */
+  const dep = (k) => { const c = FG.createFigureCache(); FG.resolveFigure(c, pose(k, null, { wantDepth: true }), new Float64Array(N * 3), N); return c; };
+  const dp = dep('forkTree');
+  let dmin = 1, dmx = 0; for (let i = 0; i < N; i++) { dmin = Math.min(dmin, dp.depthOut[i]); dmx = Math.max(dmx, dp.depthOut[i]); }
+  chk('§P7 a branching figure publishes depths spanning trunk (0) to tips (1)', dp.depthValid && dmin === 0 && dmx === 1, `[${dmin}, ${dmx}]`);
+  chk('§P7 ...and an unbranched figure publishes none', dep('dragon').depthValid === false && dep('sierpinskiTetra').depthValid === false, '');
+  const factor = (t, d) => Math.max(GR.TAPER_FLOOR, 1 - t * d);
+  chk('§P7 the factor is 1 at taper 0 and non-increasing in depth', factor(0, 1) === 1 && factor(0.6, 0) === 1 && factor(0.6, 0.5) >= factor(0.6, 1)
+    && factor(1, 1) === GR.TAPER_FLOOR, '');
+  seed('§P7 an inverted factor would grow the tips', factor(0.6, 1) > factor(0.6, 0) ? 0 : 1, '');
+
+  // §P8 — THE MIXER LAW for the five fields: each endpoint is that deck exactly; growth and seed SNAP at 0.5.
+  // Real bodies (the `Plant Wild` demo), so the Mixer sees a complete preset: A authors all five fields, B none.
+  const { VARIANT_PRESETS: VP } = await import('../src/presets/variant-presets.ts');
+  const A = structuredClone(VP.find((x) => x.name === 'Plant Wild').preset);
+  Object.assign(A.generators.lsystem, { growth: 'loopNew', seed: 3, growthTime: 12, taper: 0.6 });
+  const B = structuredClone(A);
+  for (const k of ['growth', 'seed', 'growthTime', 'growthPause', 'taper']) delete B.generators.lsystem[k];
+  const at = (t) => interpolatePreset(A, B, t, new Set()).generators.lsystem;
+  chk('§P8 the Mixer: t = 0 is deck A\'s five fields, t = 1 is deck B (which authors none)',
+    at(0).growth === 'loopNew' && at(0).seed === 3 && at(0).growthTime === 12 && at(0).taper === 0.6
+    && at(1).growth === undefined && at(1).seed === undefined && at(1).growthTime === undefined && at(1).taper === undefined, '');
+  chk('§P8 ...growth and seed SNAP at 0.5 (a half-way mode is not a state), the taper lerps',
+    at(0.49).growth === 'loopNew' && at(0.51).growth === undefined && Math.abs(at(0.25).taper - 0.45) < 1e-12, `taper@.25 ${at(0.25).taper}`);
+  /*
+   * §P9 — THE HILL TETRAHEDRON (41.S9, found by `p81-hill-search.mjs`). Measured on the engine's own leaves: consecutive
+   * pieces share the EXIT/ENTRY vertex at every depth (continuity by vertex chaining), every piece is a congruent copy at
+   * 1/2^d (volume conserved, the dissection's whole point), and the drawn centres are all distinct.
+   */
+  {
+    const H = await import('../src/generators/lsystem/hill.ts');
+    const vol = (t) => { const a = [0, 1, 2].map((q) => t[1][q] - t[0][q]), b = [0, 1, 2].map((q) => t[2][q] - t[0][q]), c = [0, 1, 2].map((q) => t[3][q] - t[0][q]);
+      return Math.abs(a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6; };
+    const k = (p) => p.map((x) => Math.round(x * 2 ** 30)).join(',');
+    const chainBreaks = (L) => { let n = 0; for (let i = 1; i < L.length; i++) if (k(L[i - 1].tet[+L[i - 1].state[1]]) !== k(L[i].tet[+L[i].state[0]])) n++; return n; };
+    let breaks = 0, volBad = 0;
+    for (let d = 1; d <= 4; d++) {
+      const L = H.hillLeaves(d);
+      breaks += chainBreaks(L);
+      const want = (1 / 6) / 8 ** d;
+      for (const l of L) if (Math.abs(vol(l.tet) - want) > 1e-12) volBad++;
+    }
+    chk('§P9 the Hill curve is CONTINUOUS: consecutive pieces share the exit/entry vertex at depths 1–4', breaks === 0, `${breaks} breaks`);
+    chk('§P9 ...every piece is a congruent copy at 1/8^d of the volume (the rep-8 dissection, exact)', volBad === 0, `${volBad} off-volume pieces`);
+    const h4 = H.buildHill(4); const cs = new Set(); for (let i = 0; i < h4.count; i++) cs.add(`${h4.xyz[i * 3]},${h4.xyz[i * 3 + 1]},${h4.xyz[i * 3 + 2]}`);
+    chk('§P9 ...and the 8^d drawn centres are all distinct (depth 4)', h4.count === 4096 && cs.size === 4096, `${cs.size} of ${h4.count}`);
+    // Seed: two children swapped in the traversal order of the first level breaks the chain.
+    const L1 = H.hillLeaves(2).slice(); const tmp = L1[2]; L1[2] = L1[3]; L1[3] = tmp;
+    seed('§P9 two children swapped in the order break the chain', chainBreaks(L1), 'a wrong order must be visible to the clause');
+    // The flag is HONOURED: the Hill rule's particles are evenly spaced along the curve (arc length), not bunched by index.
+    const NN = 3000, hc = FG.createFigureCache(), ho = new Float64Array(NN * 3);
+    // At depth 2 (64 centres) every particle step lies inside ONE segment, so chord = arc and spacing is measurable.
+    FG.resolveFigure(hc, pose('hillTetra', null, { recursion: 2 }), ho, NN);
+    const gaps = []; for (let i = 1; i < NN; i++) gaps.push(Math.hypot(ho[i * 3] - ho[i * 3 - 3], ho[i * 3 + 1] - ho[i * 3 - 2], ho[i * 3 + 2] - ho[i * 3 - 1]));
+    gaps.sort((x, y) => x - y);
+    const spread = gaps[Math.floor(NN * 0.9)] / Math.max(1e-12, gaps[Math.floor(NN * 0.5)]);
+    chk('§P9 ...and its declared `unequalSteps` is HONOURED: particles evenly spaced by arc length (p90/p50 spacing near 1)',
+      R.hillTetra.unequalSteps === true && spread < 1.05, `p90/p50 ${spread.toFixed(3)}`);
+    // Seed: the SAME list resampled by INDEX — the defect the flag exists to prevent — must read as bunched.
+    const { resampleInto: rsIdx } = await import('../src/generators/lsystem/curve.ts');
+    const h2 = H.buildHill(2), io = new Float64Array(NN * 3); rsIdx(io, NN, h2.xyz, h2.count);
+    const ig = []; for (let i = 1; i < NN; i++) ig.push(Math.hypot(io[i * 3] - io[i * 3 - 3], io[i * 3 + 1] - io[i * 3 - 2], io[i * 3 + 2] - io[i * 3 - 1]));
+    ig.sort((x, y) => x - y);
+    seed('§P9 index resampling of the Hill list bunches its particles', ig[Math.floor(NN * 0.9)] / Math.max(1e-12, ig[Math.floor(NN * 0.5)]) > 1.05 ? 1 : 0, '');
+  }
+
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== Q. v8 Phase 41 — every rule DRAWS on the Composer\'s Score (the builder rules went through the turtle and drew nothing) ===\n');
+{
+  /*
+   * ⚠️ Found on the first screenshot of the Sierpinski Tetrahedron: the Score's own walk called the TURTLE, and a builder
+   * rule has no turtle walk, so its three panes were EMPTY while the figure drew fine. The clause asks every rule — the
+   * Score must plot at least two distinct points and a non-zero extent in every plane.
+   */
+  const SC = await import('../src/ui/synthesis-lab/score-canvas.ts');
+  const empty = [];
+  for (const r of LSYSTEM_RULES) {
+    const cfg = { ...L.defaultLSystemConfig(), rule: r.key, recursion: { base: Math.min(r.recursionRange[1], r.defaultRecursion ?? r.recursionRange[0] + 1), amplitude: 0, frequency: 0 },
+      yaw: { base: r.publishedAngle, amplitude: 0, frequency: 0 }, pitch: { base: r.publishedAngle, amplitude: 0, frequency: 0 }, roll: { base: r.publishedAngle, amplitude: 0, frequency: 0 } };
+    for (const plane of ['xy', 'xz', 'yz']) {
+      const sc = SC.computeCurveScore(cfg, plane);
+      let distinct = 0; for (let i = 2; i < sc.path.length; i += 2) if (sc.path[i] !== sc.path[0] || sc.path[i + 1] !== sc.path[1]) { distinct++; break; }
+      if (sc.path.length < 4 || distinct === 0 || !(sc.extent > 0)) { empty.push(`${r.key}/${plane}`); }
+    }
+  }
+  chk('§Q every rule plots a non-empty, framed curve on all three Score planes', empty.length === 0, `[${empty.slice(0, 6)}]`);
+  // Seed: the turtle walk of a builder rule (what the Score did before the fix) is a single point — the empty pane.
+  const tw = turtleWalk(L.LSYSTEM_RULE_BY_KEY.sierpinskiTetra, 5, 60, 60, 60);
+  seed('§Q the turtle walk of a builder rule is the empty pane the clause exists for', tw.count < 2 ? 1 : 0, `${tw.count} point(s)`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== R. v8 Phase 41 (owner review 2026-11-15) — unfold FOLDS IN PLACE, plants grow BY GENERATION ===\n');
+{
+  /*
+   * The owner saw the first build's demos and the two mechanisms were wrong in LOOK while every clause above was green:
+   * unfold morphed one re-framed tangle into another (each level sat rotated and scaled against the next), and the
+   * plants' single frontier left the first seconds a dot. ⚠️ So these clauses ask what the LOOK depends on:
+   *  (1) unfold keeps the curve's ENDS where the finished figure has them, at every g (a re-framed or swirling morph
+   *      moves them) — calibrated on the old, unaligned blend;
+   *  (2) a plant grows BY GENERATION: no node of bracket depth d + 1 is out before every node of depth d has arrived —
+   *      calibrated on the old arc-length frontier, which does exactly that.
+   */
+  const FGr = await import('../src/generators/lsystem/figure.ts');
+  const Rr = L.LSYSTEM_RULE_BY_KEY;
+  const N2 = 4000;
+  const poseR = (k, g) => { const r = Rr[k]; const a = r.publishedAngle; return { rule: r, recursion: r.defaultRecursion ?? r.recursionRange[1], yaw: a, pitch: a, roll: a, multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 1, anglesAnimated: false, twistAnimated: false, stretchAnimated: false, generator: null, custom: null, growth: g, seed: 1 }; };
+  const ends = (k, g) => { const o = new Float64Array(N2 * 3); FGr.resolveFigure(FGr.createFigureCache(), poseR(k, g), o, N2); return [o[0], o[1], o[2]]; };
+  const drift = [];
+  for (const k of ['dragon', 'sierpinskiTetra', 'kochQuad']) {
+    const fin = ends(k, null);
+    let worst = 0;
+    for (const g of [0.05, 0.2, 0.4, 0.6, 0.8, 0.95]) { const e = ends(k, g); worst = Math.max(worst, Math.hypot(e[0] - fin[0], e[1] - fin[1], e[2] - fin[2])); }
+    if (worst > 0.02) drift.push(`${k} ${worst.toFixed(3)}`);
+  }
+  chk('§R unfold keeps the curve\'s start where the finished figure has it, at every g (dragon, tetra, Koch quadratic)', drift.length === 0, `[${drift}]`);
+  // Calibration: the UNALIGNED blend (each level framed by its own transform) — the first build — moves the start.
+  const { buildPose: bp, captureExtent: ce } = await import('../src/generators/lsystem/curve.ts');
+  const unalignedStart = (k, depth) => { const p = bp(Rr[k], depth, Rr[k].publishedAngle, Rr[k].publishedAngle, Rr[k].publishedAngle); const t = ce(p.xyz, p.count);
+    return [(p.xyz[0] - t.cx) / t.scale, (p.xyz[1] - t.cy) / t.scale]; };
+  const u4 = unalignedStart('dragon', 4), u11 = unalignedStart('dragon', 11);
+  seed('§R the unaligned blend moves the dragon\'s start between levels (the swirl the owner saw)', Math.hypot(u4[0] - u11[0], u4[1] - u11[1]) > 0.02 ? 1 : 0,
+    `start moves ${Math.hypot(u4[0] - u11[0], u4[1] - u11[1]).toFixed(3)} between depth 4 and 11`);
+
+  // (2) by generation: build the list's tree and check, at several g, that no deeper node is out before a shallower one arrived.
+  const pf = bp(Rr.forkTree, 6, 20, 20, 20);
+  const br = pf.branch;
+  const arrivalOf = (useTau) => {
+    if (useTau) { let m = 0; for (let k = 0; k < br.nodeCount; k++) m = Math.max(m, br.tau[k]); return Array.from({ length: br.nodeCount }, (_, k) => br.tau[k] / m); }
+    const D = br.maxDepth, base = new Int32Array(br.nodeCount), loc = new Float64Array(br.nodeCount), mx = new Float64Array(D + 1);
+    for (let k = 1; k < br.nodeCount; k++) { const p = br.parent[k]; base[k] = br.depth[k] > br.depth[p] ? p : base[p]; loc[k] = br.tau[k] - br.tau[base[k]]; mx[br.depth[k]] = Math.max(mx[br.depth[k]], loc[k]); }
+    return Array.from({ length: br.nodeCount }, (_, k) => k === 0 ? 0 : (br.depth[k] + (mx[br.depth[k]] > 0 ? loc[k] / mx[br.depth[k]] : 1)) / (D + 1));
+  };
+  const outOfOrder = (arr) => { let bad = 0; const lastByDepth = new Float64Array(br.maxDepth + 1), firstByDepth = new Float64Array(br.maxDepth + 1).fill(Infinity);
+    for (let k = 1; k < br.nodeCount; k++) { const d = br.depth[k]; lastByDepth[d] = Math.max(lastByDepth[d], arr[k]); firstByDepth[d] = Math.min(firstByDepth[d], arr[k]); }
+    for (let d = 1; d <= br.maxDepth; d++) if (firstByDepth[d] < lastByDepth[d - 1] - 1e-12) bad++; return bad; };
+  chk('§R a plant grows BY GENERATION: every branch order arrives after the whole order before it (Fork Tree)', outOfOrder(arrivalOf(false)) === 0, `${outOfOrder(arrivalOf(false))} orders early`);
+  seed('§R the raw arc-length frontier (the first build) lets deeper branches out early', outOfOrder(arrivalOf(true)), 'the frontier the owner saw must fail the clause');
+  // And the engine USES that law: halfway through the first window only the trunk order is out — no tip at the crown yet.
+  const half = new Float64Array(N2 * 3); FGr.resolveFigure(FGr.createFigureCache(), poseR('forkTree', 0.5 / (br.maxDepth + 1)), half, N2);
+  const full = new Float64Array(N2 * 3); FGr.resolveFigure(FGr.createFigureCache(), poseR('forkTree', null), full, N2);
+  const ext = (o) => { let lo = Infinity, hi = -Infinity; for (let i = 0; i < N2; i++) { lo = Math.min(lo, o[i * 3]); hi = Math.max(hi, o[i * 3]); } return hi - lo; };
+  chk('§R ...and the engine draws it: early in growth the plant is a narrow trunk, not the crown spreading', ext(half) < 0.25 * ext(full),
+    `width ${ext(half).toFixed(3)} vs grown ${ext(full).toFixed(3)}`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== S. v8 Phase 44 Part A — Sprig and Thicket Weed seed the generator editor; an edited plant keeps its branch tree ===\n');
+{
+  /*
+   * `44.A1`: the two single-production book plants seed `Customize` through the SAME turtle derivation as Plant, with
+   * NO flags (their named rows unchanged). `44.A2`: an edited generator with retraces carries a branch TREE, built
+   * STRUCTURALLY from the composition — the turtle's own tree on an unedited seed — so it grows by generation and
+   * tapers; one with no retrace takes exactly the old path. ⚠️ The structural build REPLACED a reconstruction from point
+   * positions that could not be exact (two branches can share a position, parent and depth — Sprig's straight [F]).
+   */
+  const CS = await import('../src/generators/lsystem/custom.ts');
+  const FS = await import('../src/generators/lsystem/figure.ts');
+  const GS = await import('../src/generators/lsystem/generator.ts');
+  chk('§S1 Sprig and Thicket Weed seed Customize, and their NAMED rules gain no Twist/Stretch flags (Customize-only structures)',
+    CS.customSeedable('sprig') && CS.customSeedable('thicketWeed') && GS.LSYSTEM_GENERATORS.sprig === null && GS.LSYSTEM_GENERATORS.thicketWeed === null, '');
+
+  // S2 — the tree, against the TURTLE's own, on every branching seed at depths 2–4.
+  const treeDiff = (key, d) => {
+    const r = LSYSTEM_RULE_BY_KEY[key], y = r.publishedAngle;
+    const s = CS.seedCustom(key, d, y, y, y);
+    const b = CS.buildCustom(s, d, y, y, 0, 1, null, null, true);
+    const t = turtleWalk(r, d, y, y, y);
+    const cb = b.branch, tb = t.branch;
+    if (!cb || !tb || b.count !== t.count) return { bad: Infinity, nodes: `${cb?.nodeCount}/${tb?.nodeCount}` };
+    let bad = cb.nodeCount === tb.nodeCount && cb.maxDepth === tb.maxDepth ? 0 : 1;
+    const tEnd = Math.max(...tb.tau), cEnd = Math.max(...cb.tau), k = cEnd / tEnd;
+    for (let i = 0; i < t.count; i++) {
+      if (cb.depth[cb.pointNode[i]] !== tb.depth[tb.pointNode[i]]) bad++;
+      if (Math.abs(cb.tau[cb.pointNode[i]] - k * tb.tau[tb.pointNode[i]]) > 1e-9 * cEnd) bad++;
+    }
+    for (let q = 1; q < cb.nodeCount; q++) if (!(cb.parent[q] >= 0 && cb.parent[q] < q)) bad++;
+    return { bad, nodes: `${cb.nodeCount}/${tb.nodeCount}` };
+  };
+  const rows = [];
+  let worst = 0;
+  for (const key of ['plant', 'sprig', 'thicketWeed']) for (const d of [2, 3, 4]) { const r = treeDiff(key, d); worst = Math.max(worst, r.bad); rows.push(`${key}@${d} ${r.nodes}`); }
+  chk('§S2 an unedited seed\'s tree IS the turtle\'s: same node count and max depth, every point\'s depth equal, tau proportional, parent before child',
+    worst === 0, `${rows.join(', ')}; worst ${worst}`);
+
+  // S3 — an EDITED Sprig (one turn changed) grows by generation and tapers.
+  const y = LSYSTEM_RULE_BY_KEY.sprig.publishedAngle;
+  const base = CS.seedCustom('sprig', 4, y, y, y);
+  const edited = { ...base, steps: base.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, turn: s.turn + 1 } : s)) };
+  const res = CS.resolveCustomRule({ rule: CS.CUSTOM_RULE_KEY, custom: edited });
+  // A retrace-free generator that is genuinely CUSTOM (Koch with one turn edited) — asserted, or S4 would be vacuous.
+  const kochSeed = CS.seedCustom('koch', 3, 60, 60, 60);
+  const plain = { ...kochSeed, steps: kochSeed.steps.map((s, i) => (i === 1 && s.kind === 'move' ? { ...s, turn: s.turn + 0.25 } : s)) };
+  const resPlain = CS.resolveCustomRule({ rule: CS.CUSTOM_RULE_KEY, custom: plain });
+  const N = 6000;
+  const cpose = (r, g, extra = {}) => ({ rule: LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE], recursion: 4, yaw: y, pitch: y, roll: 0,
+    multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 1, anglesAnimated: false, twistAnimated: false,
+    stretchAnimated: false, generator: null, custom: { gen: r.gen, tile: r.tile, maxDepth: r.maxDepth }, growth: g, ...extra });
+  const run = (p) => { const c = FS.createFigureCache(); const o = new Float64Array(N * 3); FS.resolveFigure(c, p, o, N); return { o, c }; };
+  const width = (o) => { let lo = Infinity, hi = -Infinity; for (let i = 0; i < N; i++) { lo = Math.min(lo, o[i * 3]); hi = Math.max(hi, o[i * 3]); } return hi - lo; };
+  const D = CS.buildCustom(edited, 4, y, y, 0, 1, null, null, true).branch.maxDepth;
+  const early = run(cpose(res, 0.5 / (D + 1))).o, full = run(cpose(res, null)).o;
+  chk('§S3 an EDITED Sprig is custom, branches, and GROWS BY GENERATION: early in growth it is a narrow trunk',
+    res.kind === 'custom' && CS.customHasBranches(edited) && width(early) < 0.25 * width(full), `width ${width(early).toFixed(3)} vs grown ${width(full).toFixed(3)}`);
+  // Calibration: the OLD mechanism — unfolding the recursion from level 1 — puts a whole small plant up at once.
+  const oldWay = run(cpose(res, null, { recursion: 1 + (0.5 / (D + 1)) * 3 })).o;
+  seed('§S3 the pre-44 unfold (recursion from level 1) is NOT a narrow trunk', width(oldWay) >= 0.25 * width(full) ? 1 : 0,
+    `old width ${width(oldWay).toFixed(3)}`);
+  const dp = run(cpose(res, null, { wantDepth: true })).c;
+  let dmin = 1, dmx = 0; for (let i = 0; i < N; i++) { dmin = Math.min(dmin, dp.depthOut[i]); dmx = Math.max(dmx, dp.depthOut[i]); }
+  chk('§S3 ...and publishes depths from trunk (0) to tips (1) for the taper', dp.depthValid && dmin === 0 && dmx === 1, `[${dmin}, ${dmx}]`);
+
+  // S4 — a generator with NO retrace: no tree, no depths, and exactly the old path.
+  const pd = run(cpose(resPlain, null, { wantDepth: true }));
+  const unf = run(cpose(resPlain, 0.4)).o, viaOld = run(cpose(resPlain, null, { recursion: 1 + 0.4 * (Math.min(resPlain.maxDepth, 4) - 1) })).o;
+  let same = 0; for (let i = 0; i < N * 3; i++) if (!Object.is(unf[i], viaOld[i])) same++;
+  chk('§S4 a retrace-free generator has no tree, publishes no depths, and still UNFOLDS exactly as before (bit-identical)',
+    resPlain.kind === 'custom' && !CS.customHasBranches(plain) && pd.c.depthValid === false && same === 0, `${resPlain.kind}; ${same} slots differ`);
+
+  // The engine's taper gate opens for a branching custom curve and stays shut for a plain one (`lissajous.ts`).
+  const { LissajousGenerator: LG } = await import('../src/generators/lissajous.ts');
+  const taperOn = (custom) => {
+    const g = new LG();
+    g.init({ type: 'lsystem', particleCount: 3000, waves: [], waveSpeed: 0.05, rotation: [0, 0, 0], angle: [0, 0, 0],
+      designResolution: { width: 100, height: 100 }, colorBase: [128, 128, 128], colorAmp: [128, 128, 128], colorFreq: [0.1, 0.1, 0.1], colorShift: [0, 0, 0],
+      lsystem: { rule: 'customize', custom, recursion: { base: 4, amplitude: 0, frequency: 0 }, yaw: { base: y, amplitude: 0, frequency: 0 },
+        pitch: { base: y, amplitude: 0, frequency: 0 }, roll: { base: y, amplitude: 0, frequency: 0 }, smoothness: 0, centre: [0, 0, 0],
+        descend: { base: 1, amplitude: 0, frequency: 0 }, taper: 0.6 } }, { width: 800, height: 600 });
+    g.update(16.667);
+    let lo = 1; for (let i = 0; i < 3000; i++) lo = Math.min(lo, g.taperFactor[i]);
+    return { live: g.taperLive, lo };
+  };
+  const tE = taperOn(edited), tP = taperOn(plain);
+  chk('§S4 ...the ENGINE tapers an edited branching generator and not a plain one', tE.live === true && tE.lo < 1 && tP.live === false,
+    `edited live ${tE.live} (min factor ${tE.lo.toFixed(3)}), plain live ${tP.live}`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== T. v8 Phase 44 Part B — the production editor: a plant\'s own rules, edited ===\n');
+{
+  /*
+   * A plant's `Customize` block stores its axiom and productions (`productions.ts`); the resolver routes an unedited
+   * block back to the plant (the no-op) and an edited one to a SYNTHESIZED rule, drawn through the turtle path. Its two
+   * silent traps are held here: the KEY-TABLE reads (a synthesized rule carries its family's key) and the figure
+   * cache's identity. Each clause is calibrated on the defect it guards.
+   */
+  const PT = await import('../src/generators/lsystem/productions.ts');
+  const CT = await import('../src/generators/lsystem/custom.ts');
+  const FT = await import('../src/generators/lsystem/figure.ts');
+  const GT = await import('../src/generators/lsystem/generator.ts');
+  const TT = await import('../src/generators/lsystem/turtle.ts');
+  const N = 4000;
+  const tpose = (rule, extra = {}) => ({ rule, recursion: rule.defaultRecursion ?? Math.min(4, rule.recursionRange[1]), yaw: rule.publishedAngle,
+    pitch: rule.publishedAngle, roll: rule.publishedAngle, multiAxis: false, smoothness: 0, descend: 1, centre: [0, 0, 0], twist: 0, stretch: 1,
+    anglesAnimated: false, twistAnimated: false, stretchAnimated: false, generator: null, custom: null, growth: null, seed: 1, ...extra });
+  const tdraw = (cache, rule, extra) => { const o = new Float64Array(N * 3); FT.resolveFigure(cache, tpose(rule, extra), o, N); return o; };
+  const ndiff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) n++; return n; };
+  const resolveBlock = (b) => CT.resolveCustomRule({ rule: CT.CUSTOM_RULE_KEY, custom: b });
+
+  // T1 — the no-op, on every plant: the seeded block routes to the plant itself and draws bit-identically.
+  const fams = PT.productionFamilies();
+  const t1 = fams.filter((r) => { const res = resolveBlock(PT.seedProductions(r.key)); return !(res.kind === 'named' && res.rule === r && res.customizedFrom); });
+  chk('§T1 every plant (10) seeds a productions block that routes back to the PLANT itself — choosing Customize is a no-op',
+    fams.length === 10 && t1.length === 0, `${fams.length} plants; not routed: [${t1.map((r) => r.key)}]`);
+  seed('§T1 a block one weight off routes to NO plant (equality is exact)', (() => {
+    const b = PT.seedProductions('wildPlant'); const k = Object.keys(b.productions)[0];
+    b.productions[k] = b.productions[k].map((a, i) => (i === 0 ? { p: a.p + 1e-12, to: a.to } : a));
+    return PT.productionsMatchRule(b) === null ? 1 : 0; })());
+
+  // T2 — an edit draws a DIFFERENT figure, and a shared cache rebuilds on the edit (identity, not key).
+  const fork = PT.seedProductions('forkTree');
+  const ed1 = { ...fork, productions: { ...fork.productions, X: 'F[+X]F[-X][+X]X' } };
+  const ed2 = { ...fork, productions: { ...fork.productions, X: 'F[-X]F[+X]+X' } };
+  const r1 = resolveBlock(ed1).rule, r2 = resolveBlock(ed2).rule;
+  const shared = FT.createFigureCache();
+  const named = tdraw(shared, LSYSTEM_RULE_BY_KEY.forkTree);
+  const e1 = tdraw(shared, r1), e2 = tdraw(shared, r2), e2fresh = tdraw(FT.createFigureCache(), r2);
+  chk('§T2 an edited block is a SYNTHESIZED rule that draws a different figure, and a SHARED cache rebuilds on each edit',
+    r1.synthesized === true && r1.key === 'forkTree' && ndiff(named, e1) > N && ndiff(e1, e2) > N && ndiff(e2, e2fresh) === 0,
+    `named→edit ${ndiff(named, e1)} slots, edit→edit ${ndiff(e1, e2)}, shared vs fresh ${ndiff(e2, e2fresh)}`);
+  // Calibration: a KEY-compared cache — the defect — hands the edit the named plant's lists.
+  const keyCache = FT.createFigureCache();
+  const namedK = tdraw(keyCache, LSYSTEM_RULE_BY_KEY.forkTree);
+  keyCache.ruleRef = r1;   // what a key compare amounts to: the cache believes it already holds this rule
+  const stale = tdraw(keyCache, r1);
+  seed('§T2 a key-compared cache would draw the OLD plant for the edit', ndiff(stale, namedK) === 0 ? 1 : 0, `stale vs named ${ndiff(stale, namedK)}`);
+
+  // T3 — key-table neutrality: the helpers give a synthesized rule the identity, and no reader bypasses them.
+  const plantSynth = resolveBlock({ ...PT.seedProductions('plant'), productions: { F: 'F[+F]F[-F][F]F' } }).rule;
+  chk('§T3 a synthesized rule gets the IDENTITY from every key table (no generator, no brackets) — even for Plant, whose named rule has them',
+    GT.generatorFlagsFor(plantSynth) === null && GT.generatorFlagsFor(LSYSTEM_RULE_BY_KEY.plant) !== null
+    && L.angleBracketFor(plantSynth).yaw === 0 && GT.twistBracketFor(plantSynth) === 0 && GT.stretchBracketFor(plantSynth) === 0, '');
+  const TABLES = /\b(LSYSTEM_GENERATORS|LSYSTEM_ANGLE_BRACKET|LSYSTEM_TWIST_BRACKET|LSYSTEM_STRETCH_BRACKET)\[/g;
+  const ALLOWED = { 'generators/lsystem/generator.ts': 3, 'generators/lsystem/rules.ts': 1, 'generators/lsystem/custom.ts': 1 };
+  const scan = (files) => {
+    const bad = [];
+    for (const f of files) {
+      const src = readFileSync(join(ROOT, 'src', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      const n = (src.match(TABLES) ?? []).length;
+      if (n > (ALLOWED[f] ?? 0)) bad.push(`${f} ${n}`);
+    }
+    return bad;
+  };
+  const SCAN = ['generators/lissajous.ts', 'generators/lsystem/figure.ts', 'generators/lsystem/curve.ts', 'ui/synthesis-lab/score-canvas.ts',
+    'ui/synthesis-lab/tabs/composer.ts', 'ui/preview-grid/grid-tile-renderer.ts', 'generators/lsystem/generator.ts', 'generators/lsystem/rules.ts',
+    'generators/lsystem/custom.ts', 'main.ts'];
+  const badScan = scan(SCAN);
+  chk('§T3 ...and no reader indexes a key table directly outside the helpers (a source scan)', badScan.length === 0, badScan.join('; ') || `${SCAN.length} files`);
+  seed('§T3 a direct `LSYSTEM_GENERATORS[rule.key]` read is caught by the scan', (() => {
+    const src = 'const g = LSYSTEM_GENERATORS[rule.key];';
+    return (src.match(TABLES) ?? []).length > 0 ? 1 : 0; })());
+  // ...and the angle rows: the effect memo is per OBJECT for a synthesized rule; and a growth-symbol plant's angles count.
+  const pitchy = resolveBlock({ ...fork, productions: { ...fork.productions, X: 'F[&X]F[-X]+X' } }).rule;
+  const eff = (r) => TT.ruleAngleEffect(r, L.ruleAngleUsage(r));
+  chk('§T3 an edit that adds a pitch symbol gains a PITCH row (the effect memo is not the named Fork Tree\'s)',
+    // ⚠️ The NAMED rule first — the user's order (view Fork Tree, then edit). Asked the other way round a key memo is still
+    // empty when the edit is looked up, and the clause passed over the defect (seeded 2026-11-17, MISSED until reordered).
+    eff(LSYSTEM_RULE_BY_KEY.forkTree).pitch === false && eff(pitchy).pitch === true, '');
+  const rowsNow = ['forkTree', 'firShoot', 'bush3dBook'].every((k) => eff(LSYSTEM_RULE_BY_KEY[k]).yaw) && eff(LSYSTEM_RULE_BY_KEY.floweringPlant).pitch
+    && eff(LSYSTEM_RULE_BY_KEY.bush3d).yaw === false;
+  chk('§T3 Fork Tree, Fir Shoot and Bush 3D have a Yaw row, Flowering Plant a Pitch row; Coral Bush\'s yaw stays inert (39.A6(c))', rowsNow, '');
+  const depth1 = (r, axis) => { const a = r.publishedAngle, [lo, hi] = r.angleRange, d = Math.max(1, r.recursionRange[0]);
+    const P = (v) => [0, 1, 2].map((k) => (k === axis ? v : a)); const A = TT.walkTurtle(r, d, ...P(lo)), B = TT.walkTurtle(r, d, ...P(hi));
+    if (A.count !== B.count) return true; for (let i = 0; i < A.count * 3; i++) if (Math.abs(A.xyz[i] - B.xyz[i]) > 1e-9) return true; return false; };
+  seed('§T3 the pre-44 depth-1 sweep hides Fork Tree\'s Yaw (the defect the three-depth sweep fixed)', depth1(LSYSTEM_RULE_BY_KEY.forkTree, 0) ? 0 : 1);
+
+  // T4 — Rmax is MEASURED: the largest depth under both budgets; the point count is an UPPER bound of the real walk.
+  const t4 = [];
+  for (const r of fams) {
+    const s = PT.synthesizeRule(PT.seedProductions(r.key));
+    const rMax = s.recursionRange[1];
+    const outline = s.polygons === 'outline';
+    const sd = L.isStochasticRule(s) ? 1 : 0;
+    for (let d = 1; d <= Math.min(rMax, 5); d++) {
+      const e = TT.expandRule(s, d, sd), w = TT.walkTurtle(s, d, s.publishedAngle, s.publishedAngle, s.publishedAngle, sd);
+      if (w.count > PT.countPoints(e.text, s.drawSymbols, outline)) t4.push(`${r.key}@${d}: walk ${w.count} > bound`);
+    }
+    if (rMax < PT.PRODUCTION_LIMITS.maxDepth) {
+      const e = TT.expandRule(s, rMax + 1, sd);
+      if (!(e.truncated || e.text.length > TT.EXPAND_SYMBOL_BUDGET || PT.countPoints(e.text, s.drawSymbols, outline) > PT.PRODUCTION_POINT_BUDGET)) t4.push(`${r.key}: Rmax+1 fits`);
+    }
+  }
+  chk('§T4 Rmax is the deepest level within both budgets, and the count bounds the real walk from above (every plant)', t4.length === 0, t4.join('; ') || `${fams.length} plants`);
+  const fast = PT.synthesizeRule({ ...fork, axiom: 'F', productions: { F: 'FFFFFFFF' } });
+  chk('§T4 ...a fast-growing production is LIMITED (F → 8 F: 8^d points, so depth 5 = 32 769 fits and 6 does not)', fast !== null && fast.recursionRange[1] === 5, `Rmax ${fast?.recursionRange[1]}`);
+  chk('§T4 ...and the restated constants equal their owners (budget, angle range)',
+    PT.PRODUCTION_POINT_BUDGET === CT.CUSTOM_SEGMENT_BUDGET && PT.PRODUCTION_ANGLE_RANGE[0] === CT.CUSTOM_RANGES.yaw[0]
+    && PT.PRODUCTION_ANGLE_RANGE[1] === CT.CUSTOM_RANGES.yaw[1], '');
+
+  // T5 — the validator and the editing operations refuse each hard-rule violation.
+  const V = (b) => PT.validateProductions(b).error;
+  const bad = {
+    empty: { ...fork, axiom: '' },
+    symbol: { ...fork, productions: { ...fork.productions, X: 'F?X' } },
+    open: { ...fork, productions: { ...fork.productions, X: 'F[+X' } },
+    nested: { ...PT.seedProductions('floweringPlant'), axiom: 'F{f{f}f}' },
+    nodraw: { ...fork, axiom: 'X', productions: { X: '[+X]-X' } },
+    many: { ...fork, productions: Object.fromEntries('ABCDEHIJK'.split('').map((c) => [c, 'F'])) },
+    weights: { ...PT.seedProductions('wildPlant'), productions: { F: [{ p: 0.5, to: 'F' }, { p: 0.4, to: 'FF' }] } },
+  };
+  const notRefused = Object.entries(bad).filter(([, b]) => V(b) === null).map(([k]) => k);
+  chk('§T5 the validator REFUSES an empty axiom, an unknown symbol, an open branch, a nested leaf, a plant that draws nothing, '
+    + 'too many productions, and weights not summing to 100 %', notRefused.length === 0, `not refused: [${notRefused}]`);
+  chk('§T5 ...and accepts every library plant\'s own block', fams.every((r) => V(PT.seedProductions(r.key)) === null), '');
+  const ins = (t, c, s2, o = true) => PT.insertSymbol(t, c, s2, o, 40);
+  const ops = {
+    pair: ins('FF', 1, '['), stepOver: ins('F[]F', 2, ']'), loneClose: ins('FF', 1, ']'), legacyLeaf: ins('FF', 1, '{', false),
+    leafInLeaf: ins('F{f}', 3, '{'), mark: ins('FF', 1, "'"), unwrap: PT.deleteBefore('F[+F]', 2), unwrapClose: PT.deleteBefore('F[+F]', 5),
+  };
+  const opOk = ops.pair.text === 'F[]F' && ops.pair.caret === 2 && ops.stepOver.text === 'F[]F' && ops.stepOver.caret === 3
+    && 'refused' in ops.loneClose && 'refused' in ops.legacyLeaf && 'refused' in ops.leafInLeaf && 'refused' in ops.mark
+    && ops.unwrap.text === 'F+F' && ops.unwrapClose.text === 'F+F';
+  chk('§T5 the edits keep pairs whole: "[" inserts a pair, a typed closer steps over, a lone closer / a legacy or nested leaf / a mark '
+    + 'are refused, and deleting either bracket UNWRAPS it', opOk, JSON.stringify(ops).slice(0, 240));
+
+  // T6 — random: one seed, one plant; weights normalise to exactly 1.
+  const wild = resolveBlock({ ...PT.seedProductions('wildPlant'), productions: { F: [{ p: 0.6, to: 'F[+F]F[-F]F' }, { p: 0.4, to: 'F[+F]F' }] } }).rule;
+  const ex = (s2) => TT.expandRule(wild, 4, s2).text;
+  const w = PT.normaliseWeights([0.3, 0.3, 0.3]);
+  chk('§T6 a random edited plant: the same seed grows the same plant, another seed another; weights normalise to EXACTLY 1',
+    wild.synthesized === true && ex(7) === ex(7) && ex(7) !== ex(31_337) && w.reduce((a, b) => a + b, 0) === 1, `[${w}]`);
+
+  // T7 — export → import round-trips leaf-identical; an unknown kind or an invalid block is the default rule.
+  const back = JSON.parse(JSON.stringify(ed1));
+  const rb = resolveBlock(back);
+  const dflt = LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE];
+  chk('§T7 a block survives JSON exactly and resolves to the same rule content; an unknown kind or an invalid block is the DEFAULT rule',
+    JSON.stringify(back) === JSON.stringify(ed1) && rb.rule.synthesized === true && JSON.stringify(rb.rule.productions) === JSON.stringify(r1.productions)
+    && resolveBlock({ ...fork, kind: 'weird' }).rule === dflt && resolveBlock(bad.open).rule === dflt, '');
+
+  // T8 — the Mixer snaps the block whole (no aliasing), Evolution takes it whole, the Randomiser never emits one.
+  const { interpolatePreset } = await import('../src/exploration/interpolate.ts');
+  const { crossoverPresets } = await import('../src/exploration/evolution-ops.ts');
+  const { randomizePreset } = await import('../src/exploration/randomize.ts');
+  const { computePresetStatistics } = await import('../src/exploration/preset-stats.ts');
+  const { VARIANT_PRESETS: VP } = await import('../src/presets/variant-presets.ts');
+  const baseP = VP.find((v) => v.name === 'Plant Fork Tree').preset;
+  const A = structuredClone(baseP); A.generators.lsystem = { ...A.generators.lsystem, rule: 'customize', custom: structuredClone(ed1) };
+  const B = structuredClone(baseP);
+  const at = (t) => interpolatePreset(A, B, t, new Set()).generators.lsystem;
+  const lo = at(0.49), hi = at(0.51);
+  chk('§T8 the Mixer SNAPS the block with the rule: deck A\'s block whole below 0.5 (a copy, not an alias), none above',
+    lo.rule === 'customize' && JSON.stringify(lo.custom) === JSON.stringify(ed1) && lo.custom !== A.generators.lsystem.custom
+    && hi.rule !== 'customize' && hi.custom === undefined, `${lo.rule}/${hi.rule}`);
+  const xs = [0.1, 0.3, 0.5, 0.7, 0.9].map((t) => crossoverPresets(A, B, t).generators.lsystem);
+  chk('§T8 ...Evolution\'s crossover carries a block WHOLE or not at all', xs.every((l) => l.rule !== 'customize' ? l.custom === undefined
+    : JSON.stringify(l.custom) === JSON.stringify(ed1)), '');
+  const STATS_T = computePresetStatistics(VP.map((v) => v.preset));
+  let emitted = 0, changed = 0;
+  for (let i = 0; i < 40; i++) {
+    const rn = randomizePreset(structuredClone(B), 'medium', new Set(), STATS_T).generators.lsystem;
+    if (rn?.custom !== undefined || rn?.rule === 'customize') emitted++;
+    const ra = randomizePreset(structuredClone(A), 'medium', new Set(), STATS_T).generators.lsystem;
+    if (ra?.custom !== undefined && JSON.stringify(ra.custom) !== JSON.stringify(ed1)) changed++;
+  }
+  chk('§T8 ...and the Randomiser never EMITS a block, nor rewrites one it was handed (40 presses each)', emitted === 0 && changed === 0, `emitted ${emitted}, rewritten ${changed}`);
+
+  // T9 — one tooltip per production symbol, in BOTH directions.
+  const { PRODUCTION_SYMBOL_TIPS } = await import('../src/ui/synthesis-lab/tooltips.ts');
+  const syms = new Set([...Object.values(PT.PRODUCTION_SYMBOLS).join('')]);
+  const tipKeys = new Set(Object.keys(PRODUCTION_SYMBOL_TIPS));
+  const missingTip = [...syms].filter((c) => !tipKeys.has(c)), extraTip = [...tipKeys].filter((k) => k !== 'letter' && !syms.has(k));
+  chk('§T9 every production symbol has its tooltip and every tooltip names a symbol (plus the one for letters)',
+    missingTip.length === 0 && extraTip.length === 0 && tipKeys.has('letter'), `missing [${missingTip}], extra [${extraTip}]`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== T10. v8 Phase 44 — the Composer\'s Score draws the EDITED plant (the three demos) ===\n');
+{
+  /*
+   * The Score resolves the block through the same resolver, so an edited plant must plot its OWN curve — not the named
+   * plant it was seeded from. Calibrated by the defect: a Score that ignored the block would plot the family exactly.
+   */
+  const SC10 = await import('../src/ui/synthesis-lab/score-canvas.ts');
+  const { VARIANT_PRESETS: V10 } = await import('../src/presets/variant-presets.ts');
+  const demos = V10.filter((v) => v.preset.generators.lsystem?.custom?.kind === 'productions');
+  const same = (a, b) => a.path.length === b.path.length && a.path.every((v, i) => v === b.path[i]);
+  const rows = [], bad = [];
+  for (const d of demos) {
+    const ls = d.preset.generators.lsystem;
+    const fam = { ...ls, rule: ls.custom.family }; delete fam.custom;
+    for (const plane of ['xy', 'xz', 'yz']) {
+      const a = SC10.computeCurveScore(ls, plane), b = SC10.computeCurveScore(fam, plane);
+      if (!(a.path.length >= 4 && a.extent > 0)) bad.push(`${d.name}/${plane} empty`);
+      else if (plane === 'xy' && same(a, b)) bad.push(`${d.name}/xy = the named plant`);
+    }
+    rows.push(d.name);
+  }
+  chk('§T10 every production demo plots its OWN curve on the Score (non-empty on all planes, not the named plant\'s)',
+    demos.length === 3 && bad.length === 0, `${rows.join(', ')}${bad.length ? ' | ' + bad.join('; ') : ''}`);
+  const d0 = demos[0].preset.generators.lsystem;
+  const ignored = { ...d0, rule: d0.custom.family }; delete ignored.custom;
+  seed('§T10 a Score that ignored the block would plot the named plant exactly', same(SC10.computeCurveScore(ignored, 'xy'),
+    SC10.computeCurveScore({ ...d0, rule: d0.custom.family, custom: undefined }, 'xy')) ? 1 : 0);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

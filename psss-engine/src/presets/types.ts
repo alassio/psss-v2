@@ -1413,6 +1413,11 @@ export interface OverlayState {
   /** Each copy turned to face OUTWARD from the centre, or kept PARALLEL to the original. */
   sym3dFacing?:          'outward' | 'parallel';
   /**
+   * Where each copy is anchored: the figure's centre (absent = `'centre'`) or the curve's START, so a plant's copies grow
+   * outward from one point. Read only on a self-similar curve; exported only when it is `'start'`.
+   */
+  sym3dAnchor?:          'centre' | 'start';
+  /**
    * v8 `30.1` (`E129a`) — **Barr twist, per axis, in TURNS PER HALF-EXTENT of the design box.**
    *
    * `twistZ: 1.0` means a point at the far edge of the design box in z is rotated one full turn about the

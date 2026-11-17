@@ -1966,3 +1966,43 @@
   text-align: left;
   cursor: pointer;
 }
+
+/*
+ * v8 Phase 44 (`44.B5`) — the PRODUCTION editor: a plant's rules as chips. A strip is a focusable row of chips with a
+ * caret; the palette inserts at the focused strip's caret. Chips are coloured by symbol group so a production reads at
+ * a glance: draw (green), move (teal), turns (blue), branches (amber), leaves (pink), letters (violet), marks (dim).
+ */
+.sl-prod-row { display: flex; align-items: flex-start; gap: 6px; margin: 3px 0; }
+.sl-prod-row--alt { margin-left: 2.6em; }
+.sl-prod-sym {
+  min-width: 1.4em; padding: 1px 4px; text-align: center; font: 600 13px/1.5 ui-monospace, monospace;
+  color: #d9c2ff; background: #241a38; border-radius: 3px;
+}
+.sl-prod-arrow { color: #8aa2bd; line-height: 1.6; }
+.sl-prod-strip {
+  flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: 22px; padding: 2px 4px;
+  background: #0e1620; border: 1px solid #2a3b50; border-radius: 3px; cursor: text; outline: none;
+}
+.sl-prod-strip:focus { border-color: #5aa0e6; box-shadow: 0 0 0 1px #5aa0e6 inset; }
+.sl-prod-strip--reject { border-color: #d0704a; }
+.sl-prod-chip {
+  min-width: 1.3em; padding: 0 3px; border: 0; border-radius: 3px; cursor: pointer;
+  font: 600 13px/1.5 ui-monospace, monospace; color: #0b1118; background: #8fb4d8;
+}
+.sl-prod-chip--draw { background: #7ccf8a; }
+.sl-prod-chip--move { background: #6fc7c0; }
+.sl-prod-chip--turn { background: #8fb4d8; }
+.sl-prod-chip--branch { background: #e6b85a; }
+.sl-prod-chip--leaf { background: #e89ac2; }
+.sl-prod-chip--letter { background: #b79ce8; }
+.sl-prod-chip--mark { background: #3a4656; color: #8aa2bd; }
+.sl-prod-caret { width: 2px; align-self: stretch; background: #e6f0fa; animation: sl-prod-blink 1s steps(1) infinite; }
+@keyframes sl-prod-blink { 50% { opacity: 0; } }
+.sl-prod-weight { width: 4.2em; }
+.sl-prod-share { color: #8aa2bd; font-size: 11px; min-width: 3em; line-height: 1.8; }
+.sl-prod-palette { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0 4px; align-items: center; }
+.sl-prod-palette .sl-prod-chip:disabled { opacity: 0.35; cursor: default; }
+.sl-prod-group { color: #8aa2bd; font-size: 11px; margin: 0 2px 0 8px; }
+.sl-prod-group:first-child { margin-left: 0; }
+.sl-prod-status { margin: 2px 0 6px; font-size: 12px; color: #8aa2bd; }
+.sl-prod-status--error { color: #e0906a; }

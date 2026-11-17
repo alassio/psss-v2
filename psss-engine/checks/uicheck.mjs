@@ -1378,6 +1378,176 @@ console.log('\n=== AB. v8 2026-11-13 — the Mixer deck PICKER: the grid\'s orde
   await ctxAB.close();
 }
 
+console.log('\n=== AC. v8 Phase 41 — the Growth rows per rule class, and growth that animates and restarts ===\n');
+/*
+ * ⚠️ **Rows are ABSENT where they cannot change the picture (`36`'s rule)** — so the clause asserts absence as well as
+ * presence, per rule CLASS: a plant (Growth + Taper), the stochastic plant (+ Seed), the tetra (no angle rows, Customize
+ * disabled with its reason), an unbranched curve (Growth, no Taper). ⚠️ **And growth must be SEEN to move**: the lit
+ * extent of the canvas must grow on a `loopNew` plant, and a re-application must start it again as the seed (`41.S5`'s
+ * clock rule). ⚠️ The growth clock advances by FRAME time (capped at 100 ms a frame), so under a software GPU it runs
+ * slower than the wall clock: the clause POLLS until growth shows instead of assuming a frame rate.
+ */
+{
+  const ctxAC = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  const pAC = await ctxAC.newPage();
+  const acErrs = [];
+  pAC.on('pageerror', (e) => acErrs.push(String(e)));
+  const base = process.env.DEMO_URL ?? 'http://localhost:5190/';
+  const rowsFor = async (name) => {
+    await pAC.goto(`${base}?testhook=1&preset=${encodeURIComponent(name)}`, { waitUntil: 'load' });
+    await pAC.locator('button.pg-mode-btn', { hasText: 'Lab' }).first().click({ timeout: 120000 });
+    await pAC.locator('.sl-tab-btn[data-tab="composer"]').click({ timeout: 120000 });
+    await pAC.waitForTimeout(1200);
+    return pAC.evaluate(() => {
+      const c = document.querySelector('.tab-content[data-tab="composer"]');
+      const labels = new Set([...c.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')));
+      const rule = c.querySelector('select[aria-label="Rule"]');
+      const cust = rule ? [...rule.options].find((o) => o.value === 'customize') : null;
+      return { labels: [...labels], customDisabled: cust?.disabled === true, customTitle: cust?.title ?? '' };
+    });
+  };
+  const has = (r, l) => r.labels.includes(l);
+  const wild = await rowsFor('Plant Wild');
+  chk('a plant shows Growth, its two times and Taper; the stochastic one also Seed',
+    has(wild, 'Growth') && has(wild, 'Growth time') && has(wild, 'Pause') && has(wild, 'Taper') && has(wild, 'Seed'),
+    `[${wild.labels.filter((l) => ['Growth', 'Growth time', 'Pause', 'Taper', 'Seed'].includes(l))}]`);
+  const tetra = await rowsFor('Curve Tetra Pyramids');
+  const tetraOk = (r) => !has(r, 'Yaw') && !has(r, 'Pitch') && !has(r, 'Roll') && !has(r, 'Twist') && !has(r, 'Taper')
+    && has(r, 'Growth') && r.customDisabled && /tetrahedron curves cannot be customized/.test(r.customTitle);
+  chk('the tetra has NO angle rows and no Taper, and Customize is disabled with its own reason', tetraOk(tetra),
+    `[${tetra.labels.filter((l) => ['Yaw', 'Pitch', 'Roll', 'Twist', 'Taper', 'Growth'].includes(l))}] ${tetra.customTitle.slice(0, 40)}`);
+  chk('...and the clause FAILS on a planted Taper row (calibration)', !tetraOk({ ...tetra, labels: [...tetra.labels, 'Taper'] }), '');
+  const dragon = await rowsFor('Curve Dragon Unfold');
+  chk('an unbranched curve shows Growth but no Taper and no Seed', has(dragon, 'Growth') && !has(dragon, 'Taper') && !has(dragon, 'Seed'), '');
+
+  // ⚠️ The test hook does not publish positions, so the extent is read off the CANVAS (the harness keeps its drawing
+  // buffer): the diagonal of the lit pixels' bounding box, downsampled.
+  const extent = () => pAC.evaluate(() => {
+    const c = document.querySelector('canvas'); const w = 320, h = 200;
+    const o = document.createElement('canvas'); o.width = w; o.height = h;
+    const g = o.getContext('2d'); g.drawImage(c, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    let lx = w, hx = -1, ly = h, hy = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; if (d[k] + d[k + 1] + d[k + 2] > 60) { if (x < lx) lx = x; if (x > hx) hx = x; if (y < ly) ly = y; if (y > hy) hy = y; } }
+    return hx < 0 ? 0 : Math.hypot(hx - lx, hy - ly);
+  });
+  // ⚠️ SPRIG, not Fork Tree (2026-11-17): the owner's finetuned Fork Tree glows over most of the frame from its first
+  // frame (lit extent 372 -> 365), so 'the extent grows' could not show there; Sprig starts as a dot (0 -> 62).
+  const load = async () => { await pAC.goto(`${base}?testhook=1&preset=${encodeURIComponent('Plant Sprig')}`, { waitUntil: 'load' }); await pAC.waitForTimeout(1200); };
+  await load();
+  const e1 = await extent();
+  let e2 = e1;
+  for (let i = 0; i < 40 && e2 < Math.max(40, e1 * 2); i++) { await pAC.waitForTimeout(1000); e2 = await extent(); }
+  chk('a growing plant\'s visible extent GROWS (polled until it shows, up to 40 s)', e2 > Math.max(40, e1 * 2), `extent ${e1.toFixed(1)} -> ${e2.toFixed(1)}`);
+  await load();
+  const e3 = await extent();
+  chk('...and re-applying the preset starts it again as the seed (the clock restarts)', e3 < e2 * 0.5, `extent ${e2.toFixed(1)} grown -> ${e3.toFixed(1)} after re-applying`);
+  chk('...and the restart clause FAILS on a clock that kept running (calibration: the grown extent again)', !(e2 < e2 * 0.5), '');
+  chk('...with no page error across the section', acErrs.length === 0, acErrs[0] ?? 'none');
+  await ctxAC.close();
+}
+
+console.log('\n=== AD. v8 Phase 44 — the production editor: chips, the keyboard, Export, and the Edit as switch ===\n');
+/*
+ * The editor through the USER's route: pick Customize on a plant, read its chips, edit by typing and by the palette, and
+ * read the result back through the app's own Export (the hook publishes no figure). ⚠️⚠️ **A strip is not an `<input>`**,
+ * so the document shortcuts (`l` lines, `r` ribbon mode, the arrows that change preset) would fire while typing there:
+ * the clause types them INTO a strip and asserts nothing changed — calibrated by the same arrow sent to the document,
+ * which must change the preset.
+ */
+{
+  const ctxAD = await browser.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+  const pAD = await ctxAD.newPage();
+  const adErrs = [];
+  pAD.on('pageerror', (e) => adErrs.push(String(e)));
+  const baseAD = process.env.DEMO_URL ?? 'http://localhost:5190/';
+  const tab = pAD.locator('.tab-content[data-tab="composer"]');
+  const open = async (name) => {
+    await pAD.goto(`${baseAD}?testhook=1&preset=${encodeURIComponent(name)}`, { waitUntil: 'load' });
+    await pAD.locator('button.pg-mode-btn', { hasText: 'Lab' }).first().click({ timeout: 120000 });
+    await pAD.locator('.sl-tab-btn[data-tab="composer"]').click({ timeout: 120000 });
+    await pAD.waitForTimeout(1200);
+  };
+  const exported = async () => {
+    const [dl] = await Promise.all([pAD.waitForEvent('download', { timeout: 30000 }),
+      pAD.locator('button', { hasText: /^Export$/ }).first().click()]);
+    const fs = await import('node:fs');
+    return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  };
+  const chips = (label) => tab.locator(`.sl-prod-strip[aria-label="${label}"] .sl-prod-chip`).allTextContents();
+  const hook = () => pAD.evaluate(() => ({ preset: window.__psss?.presetName, mode: window.__psss?.renderMode }));
+
+  await open('Plant Fork Tree');
+  const opt = await tab.locator('select[aria-label="Rule"] option[value="customize"]').evaluate((o) => ({ disabled: o.disabled, title: o.title }));
+  chk('on a growth-symbol plant (Fork Tree) Customize is ENABLED and names the productions', !opt.disabled && /PRODUCTIONS/.test(opt.title), opt.title.slice(0, 60));
+  await tab.locator('select[aria-label="Rule"]').selectOption('customize');
+  await pAD.waitForTimeout(800);
+  const ax = await chips('Axiom'), px = (await chips('X production')).join(''), pf = (await chips('F production')).join('');
+  chk('...it opens the PRODUCTION editor with the plant\'s own rules as chips (no Edit as: Fork Tree has one editor)',
+    ax.join('') === 'X' && px === 'F[+X]F[−X]+X' && pf === 'FF' && (await tab.locator('select[aria-label="Edit as"]').count()) === 0,
+    `axiom ${ax.join('')}, X ${px}, F ${pf}`);
+  const e0 = await exported();
+  const l0 = e0.generators.lsystem;
+  chk('...and the export is the productions block, equal to the plant (the no-op)', l0.rule === 'customize' && l0.custom?.kind === 'productions'
+    && l0.custom.axiom === 'X' && l0.custom.productions.X === 'F[+X]F[-X]+X' && l0.custom.productions.F === 'FF', JSON.stringify(l0.custom).slice(0, 90));
+
+  const before = await hook();
+  await tab.locator('.sl-prod-strip[aria-label="X production"]').click();
+  // ⚠️ ArrowRight ALONE: paired with ArrowLeft a leaked arrow walks the preset forward and straight back, and the clause
+  // passed over a removed stopPropagation (seeded 2026-11-17, MISSED until the pair was split).
+  for (const k of ['+', 'l', 'r', 'ArrowRight', 'End']) await pAD.keyboard.press(k);
+  await pAD.waitForTimeout(600);
+  const afterKeys = await hook();
+  const e1 = (await exported()).generators.lsystem.custom;
+  chk('typing "+" in the X row inserts it at the caret (the export reads F[+X]F[-X]+X+)', e1?.productions?.X === 'F[+X]F[-X]+X+', e1?.productions?.X);
+  chk('...and the keys typed in a strip trigger NO app shortcut (preset and render mode unchanged; "l", "r" refused)',
+    afterKeys.preset === before.preset && afterKeys.mode === before.mode, `${before.preset}/${before.mode} -> ${afterKeys.preset}/${afterKeys.mode}`);
+  await tab.locator('.sl-prod-strip[aria-label="X production"]').click();
+  await pAD.keyboard.press('End');
+  await pAD.keyboard.press('Backspace');
+  await pAD.waitForTimeout(500);
+  const prov = await tab.locator('.sl-row-note').filter({ hasText: /productions as/ }).count();
+  const e2 = (await exported()).generators.lsystem.custom;
+  chk('Backspace removes it again, and the figure is Fork Tree once more ("Same productions as")', e2?.productions?.X === 'F[+X]F[-X]+X' && prov > 0, e2?.productions?.X);
+  await tab.locator('.sl-prod-strip[aria-label="F production"]').click();
+  await pAD.keyboard.press('End');
+  await pAD.keyboard.press('[');
+  await pAD.waitForTimeout(500);
+  const pair = (await chips('F production')).join('');
+  await pAD.keyboard.press('Backspace');
+  await pAD.waitForTimeout(500);
+  const unwrapped = (await chips('F production')).join('');
+  chk('"[" inserts a PAIR, and deleting its opener unwraps the pair', pair === 'FF[]' && unwrapped === 'FF', `${pair} -> ${unwrapped}`);
+  // the palette acts on the focused strip
+  await tab.locator('.sl-prod-strip[aria-label="F production"]').click();
+  await tab.locator('.sl-prod-palette button[aria-label^="Insert F"]').first().click();
+  await pAD.waitForTimeout(500);
+  const e3 = (await exported()).generators.lsystem.custom;
+  chk('a palette chip inserts at the focused strip\'s caret (F production FFF)', e3?.productions?.F === 'FFF', e3?.productions?.F);
+  // calibration: the same arrow sent to the DOCUMENT does change the preset — so the no-shortcut clause could fail
+  await pAD.locator('canvas').first().click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await pAD.evaluate(() => document.body.focus());
+  await pAD.keyboard.press('ArrowRight');
+  await pAD.waitForTimeout(800);
+  const moved = (await hook()).preset;
+  chk('...calibration: ArrowRight sent to the document DOES change the preset', moved !== before.preset, `${before.preset} -> ${moved}`);
+
+  // Edit as — only on the three plants with both editors
+  await open('Plant Sprig');
+  await tab.locator('select[aria-label="Rule"]').selectOption('customize');
+  await pAD.waitForTimeout(800);
+  const ea = tab.locator('select[aria-label="Edit as"]');
+  const eaVal = (await ea.count()) > 0 ? await ea.inputValue() : null;
+  await ea.selectOption('generator').catch(() => {});
+  await pAD.waitForTimeout(800);
+  const gen = (await exported()).generators.lsystem.custom;
+  chk('on Sprig, Customize opens Productions with an "Edit as" switch, and Generator swaps in the generator editor',
+    eaVal === 'productions' && Array.isArray(gen?.steps) && gen.kind === undefined && (await tab.locator('.sl-section-title', { hasText: 'Generator' }).count()) > 0,
+    `edit as ${eaVal}; block ${gen?.kind ?? (Array.isArray(gen?.steps) ? 'generator' : '?')}`);
+  chk('...with no page error across the section', adErrs.length === 0, adErrs[0] ?? 'none');
+  await ctxAD.close();
+}
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

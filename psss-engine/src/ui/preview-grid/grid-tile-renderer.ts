@@ -1245,6 +1245,7 @@ export class GridTileRenderer {
       radius: preset.overlay?.sym3dRadius ?? SYM3D_DEFAULTS.radius,
       mirrors: preset.overlay?.sym3dMirrors ?? SYM3D_DEFAULTS.mirrors,
       facing: preset.overlay?.sym3dFacing ?? SYM3D_DEFAULTS.facing,
+      anchor: preset.overlay?.sym3dAnchor ?? SYM3D_DEFAULTS.anchor,
     });
 
     /*
@@ -1666,6 +1667,13 @@ export class GridTileRenderer {
      */
     const seedFrames = this.phaseCache.get(presetName) ?? MATH_WARM_FRAMES;
     generator.advancePhase(seedFrames - MATH_WARM_SETTLE_FRAMES);
+    /*
+     * v8 Phase 41 (`41.S5`) — **a growing curve's TILE starts FULLY GROWN** (the start of the hold), not as the seed: a
+     * tile may hold its first image for a long time under load (`tick(dt, Infinity)` is first-images-only), and a grid of
+     * single dots says nothing about the presets. The main view still starts every appearance as a seedling.
+     */
+    const ls = preset.generators.lsystem;
+    if (ls !== undefined && (ls.growth ?? 'off') !== 'off') generator.setGrowthClock(ls.growthTime ?? 12);
 
     const slot: SlotState = {
       index,

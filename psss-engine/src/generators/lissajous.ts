@@ -1,13 +1,14 @@
 import type { Generator, GeneratorState, GeneratorConfig, CanvasSize,  AttractorParams, WaveConfig,
   ChannelDriver, FigureType, LSystemConfig } from '../core/interfaces.ts';
 import {
-  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, DESCEND_MIN, DESCEND_MAX, type RuleKey,
+  LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, DESCEND_MIN, DESCEND_MAX, type RuleKey, type LSystemRule,
 } from './lsystem/rules.ts';
 import { createFigureCache, resolveFigure } from './lsystem/figure.ts';
-import { LSYSTEM_GENERATORS } from './lsystem/generator.ts';
-import { resolveCustomRule, CUSTOM_RANGES, type ResolvedCurveRule } from './lsystem/custom.ts';
+import { growthProgress, effectiveSeed, GROWTH_DEFAULTS, TAPER_FLOOR } from './lsystem/growth.ts';
+import { generatorFlagsFor, type LSYSTEM_GENERATORS } from './lsystem/generator.ts';
+import { resolveCustomRule, customHasBranches, CUSTOM_RANGES, type ResolvedCurveRule } from './lsystem/custom.ts';
 import { LSYSTEM_DESIGN_FRACTION } from './lsystem/curve.ts';
-import { resolveSym3d, type Sym3dConfig, type Sym3dOperator } from '../core/symmetry-groups.ts';
+import { resolveSym3d, stemToZ, type Sym3dConfig, type Sym3dOperator } from '../core/symmetry-groups.ts';
 import {
   createAttractorState, initAttractorState, iterateAttractor, type AttractorState, type AttractorTierOpts,
 } from './attractors.ts';
@@ -470,6 +471,21 @@ export class LissajousGenerator implements Generator {
    */
   private deformEnergy: Float32Array = new Float32Array(0);
   private deformEnergyLive = false;
+  /*
+   * v8 Phase 41 (`41.S6`) — **the branch TAPER, the channel buffer's THIRD producer** (beside the amounts and the
+   * deform energy): one factor per [wave]-block particle, MULTIPLIED into the size channel. ⚠️ `taperLive` must die
+   * with the data (invariant 3) and the gate in `writeChannels` must test it (`32.3`'s rule: a gate that tests one of
+   * its producers drops the others).
+   */
+  private taperFactor: Float32Array = new Float32Array(0);
+  private taperLive = false;
+  /**
+   * v8 Phase 41 (`41.S5`) — **the growth clock, in seconds since the preset was APPLIED.** `init()` zeroes it (every
+   * preset application goes through `init`, so every appearance starts as a seedling) and so does a rule change in
+   * `setLSystem`; a Composer edit of the times keeps it. Advanced by the frame `dt`, which already carries
+   * `speedFactor` — so `Speed 0.01x` slows growth with everything else.
+   */
+  private growthClock = 0;
 
   /*
    * v8 `32.7` (`E133`) — the 3D spherical inversion. `invertAmount` 0 is a bit-exact no-op and is the
@@ -655,6 +671,10 @@ export class LissajousGenerator implements Generator {
     // deformation that shrinks every particle to nothing on the first frame after a re-init.
     this.deformEnergy = new Float32Array(this.particleCount).fill(1);
     this.deformEnergyLive = false;
+    // v8 Phase 41 — sized with its siblings, filled with the IDENTITY (1), and dead until a taper writes it.
+    this.taperFactor = new Float32Array(this.particleCount).fill(1);
+    this.taperLive = false;
+    this.growthClock = 0;
     this.velocityDirs = new Float32Array(this.particleCount * 2);
     this.frameMotion = new Float32Array(this.particleCount * 2);
     this.physarumOffsetX = new Float32Array(this.particleCount);
@@ -1320,6 +1340,60 @@ export class LissajousGenerator implements Generator {
     return this.sym3d?.copies ?? 1;
   }
 
+  /** Scratch for `replicateFromStart`: the stem turn, and per copy its combined matrix (9) and translation (3). */
+  private s3Stem = new Float64Array(9);
+  private s3U = new Float64Array(3);
+  private s3Mats = new Float64Array(0);
+  private s3Trans = new Float64Array(0);
+
+  /**
+   * 3-D Symmetry anchored at the CURVE'S START (owner, 2026-11-17) — `Grow from: Curve start`. Every copy is moved so
+   * the curve's start (its root: particle 0, which both growth mechanisms hold still) sits on the centre, and under
+   * Outward its STEM — the direction from the root to the figure's centre, the origin — is first turned onto z, so the
+   * copy's own matrix points it along its position: the copies grow OUTWARD from one point (Radius 0) or from the
+   * solid's surface. Under Parallel the copy keeps its own orientation, so Copies at Each fan it about its root.
+   *
+   * ⚠️ **The root is read per frame from particle 0, AFTER the upstream stages**, so the anchor is where the start
+   * actually is. ⚠️ **The fit is the constant `1 / (2 + radius)`, never measured per frame**: a copy now reaches a
+   * whole figure-diameter from the centre on one side instead of a half-extent on each, and a measured extent would
+   * make the arrangement rescale while it grows. ⚠️ A root ON the centre has no stem; the copy is then only moved.
+   * Allocates nothing per frame (the scratch grows only with the copy count).
+   */
+  private replicateFromStart(s3: Sym3dOperator): void {
+    const P = this.positions, M = s3.mats, D = s3.dirs, copies = s3.copies;
+    const rx = P[0]!, ry = P[1]!, rz = P[2]!;
+    const shift = s3.radius * 0.5 * Math.min(this.designW, this.designH);
+    const fit = 1 / (2 + s3.radius);
+    const R = this.s3Stem;
+    const rl = Math.hypot(rx, ry, rz);
+    if (s3.facing === 'outward' && rl > 1e-9 * Math.min(this.designW, this.designH)) {
+      const u = this.s3U; u[0] = -rx / rl; u[1] = -ry / rl; u[2] = -rz / rl;
+      stemToZ(u, R);
+    } else {
+      R.fill(0); R[0] = 1; R[4] = 1; R[8] = 1;
+    }
+    if (this.s3Mats.length < copies * 9) { this.s3Mats = new Float64Array(copies * 9); this.s3Trans = new Float64Array(copies * 3); }
+    const C = this.s3Mats, T = this.s3Trans;
+    for (let c = 0; c < copies; c++) {
+      const m = c * 9, d = c * 3;
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+        C[m + a * 3 + b] = M[m + a * 3]! * R[b]! + M[m + a * 3 + 1]! * R[3 + b]! + M[m + a * 3 + 2]! * R[6 + b]!;
+      }
+      // the root goes to the centre, then out to the position
+      T[d] = D[d]! * shift - (C[m]! * rx + C[m + 1]! * ry + C[m + 2]! * rz);
+      T[d + 1] = D[d + 1]! * shift - (C[m + 3]! * rx + C[m + 4]! * ry + C[m + 5]! * rz);
+      T[d + 2] = D[d + 2]! * shift - (C[m + 6]! * rx + C[m + 7]! * ry + C[m + 8]! * rz);
+    }
+    for (let i = 0; i < this.particleCount; i++) {
+      const idx = i * 3;
+      const x = P[idx]!, y = P[idx + 1]!, z = P[idx + 2]!;
+      const c = i % copies, m = c * 9, d = c * 3;
+      P[idx] = (C[m]! * x + C[m + 1]! * y + C[m + 2]! * z + T[d]!) * fit;
+      P[idx + 1] = (C[m + 3]! * x + C[m + 4]! * y + C[m + 5]! * z + T[d + 1]!) * fit;
+      P[idx + 2] = (C[m + 6]! * x + C[m + 7]! * y + C[m + 8]! * z + T[d + 2]!) * fit;
+    }
+  }
+
   /**
    * Per-axis rotation SPEED, in **degrees per second** — the unit `generators.rotation` is stored in.
    *
@@ -1380,7 +1454,23 @@ export class LissajousGenerator implements Generator {
    * ⚠️ Passing `null` means *this preset has no curve block*; the figure falls back to the waves.
    */
   setLSystem(config: LSystemConfig | null): void {
+    // v8 Phase 41 (`41.S5`) — a RULE change restarts growth from the seed; any other edit keeps the clock (and so
+    // the growth phase), so dragging `Growth time` rescales the cycle instead of restarting it.
+    if ((config?.rule ?? null) !== (this.lsystem?.rule ?? null)) this.growthClock = 0;
     this.lsystem = config;
+  }
+
+  /** v8 Phase 41 — the growth clock (seconds since the preset was applied), for the UI and the checkers. */
+  getGrowthClock(): number {
+    return this.growthClock;
+  }
+
+  /**
+   * v8 Phase 41 — set the growth clock, e.g. to `growthTime` so a PREVIEW TILE opens on the fully grown figure. ⚠️ The
+   * main view never calls this: every appearance there starts as a seedling (`init()` zeroes the clock).
+   */
+  setGrowthClock(seconds: number): void {
+    this.growthClock = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
   }
 
   /**
@@ -1391,11 +1481,11 @@ export class LissajousGenerator implements Generator {
    * stored `twist` on a rule that has no Twist row (e.g. left by a rule switch in an older file) can never
    * reach the figure — the row is ABSENT there, and an absent row must mean an inert key.
    */
-  private resolveGeneratorAxes(cfg: LSystemConfig, key: RuleKey, scaledTime: number, custom: ResolvedCurveRule | null = null): {
+  private resolveGeneratorAxes(cfg: LSystemConfig, rule: LSystemRule, scaledTime: number, custom: ResolvedCurveRule | null = null): {
     twist: number; stretch: number; anglesAnimated: boolean; twistAnimated: boolean; stretchAnimated: boolean;
     generator: (typeof LSYSTEM_GENERATORS)[RuleKey];
   } {
-    const gen = LSYSTEM_GENERATORS[key];
+    const gen = generatorFlagsFor(rule);
     const anglesAnimated = cfg.yaw.amplitude !== 0 || cfg.pitch.amplitude !== 0 || cfg.roll.amplitude !== 0;
     const tw = cfg.twist, st = cfg.stretch;
     /*
@@ -1763,7 +1853,7 @@ export class LissajousGenerator implements Generator {
      * comment exists to prevent.**
      */
     if (this.channelSize === 0 && this.channelAlpha === 0 && this.channelLight === 0
-      && !this.deformEnergyLive) return undefined;
+      && !this.deformEnergyLive && !this.taperLive) return undefined;
 
     const need = totalCount * 3;
     if (this.channelScratch.length < need) this.channelScratch = new Float32Array(need);
@@ -1833,7 +1923,9 @@ export class LissajousGenerator implements Generator {
        * scratch and its length outlives the feature (invariant 7).
        */
       const energy = this.deformEnergyLive ? this.deformEnergy[i]! : 1;
-      out[o] = Math.max(CHANNEL_SIZE_FLOOR, Math.exp(aS * CHANNEL_LOG_SPAN * two) * energy);
+      // v8 Phase 41 (`41.S6`) — the taper multiplies too: an independent quantity (the branch generation).
+      const taper = this.taperLive ? this.taperFactor[i]! : 1;
+      out[o] = Math.max(CHANNEL_SIZE_FLOOR, Math.exp(aS * CHANNEL_LOG_SPAN * two) * energy * taper);
       out[o + 1] = Math.exp(aA * CHANNEL_LOG_SPAN * two);
       out[o + 2] = Math.exp(aL * CHANNEL_LOG_SPAN * two);
     }
@@ -2289,6 +2381,12 @@ export class LissajousGenerator implements Generator {
         scaledTime, pitchRange[0], pitchRange[1]);
       const roll = this.resolveOp(cfg.roll.base, cfg.roll.amplitude, cfg.roll.frequency,
         scaledTime, rule.angleRange[0], rule.angleRange[1]);
+      // v8 Phase 41 — the growth timeline at this frame's clock, and whether the taper is in use on this rule.
+      const growthNow = growthProgress(cfg.growth, this.growthClock,
+        cfg.growthTime ?? GROWTH_DEFAULTS.time, cfg.growthPause ?? GROWTH_DEFAULTS.pause);
+      // v8 Phase 44 (`44.A2`) — an edited generator that BRANCHES carries a tree too, so its taper is live.
+      const taperAmt = (custom === null ? rule.bracketed : customHasBranches(custom.gen)) ? Math.max(0, Math.min(1, cfg.taper ?? 0)) : 0;
+      const taperOn = taperAmt > 0;
       const lsysPose = {
         rule, recursion, yaw, pitch, roll,
         // ⚠️ `multiAxis` selects the bracket width and the two differ by 5x on `Hilbert 3D`, so it must
@@ -2306,8 +2404,16 @@ export class LissajousGenerator implements Generator {
          * rule with no twistable/stretchable copy ignores them entirely, so a preset that predates Phase 39
          * resolves exactly as before. "Animated" is a non-zero modulation amplitude, the `multiAxis` rule.
          */
-        ...this.resolveGeneratorAxes(cfg, rule.key as RuleKey, scaledTime, resolved),
+        ...this.resolveGeneratorAxes(cfg, rule, scaledTime, resolved),
         custom: custom !== null ? { gen: custom.gen, tile: custom.tile, maxDepth: custom.maxDepth } : null,
+        /*
+         * v8 Phase 41 (`41.S5`/`41.S6`) — growth progress (null = OFF, the branch), the stochastic rule's EFFECTIVE
+         * seed (`loopNew` adds the cycle count), and whether the taper needs each particle's branch depth. ⚠️ All read
+         * at their identity when absent, so a preset that predates the phase builds the identical pose.
+         */
+        growth: growthNow.g,
+        seed: effectiveSeed(cfg.growth, cfg.seed ?? GROWTH_DEFAULTS.seed, growthNow.cycle),
+        wantDepth: taperOn,
       };
       /*
        * v8 CPU pass (B) — **an UNCHANGED curve is not rebuilt.** The figure is a pure function of these resolved inputs
@@ -2317,13 +2423,30 @@ export class LissajousGenerator implements Generator {
        * before. The key is compared by VALUE (numbers print exactly), the custom generator by reference.
        */
       const { rule: _r, custom: _c, ...scalars } = lsysPose;
-      const lsysKey = `${this.particleCount}|${rule.key}|${JSON.stringify(scalars)}`;
+      // v8 Phase 41 — the taper amount is part of the key: it is not in the pose, but its factors are built here.
+      const lsysKey = `${this.particleCount}|${rule.key}|${JSON.stringify(scalars)}|${taperAmt}`;
       const lsysGen = custom !== null ? custom.gen : null;
       if (lsysKey !== this.lsysLastKey || lsysGen !== this.lsysLastGen) {
         resolveFigure(this.lsysCache, lsysPose, this.lsysPoints, this.particleCount);
         this.lsysLastKey = lsysKey;
         this.lsysLastGen = lsysGen;
+        /*
+         * v8 Phase 41 (`41.S6`) — the taper, from the depths the figure published for THIS build: trunk 1, tips
+         * `1 − taper`, floored at `TAPER_FLOOR`. ⚠️ Off is a BRANCH (`taperLive = false`), so the channel buffer is
+         * exactly as before when no taper is set.
+         */
+        if (taperOn && this.lsysCache.depthValid && this.taperFactor.length >= this.particleCount) {
+          const d = this.lsysCache.depthOut;
+          for (let i = 0; i < this.particleCount; i++) {
+            this.taperFactor[i] = Math.max(TAPER_FLOOR, 1 - taperAmt * d[i]!);
+          }
+          this.taperLive = true;
+        } else {
+          this.taperLive = false;
+        }
       }
+      // v8 Phase 41 — the growth clock advances with the frame (dt carries speedFactor), capped like `pos`.
+      this.growthClock += Math.min(Math.max(dt, 0), 100) / 1000;
       lsysPts = this.lsysPoints;
       lsysFit = LSYSTEM_DESIGN_FRACTION * Math.min(this.designW, this.designH);
     }
@@ -2331,6 +2454,8 @@ export class LissajousGenerator implements Generator {
     // v8 CPU pass (C) — the wave sum for the WHOLE figure at once (`sumWaveAxesBulk`: a rotation recurrence instead of
     // nine `Math.sin` per particle, re-anchored every 32). The Score keeps the exact per-particle `sumWaveAxes`.
     let waveBuf: Float64Array | null = null;
+    // v8 Phase 41 — a wave figure has no branch tree: the taper dies with the curve (invariant 3).
+    if (lsysPts === null) this.taperLive = false;
     if (lsysPts === null) {
       if (this.waveBuf.length < this.particleCount * 3) this.waveBuf = new Float64Array(this.particleCount * 3);
       waveBuf = this.waveBuf;
@@ -3160,7 +3285,9 @@ export class LissajousGenerator implements Generator {
      * nothing here can trip the three teleport guards downstream (`setSymmetry`'s note).
      */
     const s3 = this.sym3d;
-    if (s3 !== null) {
+    if (s3 !== null && s3.anchor === 'start' && this.figureType === 'lsystem' && this.lsystem !== null && this.particleCount > 0) {
+      this.replicateFromStart(s3);
+    } else if (s3 !== null) {
       const M = s3.mats, D = s3.dirs, copies = s3.copies;
       const shift = s3.radius * 0.5 * Math.min(this.designW, this.designH);
       const fit = 1 / (1 + s3.radius);

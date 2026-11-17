@@ -31,6 +31,13 @@ export type Sym3dLayout = 'off' | 'ring' | 'sphere' | 'tetrahedron' | 'octahedro
 export type Sym3dOn = 'vertices' | 'edges' | 'faces';
 /** Each copy's orientation: turned outward along its position, or parallel to the original. */
 export type Sym3dFacing = 'outward' | 'parallel';
+/**
+ * Where each copy is anchored (owner, 2026-11-17): at the figure's CENTRE (every copy turned about it — a plant's root
+ * then lands on a shell and the copies grow INWARD through each other), or at the curve's START (its root moved to
+ * the centre, and under Outward its stem turned along its position — the copies grow OUTWARD from one point).
+ * `start` reads only on a self-similar curve; every other figure has no start and keeps `centre`.
+ */
+export type Sym3dAnchor = 'centre' | 'start';
 
 /** The layouts in UI order and their labels — ⚠️ `Record`s over the unions, so a new member is a compile error. */
 export const SYM3D_LAYOUTS: readonly Sym3dLayout[] = ['off', 'ring', 'sphere', 'tetrahedron', 'octahedron', 'cube', 'icosahedron', 'dodecahedron'];
@@ -42,6 +49,8 @@ export const SYM3D_ONS: readonly Sym3dOn[] = ['vertices', 'edges', 'faces'];
 export const SYM3D_ON_LABELS: Record<Sym3dOn, string> = { vertices: 'Vertices', edges: 'Edges', faces: 'Faces' };
 export const SYM3D_FACINGS: readonly Sym3dFacing[] = ['outward', 'parallel'];
 export const SYM3D_FACING_LABELS: Record<Sym3dFacing, string> = { outward: 'Outward', parallel: 'Parallel' };
+export const SYM3D_ANCHORS: readonly Sym3dAnchor[] = ['centre', 'start'];
+export const SYM3D_ANCHOR_LABELS: Record<Sym3dAnchor, string> = { centre: 'Figure centre', start: 'Curve start' };
 
 /** The counted layouts (the others take their positions from the solid). */
 export const SYM3D_COUNTED: readonly Sym3dLayout[] = ['ring', 'sphere'];
@@ -58,7 +67,7 @@ export const SYM3D_RADIUS_RANGE = [0, 3] as const;
 /** The defaults — `layout: 'off'` is the identity; `radius` 0 is centred. */
 export const SYM3D_DEFAULTS = {
   layout: 'off' as Sym3dLayout, positions: 6, on: 'vertices' as Sym3dOn, local: 1, radius: 0,
-  mirrors: false, facing: 'outward' as Sym3dFacing,
+  mirrors: false, facing: 'outward' as Sym3dFacing, anchor: 'centre' as Sym3dAnchor,
 };
 /**
  * From this many copies in total the row says the figure thins (`42.D6`: a notice, never an automatic particle
@@ -74,6 +83,7 @@ export interface Sym3dConfig {
   radius: number;
   mirrors: boolean;
   facing: Sym3dFacing;
+  anchor: Sym3dAnchor;
 }
 
 type M3 = number[];   // row-major 3×3
@@ -194,6 +204,20 @@ export interface Sym3dOperator {
   readonly dirs: Float64Array;     // 3 per copy — the position the copy is moved to (× radius · half-extent)
   readonly copies: number;
   readonly radius: number;
+  /** Where each copy is anchored — `start` is honoured by the stage only on a self-similar curve. */
+  readonly anchor: Sym3dAnchor;
+  /** Under `start`, Outward also turns the copy's STEM (start → centre) onto its z, i.e. along its position. */
+  readonly facing: Sym3dFacing;
+}
+
+/**
+ * The rotation taking the unit vector `u` onto +z (row-major 3×3, written into `out`) — the inverse of `zTo(u)`, so
+ * a copy whose stem is `u` points it along its position once the copy's own matrix (`zTo(position)`) is applied.
+ * ⚠️ Antiparallel `u` (≈ −z) takes the half turn about x, `zTo`'s own fallback, so no direction is singular.
+ */
+export function stemToZ(u: ArrayLike<number>, out: Float64Array): void {
+  const Z = zTo([u[0]!, u[1]!, u[2]!]);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) out[i * 3 + j] = Z[j * 3 + i]!;
 }
 
 const opMemo = new Map<string, Sym3dOperator>();
@@ -204,7 +228,8 @@ export function resolveSym3d(cfg: Sym3dConfig): Sym3dOperator | null {
   const local = Math.max(SYM3D_LOCAL_RANGE[0], Math.min(SYM3D_LOCAL_RANGE[1], Math.round(Number.isFinite(cfg.local) ? cfg.local : 1)));
   const radius = Math.max(SYM3D_RADIUS_RANGE[0], Math.min(SYM3D_RADIUS_RANGE[1], Number.isFinite(cfg.radius) ? cfg.radius : 0));
   const pos = sym3dPositions(cfg);
-  const key = `${cfg.layout}|${pos.length}|${cfg.on}|${local}|${radius}|${cfg.mirrors}|${cfg.facing}`;
+  const anchor: Sym3dAnchor = cfg.anchor === 'start' ? 'start' : 'centre';
+  const key = `${cfg.layout}|${pos.length}|${cfg.on}|${local}|${radius}|${cfg.mirrors}|${cfg.facing}|${anchor}`;
   const hit = opMemo.get(key);
   if (hit !== undefined) return hit;
   const copies = pos.length * local;
@@ -224,7 +249,7 @@ export function resolveSym3d(cfg: Sym3dConfig): Sym3dOperator | null {
       c++;
     }
   }
-  const op: Sym3dOperator = { mats, dirs, copies, radius };
+  const op: Sym3dOperator = { mats, dirs, copies, radius, anchor, facing: cfg.facing };
   opMemo.set(key, op);
   return op;
 }

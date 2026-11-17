@@ -7,8 +7,9 @@ import type { OverlayState, FilmLookParams, IfsTransform, PhysarumConfig, FluidA
 import { CUSTOMIZE_FILM_LOOK, type PaletteMapping } from '../../../renderers/film-looks.ts';
 import {
   SYM3D_LAYOUTS, SYM3D_LAYOUT_LABELS, SYM3D_ONS, SYM3D_ON_LABELS, SYM3D_FACINGS, SYM3D_FACING_LABELS,
+  SYM3D_ANCHORS, SYM3D_ANCHOR_LABELS,
   SYM3D_POSITIONS_RANGE, SYM3D_LOCAL_RANGE, SYM3D_RADIUS_RANGE, SYM3D_THIN_COPIES, sym3dPositions,
-  type Sym3dConfig, type Sym3dLayout, type Sym3dOn, type Sym3dFacing,
+  type Sym3dConfig, type Sym3dLayout, type Sym3dOn, type Sym3dFacing, type Sym3dAnchor,
 } from '../../../core/symmetry-groups.ts';
 import {
   PALETTE_MAPPING_LABELS,
@@ -1821,6 +1822,7 @@ export class VisualFxTab implements TabModule {
   private sym3dOnRow: HTMLElement | null = null;
   private sym3dMirrorsRow: HTMLElement | null = null;
   private sym3dNote: HTMLElement | null = null;
+  private sym3dAnchorSelect: HTMLSelectElement | null = null;
   /**
    * v8 `34.D9` — the Z depth precondition under the `Offset` row. **The ONE inline string this phase adds**,
    * because a precondition is the single exception to *every `title` comes from `tooltips.ts`*.
@@ -1994,6 +1996,7 @@ export class VisualFxTab implements TabModule {
     this.sym3dOnRow = null;
     this.sym3dMirrorsRow = null;
     this.sym3dNote = null;
+    this.sym3dAnchorSelect = null;
     this.zDepthNote = null;
     this.gateBySelect = null;
     this.gateAmountRow = null;
@@ -2598,6 +2601,7 @@ export class VisualFxTab implements TabModule {
       show(this.sym3dSphereRow, s3.layout === 'sphere');
       show(this.sym3dOnRow, solid);
       show(this.sym3dMirrorsRow, s3.local > 1);
+      if (this.sym3dAnchorSelect) this.sym3dAnchorSelect.disabled = this.controls.getFigureType() !== 'lsystem';
       if (this.sym3dNote && on) {
         const places = sym3dPositions(s3).length;
         const copies = this.controls.getSym3dCopies();
@@ -3259,6 +3263,19 @@ export class VisualFxTab implements TabModule {
       get: () => this.controls.getSym3d().facing,
       set: v => this.controls.setSym3d({ facing: v as Sym3dFacing }),
     }), '3-D Facing'));
+    /*
+     * Owner 2026-11-17 — where each copy is anchored. `Curve start` moves a curve's root to the centre (and, under
+     * Outward, turns its stem along its position), so a plant's copies grow OUTWARD from one point instead of inward
+     * through each other. ⚠️ Only a self-similar curve has a start: on any other figure the row stays, GREYED, and its
+     * tooltip carries the precondition (`tooltips.ts`' twist rule) — the engine ignores the value there too.
+     */
+    this.sym3dAnchorSelect = this.select({
+      key: 'sym3dAnchor',
+      options: SYM3D_ANCHORS.map((a) => [a, SYM3D_ANCHOR_LABELS[a]] as [string, string]),
+      get: () => this.controls.getSym3d().anchor,
+      set: v => this.controls.setSym3d({ anchor: v as Sym3dAnchor }),
+    });
+    s3Body.appendChild(this.makeRow('Grow from', this.sym3dAnchorSelect, '3-D Grow From'));
     const s3Note = document.createElement('div');
     s3Note.className = 'sl-vfx-note';
     s3Note.style.cssText = 'margin:2px 0 0 4px;font-size:10px;color:#888;';

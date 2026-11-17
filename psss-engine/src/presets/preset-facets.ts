@@ -135,7 +135,9 @@ export type BooleanFacetKey =
   // which is a different question from *is the figure bent*.
   | 'figure:attractor' | 'figure:open'
   // v8 `36.15` — the self-similar curve figure type.
-  | 'figure:curve';
+  | 'figure:curve'
+  // v8 Phase 41 (`41.S7`) — a curve that GROWS (its `growth` is not off).
+  | 'figure:grows';
 
 /** The invented BAND keys (`22.D12`'s ⚙ marks) — closed unions, because their boundaries are authored here. */
 export type TrailDecayBand = 'crisp' | 'medium' | 'long' | 'veryLong';
@@ -232,6 +234,11 @@ interface Resolved {
    * draws it — the chip would be absent rather than wrong, which is the harder failure to notice.
    */
   readonly figureType: FigureType;
+  /**
+   * v8 Phase 41 — the curve GROWS: the resolved type is the curve AND its `growth` is on. ⚠️ Both halves, because a
+   * dormant curve block (type switched back to waves) keeps its growth fields and draws nothing.
+   */
+  readonly growing: boolean;
   /** `resolvePaletteSelection().name` — ⚠️ the film-look half carries the majority. */
   readonly paletteName: string;
   /** `resolvePaletteSelection().mapping` — ⚠️ defaults to `'depth'`, so there is NO "unset" value. */
@@ -333,6 +340,8 @@ function resolve(preset: UnifiedPreset): Resolved {
     preset, ov, materialName, materialLive, mode, tmEnabled,
     chainLength: chain.length, liveStyles, anyForceMode, attractorType,
     figureType: resolveFigureType(preset.generators?.type, preset.generators ?? {}).type,
+    growing: resolveFigureType(preset.generators?.type, preset.generators ?? {}).type === 'lsystem'
+      && (preset.generators?.lsystem?.growth ?? 'off') !== 'off',
     paletteName: sel.name, paletteMapping: sel.mapping,
     filmLook: ov.filmLook ?? '',
     liveSlots, flat, maxWinding, aspect,
@@ -832,6 +841,11 @@ const FIGURE_GROUP: FacetGroup = {
       + 'the stored string**: an unknown stored value resolves to a real type by the load order, so a '
       + 'raw read would leave such a preset in no bucket while the engine draws it happily.',
       (r) => r.figureType === 'lsystem'),
+    // v8 Phase 41 (`41.S7`) — the growing curves: every plant demo and the two non-plant growth demos.
+    bool('figure:grows', 'Grows',
+      'Self-similar curves that GROW on screen — plants growing from the trunk outwards, other curves unfolding level '
+      + 'by level. Reads the resolved figure type and the Growth setting of the curve together.',
+      (r) => r.growing),
     bool('figure:attractor', 'Attractor',
       'Presets whose figure is driven by a strange attractor rather than by sine waves alone. Needs a named attractor AND a non-zero blend — one preset names one at zero, and its figure is pure waves.',
       (r) => r.attractorType !== null),

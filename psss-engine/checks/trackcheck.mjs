@@ -451,7 +451,9 @@ chk('the readout names the DIRECTION and prints Off at 0, since a signed zero im
 // ⚠️ ANY OTHER collision still fails, so a formatter regression is still caught (the calibration above still holds).
 // ⚠️ A second pair the same day: the owner's `Aizawa Overwound` export authors −1.02 beside the library's −1.00
 // (both `+0.17 ccw`), for the same reason.
-const ROT_SHARED_LABEL_OK = [[1.42, 1.45], [-1.02, -1]];
+// ⚠️ A third, 2026-11-15: the owner's `Curve Tetra Lattice` export authors a Z speed of 4.84 beside the library's 4.88
+// (both `−0.81 cw`) — an owner body is taken verbatim, so the pair is named rather than the export retuned.
+const ROT_SHARED_LABEL_OK = [[1.42, 1.45], [-1.02, -1], [4.84, 4.88]];
 const rNz = ROT_AUTHORED.filter(v => v !== 0);
 const rTrack = [...new Set(rNz.map(v => posToRotation(rSanitize(rotationToPos(v)))))].filter(v => v !== 0);
 const rAllowed = ROT_SHARED_LABEL_OK.filter(([a, b]) => rTrack.includes(a) && rTrack.includes(b)

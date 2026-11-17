@@ -48,7 +48,47 @@ export type RuleKey =
   | 'kochSnowflake'
   | 'pentigree'
   | 'twindragon'
-  | 'fudgeflake';
+  | 'fudgeflake'
+  // v8 Phase 41 (2026-11-14): the Sierpinski tetrahedron (its own builder) and the book's plants.
+  | 'sierpinskiTetra'
+  | 'sprig'
+  | 'thicketWeed'
+  | 'forkTree'
+  | 'firShoot'
+  | 'windWeed'
+  | 'wildPlant'
+  | 'floweringPlant'
+  | 'bush3dBook'
+  // v8 Phase 41 (41.S9) — the Hill tetrahedron, FOUND by the multi-state search (its own builder, `hill.ts`).
+  | 'hillTetra';
+
+/**
+ * v8 Phase 41 (`41.S2`) — **one branch of a STOCHASTIC production** (*The Algorithmic Beauty of Plants* §1.7): the
+ * replacement `to`, chosen with probability `p`. A symbol's list must sum to 1; the choice is made per occurrence by a
+ * seeded HASH (`turtle.ts`' `stochasticPick`), never a sequential stream.
+ */
+export interface StochasticChoice {
+  readonly p: number;
+  readonly to: string;
+}
+
+/** A production: a fixed replacement, or (v8 Phase 41) a weighted list of them. */
+export type Production = string | readonly StochasticChoice[];
+
+/**
+ * v8 Phase 41 — **every replacement text of a production, flattened**, for the readers that scan a rule's ALPHABET
+ * (`ruleAngleUsage`, the checkers). ⚠️ A scan that read only `typeof p === 'string'` would miss every symbol that
+ * appears only in a stochastic branch — the same understatement `ruleAngleUsage` already guards against for axioms.
+ */
+export function productionTexts(p: Production): string[] {
+  return typeof p === 'string' ? [p] : p.map((c) => c.to);
+}
+
+/** True when any production of the rule is stochastic — the rule then has a `Seed` row (`41.S6`). */
+export function isStochasticRule(rule: LSystemRule): boolean {
+  for (const k of Object.keys(rule.productions)) if (typeof rule.productions[k] !== 'string') return true;
+  return false;
+}
 
 /**
  * One production system plus the metadata the UI and the checkers need.
@@ -64,8 +104,41 @@ export interface LSystemRule {
   /** The UI label. `namecheck`/`tipcheck` read it in both directions. */
   readonly name: string;
   readonly axiom: string;
-  /** Symbol → replacement. A symbol with no entry is passed through unchanged. */
-  readonly productions: Readonly<Record<string, string>>;
+  /**
+   * Symbol → replacement. A symbol with no entry is passed through unchanged. ⚠️ v8 Phase 41: a replacement may be a
+   * weighted LIST (a stochastic production) — read the alphabet through `productionTexts`, never `as string`.
+   */
+  readonly productions: Readonly<Record<string, Production>>;
+  /**
+   * v8 Phase 41 (`41.S2`, `41.D13`) — **how the turtle reads `{…}`**. `'outline'`: inside the braces the pen-up `f`
+   * DRAWS the polygon's boundary and `}` closes it back to its first vertex, so a leaf is a closed outline inside the
+   * one continuous stroke. Absent or `'legacy'`: braces are ignored and `f` moves without drawing — today's walk, kept
+   * BIT-IDENTICAL for `Coral Bush` (`bush3d`), whose look depends on it (`41.D16`).
+   */
+  readonly polygons?: 'outline' | 'legacy';
+  /**
+   * v8 Phase 41 (`41.S3`) — **a rule whose list is built by its OWN exact builder, not by the turtle.** `'tetra'` is
+   * the Sierpinski tetrahedron (`tetra.ts`). Its `axiom`/`productions` are then empty and NOTHING reads them; its angle
+   * rows are absent (`ruleAngleUsage` returns no axis) and `Customize` is disabled with a reason (`custom.ts`).
+   */
+  readonly builder?: 'tetra' | 'hill';
+  /**
+   * v8 Phase 41 — **the list's segments are NOT equal**, so it is resampled by ARC LENGTH (`figure.ts`), never by index.
+   * ⚠️ `curve.ts`' `resampleInto` header names exactly this case: index resampling is licensed only while every segment
+   * has one length, and *"a future rule that fails it needs arc-length resampling for itself alone … Hill tetrahedron is
+   * the known candidate"*. Its centre steps take three lengths, ratio 5 : 1.
+   */
+  readonly unequalSteps?: boolean;
+  /**
+   * v8 Phase 41 (`41.S5`) — **a PLANT**: picking it in the Composer sets growth on (`41.D19`) and a taper (`41.S6`).
+   * Optional and read `=== true`; the existing `Plant` and `Coral Bush` are plants too.
+   */
+  readonly plant?: boolean;
+  /**
+   * v8 Phase 41 — **the recursion a rule PICK starts at** (`41.D7` for the tetra). Absent ⇒ `min(rMax, rMin + 1)`, the
+   * pick's rule since Phase 39, so every older rule starts exactly where it did.
+   */
+  readonly defaultRecursion?: number;
   /**
    * Symbols that advance the turtle and emit a point, **in addition to** the universal `F`/`G`.
    * Empty for rules whose only forward symbol is `F`.
@@ -110,6 +183,13 @@ export interface LSystemRule {
    */
   readonly zoomBase?: number;
   readonly provenance: string;
+  /**
+   * v8 Phase 44 (`44.B2`) — **a rule SYNTHESIZED from edited productions** (`productions.ts`). It carries its family's
+   * KEY for the label and landmark reads, so ⚠️⚠️ **no `Record<RuleKey, …>` table may be read by its key directly** —
+   * the helpers (`generatorFlagsFor`, `angleBracketFor`, `twistBracketFor`, `stretchBracketFor`) return the identity for
+   * it — and the figure cache compares the rule's IDENTITY, never its key. Absent on every library rule.
+   */
+  readonly synthesized?: true;
 }
 
 /**
@@ -244,6 +324,7 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
     publishedAngle: 26,
     angleRange: [10, 60],
     recursionRange: [1, 5],
+    plant: true,
     bracketed: true,
     closed: false,
     zoomInverse: false,
@@ -323,8 +404,16 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
       + 'honest outcome is to drop it and add 45deg as a levyC publishedAngles landmark',
   },
   {
+    /*
+     * ⚠️⚠️ v8 Phase 41 (`41.D16`, owner 2026-11-14): **THIS RULE IS KEPT EXACTLY AS IT WAS AND ONLY ITS LABEL CHANGED, to
+     * `Coral Bush`.** Its leaf `[---^^{…}]` is the prototype's MISREADING of the book's `['''^^{…}]` — three COLOUR
+     * marks read as three turns — and that misreading IS the look of the owner's finetuned `Growing Corals`. The key
+     * stays `bush3d` because stored keys are never renamed (`39.D12`). The book's own rule is `bush3dBook`, below.
+     * ⚠️ Do NOT give it `polygons: 'outline'`: its braces must stay ignored for the walk to stay bit-identical.
+     */
     key: 'bush3d',
-    name: 'Bush 3D',
+    name: 'Coral Bush',
+    plant: true,
     axiom: 'A',
     productions: {
       A: '[&FL!A]/////[&FL!A]///////[&FL!A]',
@@ -377,8 +466,8 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
     zoomInverse: false,
     provenance: 'v8 39.A5, the Minkowski sausage (Prusinkiewicz & Lindenmayer, fig. 1.10) -- the square-wave '
       + 'coastline, eight segments per step, a silhouette no other shipped rule draws. Its 39.A10 demo carries '
-      + 'the drop condition "reads like a third square maze beside Hilbert 2D / Moore"',
-  },
+      + 'the drop condition "reads like a third square maze beside Hilbert 2D / Moore"',
+  },
   /*
    * v8 2026-11-13 (owner) — FOUR CLOSED TILES, each an existing generator laid round a STARTING SHAPE in the axiom.
    * Probed first (`p71-new-curves.mjs`, renders `p71-out/p71-planar.png`): each closes EXACTLY at its published
@@ -449,6 +538,214 @@ export const LSYSTEM_RULES: readonly LSystemRule[] = [
     zoomInverse: false,
     provenance: 'v8 2026-11-13, the fudgeflake: three terdragons round a triangle, a three-fold plane tile. '
       + 'Closed at 120deg (p71); like the terdragon it revisits lattice points by construction',
+  },
+  /*
+   * v8 Phase 41 (2026-11-14) — **the Sierpinski tetrahedron and the book's plants.** ⚠️⚠️ **EVERY PLANT DEFINITION BELOW
+   * WAS READ OFF THE BOOK'S OWN PAGES** (*The Algorithmic Beauty of Plants*, ch. 1, pp. 25–30; a copy is kept at
+   * `abop-ch1.pdf`) — never recalled. `figurecheck` §P1 holds each against a table typed from the same
+   * pages. ⚠️ The book's `∧` is `^` here and its colour marks (`'`, `‘`) are `'`, which this turtle ignores.
+   * ⚠️ `recursionRange`'s top is the book's `n` unless `41.P1`'s measured cost lowered it (said in the provenance).
+   */
+  {
+    key: 'sierpinskiTetra',
+    defaultRecursion: 5,
+    name: 'Sierpinski Tetrahedron',
+    axiom: '',
+    productions: {},
+    drawSymbols: '',
+    publishedAngle: 60,
+    angleRange: [60, 60],
+    recursionRange: [1, 7],
+    bracketed: false,
+    closed: false,
+    zoomInverse: false,
+    builder: 'tetra',
+    provenance: 'v8 Phase 41 (41.S3): the 3-D Sierpinski arrowhead -- a regular tetrahedron traversed through its four '
+      + 'corner copies at half size (p0 -> m01 -> m12 -> m23 -> p3), variant v1001 (41.D6), built EXACTLY by tetra.ts '
+      + '(copied from p70-sierpinski-tetra.mjs). Self-avoiding, turns 60/90 deg only, 4^d + 1 points. Not a turtle '
+      + 'rule: its torsion takes 4-6 values, which one shared turtle angle cannot express (p70). NO DESCEND (41.S4, '
+      + 'p80-tetra-zoom.mjs): its seam is exact (chord x1.00 at every whole octave, band compact) but its mid-octave '
+      + 'density dip is x0.68, worse than every shipped zoom rule (Hilbert 3D x0.79, Hilbert 2D x0.83), so by 41.S4\'s '
+      + 'predetermined rule it ships without the zoom. (The first probe criterion, +-15 % at every descend, failed the '
+      + 'SHIPPED rules too -- the instrument was wrong, so the comparison is against them, not against a number)',
+  },
+  {
+    key: 'hillTetra',
+    defaultRecursion: 5,
+    name: 'Hill Tetrahedron',
+    axiom: '',
+    productions: {},
+    drawSymbols: '',
+    publishedAngle: 60,
+    angleRange: [60, 60],
+    recursionRange: [1, 5],
+    bracketed: false,
+    closed: false,
+    zoomInverse: false,
+    builder: 'hill',
+    unequalSteps: true,
+    provenance: 'v8 Phase 41 (41.S9): a continuous space-filling traversal of the Hill (Kuhn) tetrahedron -- one sixth '
+      + 'of a cube -- through its rep-8 Maubach dissection, FOUND by p81-hill-search.mjs: multi-state (a closed set of 7 '
+      + 'of the 12 entry/exit states), every piece congruent to the root at 1/2, chained at vertices at every depth, '
+      + '75 % face contacts. Drawn through the 8^d piece CENTRES (distinct by construction). Recursion to 5 = 32 768 '
+      + 'pieces, inside the curve budget. Not a turtle rule and not customizable',
+  },
+  {
+    key: 'sprig',
+    defaultRecursion: 5,
+    name: 'Sprig',
+    axiom: 'F',
+    productions: { F: 'F[+F]F[-F][F]' },
+    drawSymbols: '',
+    publishedAngle: 20,
+    angleRange: [10, 60],
+    recursionRange: [1, 5],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.24b, n=5, delta=20 (edge-rewriting), read off p. 25',
+  },
+  {
+    key: 'thicketWeed',
+    defaultRecursion: 4,
+    name: 'Thicket Weed',
+    axiom: 'F',
+    productions: { F: 'FF-[-F+F+F]+[+F-F-F]' },
+    drawSymbols: '',
+    publishedAngle: 22.5,
+    angleRange: [10, 60],
+    recursionRange: [1, 4],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.24c, n=4, delta=22.5 (edge-rewriting), read off p. 25',
+  },
+  {
+    key: 'forkTree',
+    defaultRecursion: 6,
+    name: 'Fork Tree',
+    axiom: 'X',
+    productions: { X: 'F[+X]F[-X]+X', F: 'FF' },
+    drawSymbols: '',
+    publishedAngle: 20,
+    angleRange: [10, 60],
+    recursionRange: [1, 7],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.24d, n=7, delta=20 (node-rewriting), read off p. 25',
+  },
+  {
+    key: 'firShoot',
+    defaultRecursion: 6,
+    name: 'Fir Shoot',
+    axiom: 'X',
+    productions: { X: 'F[+X][-X]FX', F: 'FF' },
+    drawSymbols: '',
+    publishedAngle: 25.7,
+    angleRange: [10, 60],
+    recursionRange: [1, 7],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.24e, n=7, delta=25.7 (node-rewriting), read off p. 25',
+  },
+  {
+    key: 'windWeed',
+    defaultRecursion: 5,
+    name: 'Wind Weed',
+    axiom: 'X',
+    productions: { X: 'F-[[X]+X]+F[+FX]-X', F: 'FF' },
+    drawSymbols: '',
+    publishedAngle: 22.5,
+    angleRange: [10, 60],
+    recursionRange: [1, 5],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.24f, n=5, delta=22.5 (node-rewriting), read off p. 25',
+  },
+  {
+    key: 'wildPlant',
+    defaultRecursion: 5,
+    name: 'Wild Plant',
+    axiom: 'F',
+    productions: {
+      F: [
+        { p: 0.33, to: 'F[+F]F[-F]F' },
+        { p: 0.33, to: 'F[+F]F' },
+        { p: 0.34, to: 'F[-F]F' },
+      ],
+    },
+    drawSymbols: '',
+    publishedAngle: 25.7,
+    angleRange: [10, 60],
+    recursionRange: [1, 5],
+    plant: true,
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP s1.7 (figs. 1.27), the stochastic OL-system, derivation length 5, read off p. 28. '
+      + 'ANGLE IS A CHOICE, NOT A QUOTATION: s1.7 gives none; it is fig. 1.24a split three ways, so it takes 1.24a\'s 25.7',
+  },
+  {
+    key: 'floweringPlant',
+    defaultRecursion: 5,
+    name: 'Flowering Plant',
+    axiom: 'P',
+    productions: {
+      // plant P, internode I, seg S, leaf L, flower K, pedicel D, wedge E (the book's multi-letter symbols).
+      P: 'I+[P+K]--//[--L]I[++L]-[PK]++PK',
+      I: 'FS[//&&L][//^^L]FS',
+      S: 'SFS',
+      L: '[\'{+f-ff-f+|+f-ff-f}]',
+      K: '[&&&D\'/E////E////E////E////E]',
+      D: 'FF',
+      E: '[\'^F][{&&&&-f+f|-f+f}]',
+    },
+    drawSymbols: '',
+    publishedAngle: 18,
+    angleRange: [10, 45],
+    // ⚠️ Starts at 2, MEASURED: depth 1 is a single point (the first stem appears only at depth 2, p82-rule-sizes).
+    recursionRange: [2, 5],
+    plant: true,
+    polygons: 'outline',
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.26, n=5, delta=18, read off p. 27; leaves and petals drawn as closed '
+      + 'outlines (41.D13)',
+  },
+  {
+    key: 'bush3dBook',
+    defaultRecursion: 5,
+    name: 'Bush 3D',
+    axiom: 'A',
+    productions: {
+      A: '[&FL!A]/////\'[&FL!A]///////\'[&FL!A]',
+      F: 'S/////F',
+      S: 'FL',
+      L: '[\'\'\'^^{-f+f+f-|-f+f+f}]',
+    },
+    drawSymbols: '',
+    publishedAngle: 22.5,
+    angleRange: [10, 50],
+    // ⚠️ The book's n is 7, LOWERED to 5 by measurement (41.P1): depth 6 is 188 433 points and depth 7 1 110 447
+    // (36 ms a build), past the 65 536-segment curve budget the engine already holds `Customize` to (p82-rule-sizes).
+    recursionRange: [1, 5],
+    plant: true,
+    polygons: 'outline',
+    bracketed: true,
+    closed: false,
+    zoomInverse: false,
+    provenance: 'v8 Phase 41: ABOP fig. 1.25, n=7, delta=22.5, read off p. 26 -- the CORRECTED bush (the colour marks '
+      + 'are colour marks), leaves as closed outlines. The prototype misreading is kept as Coral Bush (bush3d, 41.D16). '
+      + 'Recursion capped at 5 (book n = 7) by the measured list size',
   },
 ];
 
@@ -525,6 +822,13 @@ export const LSYSTEM_DEFAULT_RULE: RuleKey = 'hilbert3d';
  * solves to any width.** Capping keeps the number honest if the inertness is ever fixed. **The
  * inertness itself is a finding, not a setting — see that rule's `provenance`.**
  */
+/**
+ * v8 Phase 44 (`44.B2.3`) — the angle bracket read through the RULE: a synthesized rule (edited productions) has
+ * none (width 0 — the exact "rebuild per frame" path), whatever its family's entry says.
+ */
+export function angleBracketFor(rule: { readonly key: RuleKey; readonly synthesized?: true }): { yaw: number; multi: number } {
+  return rule.synthesized === true ? { yaw: 0, multi: 0 } : LSYSTEM_ANGLE_BRACKET[rule.key];
+}
 export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number }> = {
   hilbert3d: { yaw: 0.22, multi: 0.04 },
   hilbert2d: { yaw: 1.25, multi: 1.25 },
@@ -547,6 +851,21 @@ export const LSYSTEM_ANGLE_BRACKET: Record<RuleKey, { yaw: number; multi: number
   pentigree: { yaw: 1.81, multi: 1.81 },       // binds at depth 4, centre 85 deg
   twindragon: { yaw: 0.47, multi: 0.47 },      // binds at depth 12, centre 51 deg -- BELOW the useful floor: rebuilt per frame
   fudgeflake: { yaw: 1.68, multi: 1.68 },      // binds at depth 7, centre 84 deg
+  /*
+   * v8 Phase 41 — ⚠️ **NOT SOLVED, SO 0: below `LSYSTEM_MIN_USEFUL_BRACKET_DEG`, i.e. no bracket — a breathing angle
+   * rebuilds per frame at the EXACT angle (correct, only slower), and a still angle builds once.** This file forbids an
+   * invented width; solve with `t36-bracket-solve.mjs` before giving any of these a bracket. The tetra has no angle.
+   */
+  sierpinskiTetra: { yaw: 0, multi: 0 },
+  sprig: { yaw: 0, multi: 0 },
+  thicketWeed: { yaw: 0, multi: 0 },
+  forkTree: { yaw: 0, multi: 0 },
+  firShoot: { yaw: 0, multi: 0 },
+  windWeed: { yaw: 0, multi: 0 },
+  wildPlant: { yaw: 0, multi: 0 },
+  floweringPlant: { yaw: 0, multi: 0 },
+  bush3dBook: { yaw: 0, multi: 0 },
+  hillTetra: { yaw: 0, multi: 0 },
 };
 
 /**
@@ -587,10 +906,15 @@ export const LSYSTEM_MIN_USEFUL_BRACKET_DEG = 1.0;
  * single source for that visibility and `36.20` clause 6 asserts the forward direction against it.
  */
 export function ruleAngleUsage(rule: LSystemRule): { yaw: boolean; pitch: boolean; roll: boolean } {
+  // v8 Phase 41 — a BUILDER rule has no turtle, so no angle row can change it (`41.D9`): none is shown.
+  if (rule.builder !== undefined) return { yaw: false, pitch: false, roll: false };
   // Scan the axiom AND every production body: a symbol can be introduced at any expansion level, so
   // reading the axiom alone understates the alphabet on every rule whose axiom is a bare non-terminal.
   let text = rule.axiom;
-  for (const key of Object.keys(rule.productions)) text += rule.productions[key] ?? '';
+  for (const key of Object.keys(rule.productions)) {
+    const p = rule.productions[key];
+    if (p !== undefined) text += productionTexts(p).join('');
+  }
   return {
     yaw: /[+\-]/.test(text),
     pitch: /[&^]/.test(text),

@@ -24,10 +24,11 @@
  * so an edit to an out-leg can never leave its return leg drawing a different subtree.
  */
 
-import type { CustomCurveGenerator, CustomCurveStep, LSystemConfig } from '../../core/interfaces.ts';
+import type { CustomCurveGenerator, CustomCurveStep, CustomProductions, LSystemConfig } from '../../core/interfaces.ts';
+import { isProductionsBlock, productionsMatchRule, synthesizeRule } from './productions.ts';
 import { LSYSTEM_RULES, LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, type LSystemRule, type RuleKey } from './rules.ts';
-import { walkTurtle } from './turtle.ts';
-import { LSYSTEM_GENERATORS, affine, compose, copyTransform, type Affine } from './generator.ts';
+import { walkTurtle, type BranchData } from './turtle.ts';
+import { LSYSTEM_GENERATORS, affine, compose, copyTransform, type Affine, type GeneratorFlags } from './generator.ts';
 
 /** The stored rule key of the custom rule. ⚠️ Not a `RuleKey`: it has no production and no library entry. */
 export const CUSTOM_RULE_KEY = 'customize';
@@ -393,7 +394,8 @@ export function buildCustom(
   gen: CustomCurveGenerator, depth: number, yaw: number, pitch: number, twist: number, stretch: number,
   tile: CustomTile | null,
   into: Float64Array | null = null,
-): { xyz: Float64Array; count: number } | null {
+  withBranches = false,
+): { xyz: Float64Array; count: number; branch?: BranchData | null } | null {
   const cells = gen.draw === 'cells' && tile !== null;
   const y = cells ? CUSTOM_CELL_YAW : yaw, p = cells ? CUSTOM_CELL_PITCH : pitch;
   const { walk } = walkCustom(gen, y, p, stretch);
@@ -411,7 +413,7 @@ export function buildCustom(
       xyz[i * 3 + 1] = B[3]! * u + B[4]! * v + B[5]! * w;
       xyz[i * 3 + 2] = B[6]! * u + B[7]! * v + B[8]! * w;
     }
-    return { xyz, count };
+    return withBranches ? { xyz, count, branch: customBranches(gen, depth, walk, init.tops, xyz, count) } : { xyz, count };
   }
   // Into the captured frame: an in-plane rotation and a mirror (about the view axis, so z is untouched).
   const a = (gen.frame.rotate * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a), my = gen.frame.mirror ? -1 : 1;
@@ -420,7 +422,110 @@ export function buildCustom(
     xyz[i * 3] = c * x - s * yy;
     xyz[i * 3 + 1] = s * x + c * yy;
   }
-  return { xyz, count };
+  return withBranches ? { xyz, count, branch: customBranches(gen, depth, walk, init.tops, xyz, count) } : { xyz, count };
+}
+
+/**
+ * v8 Phase 44 (`44.A2`) — **does an edited generator BRANCH?** A path generator with at least one retrace draws its
+ * branches out and back like the turtle's brackets, so it gets a branch tree (growth by generation, the taper). One
+ * with none — every shipped `Customize` preset — takes exactly the path it took before.
+ */
+export function customHasBranches(gen: CustomCurveGenerator): boolean {
+  return gen.draw === 'path' && gen.steps.some((s) => s.kind === 'retrace');
+}
+
+/**
+ * v8 Phase 44 (`44.A2`) — **the branch tree behind an edited generator**, the turtle's `BranchData` shape, so growth's
+ * `nodeArrival` / `growExtend` and the taper read it unchanged.
+ *
+ * - **Depth, from the STRUCTURE.** A step's bracket depth is the number of move/retrace pairs (`retracePartners`, the
+ *   one pairing) enclosing it — a retrace takes its partner's — and a point's depth is the SUM over the levels of the
+ *   composition, walked in `emitCopies`' own leaf order (a reversed copy visits its steps backwards). ⚠️ Geometry
+ *   alone cannot give it: `[FF]` and `[F[F]]` draw the same out-and-back path.
+ * - **The tree, from the POINTS.** A point that lands back on the current node's parent is a return leg (it keeps that
+ *   node); any other point is a new child. `tau` is the arc length from the root along the tree.
+ * - Null for a generator with no branch (`customHasBranches`), for `cells` drawing, or when the labels cannot cover
+ *   the list (a defensive branch — the counts are equal by construction).
+ */
+export function customBranches(gen: CustomCurveGenerator, depth: number, walk: CustomWalk,
+  tops: { A: Affine; rev: boolean }[] | null, xyz: Float64Array, count: number): BranchData | null {
+  if (!customHasBranches(gen) || count < 2) return null;
+  const steps = gen.steps, k = steps.length;
+  const partner = retracePartners(steps);
+  /*
+   * ⚠️ **A pair that DIRECTLY wraps its neighbour (`m − 1`, `r + 1`) is the SAME bracket.** The turtle's `[-F+F+F]` reads
+   * back as three nested move/retrace pairs (each retrace walks back ONE segment), so counting pairs gave Thicket Weed
+   * depth 3 for a single bracket (measured: maxDepth 6 vs the turtle's 2 at depth 2, `p97j-treeprobe.mjs`). `[F[F]]`
+   * draws exactly the same points as `[FF]`, so which one a contiguous chain "is" is a convention — this one matches
+   * the turtle on every shipped plant.
+   */
+  const pairs: { m: number; r: number }[] = [];
+  for (let r = 0; r < k; r++) if (steps[r]!.kind === 'retrace' && partner[r]! >= 0) pairs.push({ m: partner[r]!, r });
+  const counts = pairs.map((P) => {
+    let enc: { m: number; r: number } | null = null;
+    for (const Q of pairs) if (Q !== P && Q.m < P.m && P.r < Q.r && (enc === null || Q.m > enc.m)) enc = Q;
+    return !(enc !== null && enc.m === P.m - 1 && enc.r === P.r + 1);
+  });
+  const sd = new Float64Array(k);
+  for (let i = 0; i < k; i++) {
+    const at = steps[i]!.kind === 'retrace' ? partner[i]! : i;
+    if (at < 0) continue;
+    let d = 0;
+    for (let q = 0; q < pairs.length; q++) if (counts[q] && pairs[q]!.m <= at && at < pairs[q]!.r) d++;
+    sd[i] = d;
+  }
+  const rev = walk.copies.map((c) => c.reverse);
+  const pairOf = new Int32Array(k).fill(-1);
+  for (let q = 0; q < pairs.length; q++) { pairOf[pairs[q]!.m] = q; pairOf[pairs[q]!.r] = q; }
+  const n = Math.max(1, Math.floor(depth));
+  const pointNode = new Int32Array(count), parent = new Int32Array(count), tau = new Float64Array(count), dep = new Float64Array(count);
+  parent[0] = -1;
+  let nodes = 1, maxDepth = 0, m = 1, overflow = false;
+  /*
+   * ⚠️⚠️ **THE TREE IS STRUCTURAL, NEVER GEOMETRIC.** Within one generator copy a move and its retrace are a PAIR: the
+   * one VISITED FIRST draws (in a reversed copy that is the retrace), the second re-walks exactly the first's points in
+   * reverse, ending at its start — the turtle's `]`. A reconstruction from point positions was tried first and could
+   * not be made exact: two branches can share a position, parent AND depth (Sprig's straight `[F]` beside the trunk),
+   * so any position rule picks a wrong twin somewhere (`p97j-treeprobe.mjs`: Thicket Weed 99.9 % at depth 4).
+   */
+  const emitNew = (d: number): number => {
+    if (m >= count) { overflow = true; return 0; }
+    const j = m++, prev = pointNode[j - 1]!, id = nodes++;
+    parent[id] = prev;
+    tau[id] = tau[prev]! + Math.hypot(xyz[j * 3]! - xyz[(j - 1) * 3]!, xyz[j * 3 + 1]! - xyz[(j - 1) * 3 + 1]!,
+      xyz[j * 3 + 2]! - xyz[(j - 1) * 3 + 2]!);
+    dep[id] = d;
+    if (d > maxDepth) maxDepth = d;
+    pointNode[j] = id;
+    return id;
+  };
+  const visit = (d: number, reversed: boolean, acc: number, out: number[]): void => {
+    const first = new Map<number, { start: number; leaves: number[] }>();
+    for (let s2 = 0; s2 < k; s2++) {
+      const i = reversed ? k - 1 - s2 : s2;
+      const pid = pairOf[i]!;
+      const startNode = pointNode[m - 1]!;
+      const f = pid >= 0 ? first.get(pid) : undefined;
+      if (f !== undefined) {
+        // the SECOND of its pair: re-walk the first's points backwards — its leaves but the last, then its start
+        for (let q = f.leaves.length - 2; q >= -1; q--) {
+          if (m >= count) { overflow = true; return; }
+          const nd = q >= 0 ? f.leaves[q]! : f.start;
+          pointNode[m++] = nd;
+          out.push(nd);
+        }
+        continue;
+      }
+      const leaves: number[] = [];
+      if (d === 1) leaves.push(emitNew(acc + sd[i]!));
+      else visit(d - 1, rev[i] !== reversed, acc + sd[i]!, leaves);
+      if (pid >= 0) first.set(pid, { start: startNode, leaves });
+      for (let q = 0; q < leaves.length; q++) out.push(leaves[q]!);
+    }
+  };
+  for (const t of tops ?? [{ rev: false }]) visit(n, t.rev, 0, []);
+  if (overflow || m !== count) return null;
+  return { pointNode, parent: parent.subarray(0, nodes), tau: tau.subarray(0, nodes), depth: dep.subarray(0, nodes), nodeCount: nodes, maxDepth };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -522,14 +627,62 @@ const CUSTOM_ONLY_STRUCTURES: Partial<Record<RuleKey, () => RuleStructure>> = {
   }),
   twindragon: () => ({ draw: 'path', steps: ruleStructure('dragon')!.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(2, 0, 0)] }),
   fudgeflake: () => ({ draw: 'path', steps: ruleStructure('terdragon')!.steps.map((s) => ({ ...s })), initiator: [mv(0, 0, 0), mv(1, 0, 0), mv(1, 0, 0)] }),
+  /*
+   * v8 Phase 44 (`44.A1`) — the two single-production book plants, derived from their depth-1 walk with NO flags (so
+   * their NAMED rows stay as they are). Exact at depths 1–4 (`p97g-seedprobe.mjs`).
+   */
+  sprig: () => deriveTurtleStructure('sprig', NO_FLAGS),
+  thicketWeed: () => deriveTurtleStructure('thicketWeed', NO_FLAGS),
 };
+
+/** The per-step flags a turtle-derived structure reads (a rule's `LSYSTEM_GENERATORS` entry, or none). */
+type StepFlags = Pick<GeneratorFlags, 'reverse' | 'orient180' | 'twistable' | 'stretchable'>;
+/** v8 Phase 44 (`44.A1`) — no flags: a rule seeded by `Customize` ONLY keeps its named form free of Twist/Stretch rows. */
+const NO_FLAGS: StepFlags = { reverse: [], orient180: [], twistable: [], stretchable: [] };
+
+/**
+ * The depth-1 walk at the published angle, read back as a generator: turn units are heading changes / yaw, and a
+ * segment that undoes the most recent OPEN move is a RETRACE (the Plant's return legs). ⚠️ v8 Phase 44 (`44.A1`)
+ * factored it out of `ruleStructure` so a Customize-only rule (Sprig, Thicket Weed) derives the SAME way with no flags —
+ * measured exact against the turtle at depths 1–4 (`p97g-seedprobe.mjs`, 4.4e-16), held by `figurecheck` §K2.
+ */
+function deriveTurtleStructure(key: RuleKey, flags: StepFlags): RuleStructure {
+  const has = (list: readonly number[], i: number): boolean => list.includes(i + 1);
+  const rule = LSYSTEM_RULE_BY_KEY[key];
+  const a = rule.publishedAngle;
+  const w = walkTurtle(rule, 1, a, a, a);
+  const steps: CustomCurveStep[] = [];
+  const open: { vx: number; vy: number; before: number }[] = [];
+  let theta = NaN;
+  for (let i = 1; i < w.count; i++) {
+    const vx = w.xyz[i * 3]! - w.xyz[i * 3 - 3]!, vy = w.xyz[i * 3 + 1]! - w.xyz[i * 3 - 2]!;
+    const top = open[open.length - 1];
+    if (top !== undefined && Math.abs(vx + top.vx) < 1e-9 && Math.abs(vy + top.vy) < 1e-9) {
+      open.pop();
+      steps.push({ kind: 'retrace' });
+      theta = top.before;
+      continue;
+    }
+    const ang = Math.atan2(vy, vx);
+    const before = Number.isNaN(theta) ? ang : theta;
+    let d = ((ang - before) * 180) / Math.PI;
+    d = ((d + 540) % 360) - 180;
+    steps.push({
+      kind: 'move', turn: near(d / a), lift: 0, length: near(Math.hypot(vx, vy)),
+      reverse: has(flags.reverse, i - 1), orient: (has(flags.orient180, i - 1) ? 180 : 0) as 0 | 180,
+      twistable: has(flags.twistable, i - 1), stretchable: has(flags.stretchable, i - 1),
+    });
+    open.push({ vx, vy, before });
+    theta = ang;
+  }
+  return { draw: 'path', steps };
+}
 
 /** The STRUCTURE of a rule's generator — its steps and draw mode, independent of every parameter. Memoised. */
 const structureMemo = new Map<string, RuleStructure | null>();
 export function ruleStructure(key: RuleKey): RuleStructure | null {
   if (structureMemo.has(key)) return structureMemo.get(key)!;
   const flags = LSYSTEM_GENERATORS[key];
-  const rule = LSYSTEM_RULE_BY_KEY[key];
   let out: RuleStructure | null = CUSTOM_ONLY_STRUCTURES[key]?.() ?? null;
   if (out === null && flags !== null) {
     const has = (list: readonly number[], i: number): boolean => list.includes(i + 1);
@@ -542,35 +695,7 @@ export function ruleStructure(key: RuleKey): RuleStructure | null {
         })),
       };
     } else {
-      // The depth-1 walk at the published angle: turn units are heading changes / yaw, and a segment that undoes
-      // the most recent OPEN move is a RETRACE (the Plant's return legs).
-      const a = rule.publishedAngle;
-      const w = walkTurtle(rule, 1, a, a, a);
-      const steps: CustomCurveStep[] = [];
-      const open: { vx: number; vy: number; before: number }[] = [];
-      let theta = NaN;
-      for (let i = 1; i < w.count; i++) {
-        const vx = w.xyz[i * 3]! - w.xyz[i * 3 - 3]!, vy = w.xyz[i * 3 + 1]! - w.xyz[i * 3 - 2]!;
-        const top = open[open.length - 1];
-        if (top !== undefined && Math.abs(vx + top.vx) < 1e-9 && Math.abs(vy + top.vy) < 1e-9) {
-          open.pop();
-          steps.push({ kind: 'retrace' });
-          theta = top.before;
-          continue;
-        }
-        const ang = Math.atan2(vy, vx);
-        const before = Number.isNaN(theta) ? ang : theta;
-        let d = ((ang - before) * 180) / Math.PI;
-        d = ((d + 540) % 360) - 180;
-        steps.push({
-          kind: 'move', turn: near(d / a), lift: 0, length: near(Math.hypot(vx, vy)),
-          reverse: has(flags.reverse, i - 1), orient: (has(flags.orient180, i - 1) ? 180 : 0) as 0 | 180,
-          twistable: has(flags.twistable, i - 1), stretchable: has(flags.stretchable, i - 1),
-        });
-        open.push({ vx, vy, before });
-        theta = ang;
-      }
-      out = { draw: 'path', steps };
+      out = deriveTurtleStructure(key, flags);
     }
   }
   structureMemo.set(key, out);
@@ -723,9 +848,13 @@ function similarityFit(src: Float64Array, ref: Float64Array, n: number): { rotat
 // The ONE resolver (spec §3.4), and the density readout (`39.D6`)
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
-const resolvedMemo = new WeakMap<CustomCurveGenerator, ResolvedCurveRule>();
+const resolvedMemo = new WeakMap<CustomCurveGenerator | CustomProductions, ResolvedCurveRule>();
 
 export type ResolvedCurveRule =
+  /**
+   * `customizedFrom`: a `Customize` block equal to this rule (the no-op). ⚠️ v8 Phase 44: `rule.synthesized` marks a
+   * plant's EDITED productions — a named-rule shape on purpose, so every reader draws it through the turtle path.
+   */
   | { readonly kind: 'named'; readonly rule: LSystemRule; readonly customizedFrom: boolean }
   | { readonly kind: 'custom'; readonly gen: CustomCurveGenerator; readonly tile: CustomTile | null; readonly maxDepth: number };
 
@@ -744,6 +873,31 @@ export function resolveCustomRule(cfg: Pick<LSystemConfig, 'rule' | 'custom'>): 
      */
     const hit = resolvedMemo.get(cfg.custom);
     if (hit !== undefined) return hit;
+    /*
+     * v8 Phase 44 (`44.B2`) — **a PLANT's edited productions.** Equal to a plant (content, deep) ⇒ THAT plant — the
+     * no-op by routing; else the synthesized rule (`productions.ts`), drawn by the turtle like any named rule; an
+     * invalid block (or one that does not fit at depth 1) ⇒ the default rule, never "repaired" (spec §3.5).
+     */
+    if (isProductionsBlock(cfg.custom)) {
+      const pm = productionsMatchRule(cfg.custom);
+      const synth = pm === null ? synthesizeRule(cfg.custom) : null;
+      const rp: ResolvedCurveRule = pm !== null
+        ? { kind: 'named', rule: LSYSTEM_RULE_BY_KEY[pm], customizedFrom: true }
+        : synth !== null ? { kind: 'named', rule: synth, customizedFrom: false }
+          : { kind: 'named', rule: LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE], customizedFrom: false };
+      resolvedMemo.set(cfg.custom, rp);
+      return rp;
+    }
+    /*
+     * ⚠️ v8 Phase 44 (`44.B1`) — **anything that is not a well-formed GENERATOR is the default rule, never a crash**: an
+     * unknown `kind` (an imported or hand-edited block) fell through to here and threw on `steps` (`figurecheck` §T7).
+     */
+    const ck = (cfg.custom as { kind?: unknown }).kind;
+    if ((ck !== undefined && ck !== 'generator') || !Array.isArray((cfg.custom as { steps?: unknown }).steps)) {
+      const rd: ResolvedCurveRule = { kind: 'named', rule: LSYSTEM_RULE_BY_KEY[LSYSTEM_DEFAULT_RULE], customizedFrom: false };
+      resolvedMemo.set(cfg.custom, rd);
+      return rd;
+    }
     const match = customMatchesRule(cfg.custom);
     const tile = cfg.custom.draw === 'cells' ? customTile(cfg.custom) : null;
     const r: ResolvedCurveRule = match !== null

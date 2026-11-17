@@ -531,6 +531,35 @@ const AUTHORED_INDEX_PALETTES = {
   // Golden Lightning and Zigzag Cross were REPLACED the same day by the owner's finetuned exports (leaf-identical).
   'Curve Golden Lightning': 'Cycle: Solar',   // the owner's finetuned export, 2026-11-13
   'Curve Zigzag Cross': 'Sunset',   // the owner's finetuned export, 2026-11-13
+  // 2026-11-14 — v8 Phase 41, the demos (drafts for the owner's finetuning): each authors its own palette under `index`,
+  // set in BOTH `overlay.palette` and its Customize look (a Customize look's palette outranks the overlay's).
+  'Curve Tetra Pyramids': 'Prismatic',
+  'Curve Tetra Lattice': 'Cycle: Embers',   // the owner's finetuned export, 2026-11-15 (its look block still says Azure; `overlay.palette` wins)
+  'Curve Tetra Unfold': 'Neon',
+  // `Plant Sprig` left this list 2026-11-17: the owner's finetuned export maps its palette by PHASE, not `index`.
+  'Plant Thicket Weed': 'Material: organic',   // the owner's finetuned export, 2026-11-17 (exported as `Growing Corals`)
+  'Plant Fork Tree': 'Cycle: Solar',   // the owner's finetuned export, 2026-11-17 (filmLook Legacy Graded, no look block)
+  'Plant Fir Shoot': 'Cool',
+  'Plant Wind Weed': 'Aurora',
+  'Plant Wild': 'Warm',
+  'Plant Flowering': 'Material: fire',   // the owner's finetuned export, 2026-11-17 (its look block still says Pastel; `overlay.palette` wins)
+  'Plant Bush 3D': 'Classic: thermal',
+  'Curve Dragon Unfold': 'Sunset',   // the owner's finetuned export, 2026-11-17 (its look block says Material: liquid; `overlay.palette` wins)
+  'Curve Hilbert Fill': 'Neon',
+  'Curve Hill Tetrahedron': 'Ocean',
+  'Curve Hill Unfold': 'Sunset',
+  // 2026-11-17 — the four `Grow from: Curve start` drafts (3-D Symmetry), each cloned from a Phase 41 demo with its
+  // own palette, set in both `overlay.palette` and its Customize look.
+  'Plant Burst': 'Aurora',
+  // ⚠️ 2026-11-17: all four REPLACED by the owner's finetuned exports. `Plant Corner Cube` now maps its palette by PHASE,
+  // so it is no longer an `index` body and leaves this list; `Plant Rosette` now authors Warm.
+  'Plant Rosette': 'Warm',
+  'Curve Dragon Burst': 'Neon',
+  // 2026-11-17 — v8 Phase 44, the three production-editor drafts, each cloned from the owner's finetuned plant demo and
+  // keeping its palette.
+  'Plant Custom Fork': 'Cycle: Solar',
+  // `Plant Custom Wild` left this list 2026-11-17: the owner's finetuned export maps its palette (Prismatic) by PHASE.
+  'Plant Custom Bloom': 'Material: fire',
   // 2026-11-13 — v8 Phase 37, the strand demos: each authors its OWN palette under `index`, because a gradient along
   // the stroke is the free half of the feature (the plan's demo table). Two of the four are the first presets ever
   // authored on their attractor type (`nose-hoover`, `halvorsen`).

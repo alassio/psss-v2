@@ -490,7 +490,25 @@ export interface LSystemConfig {
    * interpolated** (spec §2.4): the Mixer snaps it WITH the rule and Evolution never mutates it. A format
    * ADDITION — absent on every preset that predates it, so no migration and no `metadata.version` bump.
    */
-  custom?: CustomCurveGenerator;
+  custom?: CustomCurveGenerator | CustomProductions;
+  /*
+   * v8 Phase 41 (`41.S5`/`41.S6`) — GROWTH, TAPER and SEED. ⚠️⚠️ **All five are FLAT OPTIONAL fields read at their
+   * IDENTITY when absent (invariant 14: no migration, no `metadata.version` bump)**, and `growth: 'off'` / `taper: 0` are
+   * BRANCHES, never weights (`36.D10`) — so every preset written before the phase is bit-identical.
+   */
+  /**
+   * The growth animation: `'once'` grows from the seed to the Recursion level and holds; `'loop'` then withers back and
+   * regrows; `'loopNew'` regrows from the NEXT seed each cycle (`41.D19`). Identity `'off'`. Categorical: the Mixer SNAPS it.
+   */
+  growth?: 'off' | 'once' | 'loop' | 'loopNew';
+  /** Seconds for one grow (and one wither). Default 12 (`41.D23`). */
+  growthTime?: number;
+  /** Seconds held fully grown, and rested as the seed, before turning round. Default 4 (`41.D23`). */
+  growthPause?: number;
+  /** Branch taper, 0–1: particles shrink from trunk to tips (bracketed rules only, `41.S6`). Identity 0. */
+  taper?: number;
+  /** The stochastic plant's specimen (`41.D15`), an integer 0–9999. Read only by a stochastic rule. Default 1. */
+  seed?: number;
 }
 
 /**
@@ -519,8 +537,23 @@ export type CustomCurveStep =
   }
   | { kind: 'retrace' };
 
+/**
+ * v8 Phase 44 (`44.B1`) — **a PLANT's own productions, edited**: the second kind of `Customize` block. `family` is the
+ * plant it was seeded from — METADATA ONLY (label, landmark angle, `polygons`, `drawSymbols`), ⚠️ never part of the
+ * no-op's equality (`39.D8`). `productions` has exactly `LSystemRule.productions`' shape (a string, or weighted
+ * alternatives). Present IFF `rule === 'customize'`; read only through `resolveCustomRule`.
+ */
+export interface CustomProductions {
+  kind: 'productions';
+  family: string;
+  axiom: string;
+  productions: Record<string, string | { p: number; to: string }[]>;
+}
+
 /** v8 `39.C1` — a custom generator: its steps, what each leaf emits, and the frame captured at seeding. */
 export interface CustomCurveGenerator {
+  /** v8 Phase 44 — the block's kind; ABSENT means a generator, so every stored preset reads exactly as before. */
+  kind?: 'generator';
   steps: CustomCurveStep[];
   /** `path` emits the joints; `cells` the centre of each piece's tile, offered only when the generator fills space. */
   draw: 'path' | 'cells';

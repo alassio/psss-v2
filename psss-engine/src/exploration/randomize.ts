@@ -10,6 +10,7 @@ import { deepCopy } from './state.ts';
 import { ATTRACTOR_ENTRY_BLEND, OVERLAY_RULES } from './overlay-rules.ts';
 import { ATTRACTOR_PRESETS } from '../generators/attractors.ts';
 import { STRAND_CAPABLE } from '../generators/attractor-strand.ts';
+import { LSYSTEM_RULE_BY_KEY, isStochasticRule, type RuleKey } from '../generators/lsystem/rules.ts';
 import { getMaterialPreset, MATERIAL_PRESETS, resolveModeAgainstMaterial } from '../generators/material-presets.ts';
 import { FILM_LOOKS } from '../renderers/film-looks.ts';
 import { getAllPaletteNames } from '../presets/palettes.ts';
@@ -448,6 +449,20 @@ function applyGaussianJitter(preset: UnifiedPreset, sigma: number, locks: Set<Ca
      * and reaches `generators` fields — so `evolution-ops.ts` carries one, as a WHOLE-BLOCK choice and
      * never a per-field lerp (`36.D18`).
      */
+    /*
+     * v8 Phase 41 (`41.S7`) — **two exceptions to the no-roll rule above, and each is a VARIANT, not a different
+     * figure**: the stochastic rule's `seed` rolls (a sibling specimen of the same plant — exactly what the Randomiser
+     * is for) and an authored `taper` jitters inside 0.3–0.9. ⚠️ `growth` NEVER rolls: a mode is not a look. One
+     * implementation serves Evolution too, whose `mutatePreset` is `randomizePreset`.
+     */
+    const ls = preset.generators.lsystem;
+    if (ls !== undefined) {
+      const lr = LSYSTEM_RULE_BY_KEY[ls.rule as RuleKey];
+      if (lr !== undefined && isStochasticRule(lr)) ls.seed = Math.floor(Math.random() * 10000);
+      if (lr !== undefined && lr.bracketed && ls.taper !== undefined) {
+        ls.taper = Math.max(0.3, Math.min(0.9, ls.taper + gaussianRandom() * sigma * 0.6));
+      }
+    }
     preset.generators.particleCount = Math.max(10, Math.round(jitter(preset.generators.particleCount, 'generators.particleCount', sigma, stats)));
     for (let w = 0; w < preset.generators.waves.length; w++) {
       const wave = preset.generators.waves[w]!;

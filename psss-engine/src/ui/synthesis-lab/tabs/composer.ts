@@ -109,26 +109,46 @@ import {
 import { sliderMul } from '../../../exploration/slider-mappings.ts';
 // Rotation's signed quartic track, its step and its RPM formatter — three owners, none of them here.
 import { ROT_STEP, rotationToPos, posToRotation, fmtRotationRpm } from '../../../core/rotation-track.ts';
-import { TAB_TIPS } from '../tooltips.ts';
+import { TAB_TIPS, PRODUCTION_SYMBOL_TIPS } from '../tooltips.ts';
 import { makeCollapsible } from '../collapsible.ts';
 import { computeCurveScore } from '../score-canvas.ts';
 import { FIGURE_TYPES } from '../../../generators/figure-types.ts';
 import {
-  LSYSTEM_RULES, LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, LSYSTEM_ANGLE_BRACKET,
+  LSYSTEM_RULES, LSYSTEM_RULE_BY_KEY, LSYSTEM_DEFAULT_RULE, angleBracketFor,
   LSYSTEM_MIN_USEFUL_BRACKET_DEG, DESCEND_MIN, DESCEND_MAX, defaultLSystemConfig,
-  ruleAngleUsage, type RuleKey,
+  ruleAngleUsage, isStochasticRule, type RuleKey, type LSystemRule,
 } from '../../../generators/lsystem/rules.ts';
+import {
+  GROWTH_MODES, GROWTH_DEFAULTS, GROWTH_TIME_RANGE, GROWTH_PAUSE_RANGE, SEED_RANGE, type GrowthMode,
+} from '../../../generators/lsystem/growth.ts';
+
+/**
+ * v8 Phase 41 — the Growth dropdown's labels (`41.D19`'s wording). A `Record`, so a new mode is a `tsc` error here.
+ */
+const GROWTH_MODE_LABELS: Record<GrowthMode, string> = {
+  off: 'Off',
+  once: 'Grow once',
+  loop: 'Loop',
+  loopNew: 'Loop, new plant each time',
+};
 import { ruleAngleEffect } from '../../../generators/lsystem/turtle.ts';
-import { LSYSTEM_GENERATORS } from '../../../generators/lsystem/generator.ts';
+import { generatorFlagsFor } from '../../../generators/lsystem/generator.ts';
 import {
   CUSTOM_RULE_KEY, CUSTOM_RULE_LABEL, CUSTOM_RANGES, CUSTOM_K_MAX, CUSTOM_K_MIN, CUSTOM_UNIT_RANGE,
   CUSTOM_UNIT_STEP, CUSTOM_LENGTH_RANGE, CUSTOM_LENGTH_STEP, CUSTOM_DENSITY_BANDS, customSeedable, seedCustom,
   resolveCustomRule, walkCustom, customTile, customDensity, buildCustom, newMoveStep, retracePartners,
   customInitiatorError, CUSTOM_CELL_PITCH, type ResolvedCurveRule,
 } from '../../../generators/lsystem/custom.ts';
+import {
+  isProductionsBlock, seedProductions, productionsMatchRule, synthesizeRule, validateProductions, blockTexts,
+  isProductionLetter, freeLetter, insertSymbol, deleteBefore, deleteAfter, normaliseWeights, snapWeight,
+  PRODUCTION_LIMITS, PRODUCTION_SYMBOLS, PRODUCTION_WEIGHT, type TextEdit,
+} from '../../../generators/lsystem/productions.ts';
 import type {
-  FigureType, LSystemConfig, ModulatedValue, CustomCurveGenerator, CustomCurveStep,
+  FigureType, LSystemConfig, ModulatedValue, CustomCurveGenerator, CustomCurveStep, CustomProductions,
 } from '../../../core/interfaces.ts';
+/** v8 Phase 44 (`44.D5`) — the plants with BOTH editors, the only ones offered `Edit as`. */
+const EDIT_AS_FAMILIES: readonly RuleKey[] = ['plant', 'sprig', 'thicketWeed'];
 // ⚠️ The rate unit is Phase 34's `OP_RATE_*`, NOT the wave-slot `frequency` scale (`36.D6c`) — the two
 // fields share a NAME and not a unit, and `LSystemConfig`'s own declaration states which is which.
 import { OP_RATE_MAX } from '../../../core/deform-limits.ts';
@@ -173,6 +193,13 @@ function curveBodyKey(cfg: LSystemConfig): string {
 function withoutCustom(cfg: LSystemConfig): LSystemConfig {
   const c = { ...cfg };
   delete c.custom;
+  return c;
+}
+
+/** v8 Phase 41 — a copy with none of the five growth/taper/seed keys (absent = their identity, `41.S5`). */
+function withoutGrowth(cfg: LSystemConfig): LSystemConfig {
+  const c = { ...cfg };
+  delete c.growth; delete c.growthTime; delete c.growthPause; delete c.taper; delete c.seed;
   return c;
 }
 import type { Collapsible } from '../collapsible.ts';
@@ -980,6 +1007,12 @@ export class ComposerTab implements TabModule {
   }
   /** v8 `39.C3` — whether the generator editor shows its Lift column (a view choice, never stored). */
   private showLift = false;
+  /** v8 Phase 44 — the production editor's focused strip and caret (a view state, never stored). */
+  private prodFocus: { strip: string; caret: number } | null = null;
+  /** v8 Phase 44 — the last REFUSED edit's reason, shown on the status line until the next commit. */
+  private prodMessage: string | null = null;
+  /** v8 Phase 44 — the strips of the LAST built production editor, by strip id (focus is restored onto these). */
+  private prodStrips = new Map<string, HTMLElement>();
 
   private render(): void {
     const el = this.container!;
@@ -3825,9 +3858,12 @@ export class ComposerTab implements TabModule {
     const custOpt = document.createElement('option');
     custOpt.value = CUSTOM_RULE_KEY;
     custOpt.textContent = CUSTOM_RULE_LABEL;
-    const seedable = isCustom || customSeedable(rule.key as RuleKey);
+    // v8 Phase 44 (`44.D4`) — every PLANT is customizable through its productions; only the tetrahedra keep a reason.
+    const plantFamily = rule.plant === true && rule.builder === undefined;
+    const seedable = isCustom || plantFamily || customSeedable(rule.key as RuleKey);
     custOpt.disabled = !seedable;
-    custOpt.title = seedable ? TAB_TIPS['composer.customize']! : TAB_TIPS['composer.customizeUnavailable']!;
+    custOpt.title = plantFamily ? TAB_TIPS['composer.customizePlant']!
+      : seedable ? TAB_TIPS['composer.customize']! : TAB_TIPS['composer.customizeUnavailableTetra']!;
     ruleSel.appendChild(custOpt);
     ruleSel.value = isCustom ? CUSTOM_RULE_KEY : rule.key;
     ruleSel.addEventListener('change', () => {
@@ -3838,7 +3874,11 @@ export class ComposerTab implements TabModule {
        */
       if (ruleSel.value === CUSTOM_RULE_KEY) {
         if (live.rule === CUSTOM_RULE_KEY) return;
-        const seed = seedCustom(rule.key as RuleKey, live.recursion.base, live.yaw.base, live.pitch.base, live.roll.base);
+        // v8 Phase 44 (`44.D6`) — a PLANT opens the production editor; every other rule the generator editor.
+        this.prodFocus = null;
+        this.prodMessage = null;
+        const seed = plantFamily ? seedProductions(rule.key as RuleKey)
+          : seedCustom(rule.key as RuleKey, live.recursion.base, live.yaw.base, live.pitch.base, live.roll.base);
         if (seed === null) { ruleSel.value = rule.key; return; }
         this.commitLSystem({ ...live, rule: CUSTOM_RULE_KEY, custom: seed });
         this.render();
@@ -3859,13 +3899,23 @@ export class ComposerTab implements TabModule {
       const still = (base: number): ModulatedValue => ({ base, amplitude: 0, frequency: 0 });
       // ⚠️ A named pick DROPS the custom generator — it is stored only under `customize` (spec §3.5), and the
       // next `Customize` pick re-seeds from the rule then on screen (spec §3.1: "edits replaced, no confirmation").
+      /*
+       * v8 Phase 41 (`41.S7`) — **the pick resets growth too**: a PLANT starts growing (`41.D19`: loop, a new plant each
+       * cycle; `41.D23`: 12 s / 4 s; taper 0.6; seed 1), any other rule starts with growth OFF — the fields are DROPPED,
+       * so the block reads as no growth at all (absent = identity) rather than carrying a plant's settings onto a dragon.
+       */
+      const grown = withoutGrowth(withoutCustom(live));
       this.commitLSystem({
-        ...withoutCustom(live),
+        ...grown,
         rule: next.key,
-        recursion: still(Math.min(next.recursionRange[1], next.recursionRange[0] + 1)),
+        recursion: still(next.defaultRecursion ?? Math.min(next.recursionRange[1], next.recursionRange[0] + 1)),
         yaw: still(next.publishedAngle), pitch: still(next.publishedAngle), roll: still(next.publishedAngle),
         twist: { ...fresh.twist },
         stretch: { ...fresh.stretch },
+        ...(next.plant === true ? {
+          growth: 'loopNew' as const, growthTime: GROWTH_DEFAULTS.time, growthPause: GROWTH_DEFAULTS.pause,
+          taper: GROWTH_DEFAULTS.taper, ...(isStochasticRule(next) ? { seed: GROWTH_DEFAULTS.seed } : {}),
+        } : {}),
       });
       this.render();
       this.sync();
@@ -3885,12 +3935,15 @@ export class ComposerTab implements TabModule {
      * names that rule and its published angle (the figure IS that rule); after the first structural edit it
      * describes the custom generator instead. Undoing the edit brings the rule's name back.
      */
+    const prodBlock = isCustom && isProductionsBlock(cfg.custom);
     prov.textContent = own !== null
       ? `Custom generator  ·  ${own.gen.steps.length} pieces  ·  recursion 1\u2013${own.maxDepth}`
-      : (isCustom ? `Same generator as ${rule.name}  ·  ` : '') + `Named at ${rule.publishedAngle}°`
+      : rule.synthesized === true
+        ? `Custom productions  ·  edited from ${rule.name}  ·  recursion ${rule.recursionRange[0]}\u2013${rule.recursionRange[1]}`
+        : (isCustom ? `Same ${prodBlock ? 'productions' : 'generator'} as ${rule.name}  ·  ` : '') + `Named at ${rule.publishedAngle}°`
         + `  ·  recursion ${rule.recursionRange[0]}\u2013${rule.recursionRange[1]}`
         + `  ·  ${rule.closed ? 'closed loop' : 'open curve'}`;
-    if (isCustom) prov.title = TAB_TIPS['composer.customizeNote']!;
+    if (isCustom) prov.title = prodBlock ? TAB_TIPS['composer.productions']! : TAB_TIPS['composer.customizeNote']!;
     sec.appendChild(prov);
 
     this.curveExclusion = null;
@@ -3949,7 +4002,7 @@ export class ComposerTab implements TabModule {
      * with no such copy the row would move nothing. ⚠️ Twist's range is the rule's own (`39.A0(d)`), and the
      * dragon / Lévy C rows name their landmark in the tooltip — 180° is the OTHER named curve.
      */
-    const genFlags = own !== null ? null : LSYSTEM_GENERATORS[rule.key];
+    const genFlags = own !== null ? null : generatorFlagsFor(rule);
     // v8 `39.C` — a custom generator's Twist / Stretch rows exist iff some piece is MARKED for them.
     if (ownSteps !== null && ownSteps.some((s) => s.kind === 'move' && s.twistable)) {
       this.appendCurveTriple(sec, 'Twist', TAB_TIPS['composer.twist']!, 'twist',
@@ -4027,7 +4080,7 @@ export class ComposerTab implements TabModule {
      * the point list every frame — the control is not wrong, no per-row note can own it, and the author
      * needs it before the first drag rather than after. **Measured, and a property of the RULE.**
      */
-    const br = LSYSTEM_ANGLE_BRACKET[rule.key];
+    const br = angleBracketFor(rule);
     if (own === null && (br.yaw < LSYSTEM_MIN_USEFUL_BRACKET_DEG || br.multi < LSYSTEM_MIN_USEFUL_BRACKET_DEG)) {
       const cost = document.createElement('p');
       cost.className = 'sl-composer-precondition';
@@ -4036,8 +4089,545 @@ export class ComposerTab implements TabModule {
       sec.appendChild(cost);
     }
 
-    if (isCustom) this.buildGeneratorEditor(sec, cfg.custom!, resolved);
+    // v8 Phase 41 (`41.S8`) — growth (every curve), taper (branching rules) and seed (the stochastic rule).
+    this.appendGrowthRows(sec, rule, own !== null, rule.zoomInverse || (own !== null && ownCells));
+
+    if (isCustom) {
+      const blk = cfg.custom!;
+      if (isProductionsBlock(blk)) this.buildProductionsEditor(sec, blk);
+      else this.buildGeneratorEditor(sec, blk, resolved);
+    }
     return sec;
+  }
+
+  /**
+   * v8 Phase 41 (`41.S8`) — **the `Growth` sub-head**: the mode, then `Growth time` and `Pause` while growth is on,
+   * then `Taper` on a branching rule and `Seed` on the stochastic one. ⚠️ Every row is ABSENT where it cannot change
+   * the picture (`36`'s rule) — derived from the rule's own flags, never a hand-list. A mode change rebuilds the body,
+   * because it shows or hides the two time rows.
+   */
+  private appendGrowthRows(sec: HTMLElement, rule: LSystemRule, isOwn: boolean, zooms: boolean): void {
+    const cfg = this.liveLSystem();
+    const head = document.createElement('div');
+    head.className = 'sl-section-title sl-composer-subhead';
+    head.textContent = 'Growth';
+    head.title = TAB_TIPS['composer.growth']!;
+    sec.appendChild(head);
+
+    const row = document.createElement('div');
+    row.className = 'sl-vfx-row';
+    row.title = TAB_TIPS['composer.growth']!;
+    const lab = document.createElement('span');
+    lab.className = 'sl-vfx-label';
+    lab.textContent = 'Growth';
+    row.appendChild(lab);
+    const sel = document.createElement('select');
+    sel.className = 'sl-dropdown';
+    sel.title = TAB_TIPS['composer.growth']!;
+    sel.setAttribute('aria-label', 'Growth');
+    // `Loop, new plant each time` only where a new seed can draw a different figure: the stochastic rule, and every
+    // plant (the owner's default for a plant, `41.D19` — on a fixed plant it regrows the same shape).
+    const offerNew = !isOwn && (rule.plant === true || isStochasticRule(rule));
+    for (const m of GROWTH_MODES) {
+      if (m === 'loopNew' && !offerNew && cfg.growth !== 'loopNew') continue;
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = GROWTH_MODE_LABELS[m];
+      sel.appendChild(opt);
+    }
+    sel.value = cfg.growth ?? 'off';
+    sel.addEventListener('change', () => {
+      const live = this.liveLSystem();
+      const mode = sel.value as GrowthMode;
+      if (mode === 'off') {
+        const c = { ...live };
+        delete c.growth; delete c.growthTime; delete c.growthPause;
+        this.commitLSystem(c);
+      } else {
+        this.commitLSystem({
+          ...live, growth: mode,
+          growthTime: live.growthTime ?? GROWTH_DEFAULTS.time, growthPause: live.growthPause ?? GROWTH_DEFAULTS.pause,
+        });
+      }
+      this.render();
+      this.sync();
+    });
+    row.appendChild(sel);
+    sec.appendChild(row);
+
+    const on = (cfg.growth ?? 'off') !== 'off';
+    if (on) {
+      const secs = (v: number): string => `${v.toFixed(1)} s`;
+      const linear = (lo: number, hi: number) => ({
+        toPos: (v: number) => (v - lo) / (hi - lo),
+        // Quantised to half a second in the STORED unit, so an authored 12 s reads back as 12.0 s exactly.
+        fromPos: (q: number) => Math.round((lo + q * (hi - lo)) * 2) / 2,
+      });
+      sec.appendChild(this.framingRow('Growth time', TAB_TIPS['composer.growthTime']!, {
+        min: 0, max: 1, step: 1 / 128,
+        get: () => this.liveLSystem().growthTime ?? GROWTH_DEFAULTS.time,
+        set: (v) => this.commitLSystem({ ...this.liveLSystem(), growthTime: v }),
+        ...linear(GROWTH_TIME_RANGE[0], GROWTH_TIME_RANGE[1]), fmt: secs,
+      }));
+      sec.appendChild(this.framingRow('Pause', TAB_TIPS['composer.growthPause']!, {
+        min: 0, max: 1, step: 1 / 128,
+        get: () => this.liveLSystem().growthPause ?? GROWTH_DEFAULTS.pause,
+        set: (v) => this.commitLSystem({ ...this.liveLSystem(), growthPause: v }),
+        ...linear(GROWTH_PAUSE_RANGE[0], GROWTH_PAUSE_RANGE[1]), fmt: secs,
+      }));
+      if (zooms) {
+        // ⚠️ A precondition, inline (invariant 25): the zoom owns the recursion, so growth waits while it is on.
+        const pre = document.createElement('p');
+        pre.className = 'sl-composer-precondition';
+        pre.textContent = 'Growth pauses while Descend is above 1×: the zoom and the growth both drive the recursion.';
+        sec.appendChild(pre);
+      }
+    }
+    if (!isOwn && rule.bracketed) {
+      sec.appendChild(this.framingRow('Taper', TAB_TIPS['composer.taper']!, {
+        min: 0, max: 1, step: CURVE_STEP,
+        get: () => this.liveLSystem().taper ?? 0,
+        set: (v) => {
+          const live = this.liveLSystem();
+          if (v === 0) { const c = { ...live }; delete c.taper; this.commitLSystem(c); }
+          else this.commitLSystem({ ...live, taper: v });
+        },
+        toPos: (v) => v, fromPos: (q) => q, fmt: (v) => v.toFixed(2),
+      }));
+    }
+    if (!isOwn && isStochasticRule(rule)) {
+      const srow = document.createElement('div');
+      srow.className = 'sl-vfx-row';
+      srow.title = TAB_TIPS['composer.seed']!;
+      const slab = document.createElement('span');
+      slab.className = 'sl-vfx-label';
+      slab.textContent = 'Seed';
+      srow.appendChild(slab);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'sl-input sl-composer-seed';
+      input.min = String(SEED_RANGE[0]);
+      input.max = String(SEED_RANGE[1]);
+      input.step = '1';
+      input.value = String(cfg.seed ?? GROWTH_DEFAULTS.seed);
+      input.title = TAB_TIPS['composer.seed']!;
+      input.setAttribute('aria-label', 'Seed');
+      const commitSeed = (v: number): void => {
+        const s = Math.max(SEED_RANGE[0], Math.min(SEED_RANGE[1], Math.round(Number.isFinite(v) ? v : 1)));
+        input.value = String(s);
+        this.commitLSystem({ ...this.liveLSystem(), seed: s });
+      };
+      input.addEventListener('change', () => commitSeed(Number(input.value)));
+      srow.appendChild(input);
+      const roll = document.createElement('button');
+      roll.className = 'sl-btn sl-btn-sm';
+      roll.textContent = 'New';
+      roll.title = TAB_TIPS['composer.seedNew']!;
+      roll.setAttribute('aria-label', 'New seed');
+      roll.addEventListener('click', () => commitSeed(Math.floor(Math.random() * (SEED_RANGE[1] + 1))));
+      srow.appendChild(roll);
+      sec.appendChild(srow);
+    }
+  }
+
+  /**
+   * v8 Phase 44 (`44.D5`) — **`Edit as: Generator / Productions`**, only on the three plants with BOTH editors (Plant,
+   * Sprig, Thicket Weed), and only while the block still names its plant (a productions block always does; a generator
+   * block only while it EQUALS the plant — an edited generator records no family, so it cannot be switched, only
+   * re-picked). Switching re-seeds the other editor from the plant and replaces the edits with no confirmation
+   * (`44.X1`, the named-pick precedent).
+   */
+  private appendEditAs(sec: HTMLElement, current: 'generator' | 'productions', family: RuleKey): void {
+    if (!EDIT_AS_FAMILIES.includes(family)) return;
+    const row = document.createElement('div');
+    row.className = 'sl-vfx-row';
+    row.title = TAB_TIPS['composer.editAs']!;
+    const lab = document.createElement('span');
+    lab.className = 'sl-vfx-label';
+    lab.textContent = 'Edit as';
+    row.appendChild(lab);
+    const sel = document.createElement('select');
+    sel.className = 'sl-dropdown';
+    sel.title = TAB_TIPS['composer.editAs']!;
+    sel.setAttribute('aria-label', 'Edit as');
+    for (const [v, label] of [['productions', 'Productions'], ['generator', 'Generator']] as const) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      sel.appendChild(o);
+    }
+    sel.value = current;
+    sel.addEventListener('change', () => {
+      const live = this.liveLSystem();
+      const next = sel.value === 'generator'
+        ? seedCustom(family, live.recursion.base, live.yaw.base, live.pitch.base, live.roll.base)
+        : seedProductions(family);
+      if (next === null) { sel.value = current; return; }
+      this.prodFocus = null;
+      this.prodMessage = null;
+      this.commitLSystem({ ...live, rule: CUSTOM_RULE_KEY, custom: next });
+      this.render();
+      this.sync();
+    });
+    row.appendChild(sel);
+    sec.appendChild(row);
+  }
+
+  /**
+   * v8 Phase 44 (`44.B4`) — **commit an edited production block, or refuse it.** ⚠️ The ONE gate: the validator and the
+   * synthesis (does it fit at depth 1?) — a refused edit commits nothing and its reason goes on the status line. A
+   * commit is always a NEW block (`resolveCustomRule` memoises by identity), and a Recursion above the new limit is
+   * clamped so its row re-reads the engine (`32.14`).
+   */
+  private commitProductions(next: CustomProductions): void {
+    const v = validateProductions(next);
+    if (v.error !== null) { this.prodMessage = v.error; this.render(); return; }
+    if (productionsMatchRule(next) === null && synthesizeRule(next) === null) {
+      this.prodMessage = 'Too large: even one level of this plant would pass the drawing budget.';
+      this.render();
+      return;
+    }
+    const live = this.liveLSystem();
+    const res = resolveCustomRule({ rule: CUSTOM_RULE_KEY, custom: next });
+    const rr = res.kind === 'named' ? res.rule.recursionRange : [1, live.recursion.base] as const;
+    const base = Math.min(rr[1], Math.max(rr[0], live.recursion.base));
+    this.prodMessage = null;
+    this.commitLSystem({ ...live, rule: CUSTOM_RULE_KEY, custom: next, recursion: { ...live.recursion, base } });
+    this.render();
+    this.sync();
+    /*
+     * ⚠️⚠️ **Focus back onto the edited strip SYNCHRONOUSLY.** `render()` replaced it; a deferred focus (`setTimeout`) left a
+     * gap in which the next typed key landed on the DOCUMENT — where the app's shortcuts live, so a fast `ArrowRight`
+     * changed the PRESET (`uicheck` §AD found it: keys typed without a pause).
+     */
+    const f = this.prodFocus;
+    if (f !== null) this.prodStrips.get(f.strip)?.focus();
+  }
+
+  /**
+   * v8 Phase 44 (`44.B5`) — **the production editor**, inline where the generator editor sits: the Axiom strip, one row
+   * per production (random ones with their alternatives and weights), `+ Production`, the symbol palette and the status
+   * line. ⚠️⚠️ **A strip is NOT an `<input>`**, so the app's document shortcuts (`+ - a l r`, the arrows that change
+   * preset) would fire while typing in it: every key the strip handles calls `stopPropagation()` (`44.S0d`).
+   */
+  private buildProductionsEditor(sec: HTMLElement, block: CustomProductions): void {
+    const fam = LSYSTEM_RULE_BY_KEY[block.family as RuleKey];
+    if (fam === undefined) return;
+    const outline = fam.polygons === 'outline';
+    this.appendEditAs(sec, 'productions', fam.key);
+
+    const head = document.createElement('div');
+    head.className = 'sl-section-title';
+    head.textContent = 'Productions';
+    head.title = TAB_TIPS['composer.productions']!;
+    sec.appendChild(head);
+
+    // ---- one text per strip id: `axiom`, `p:X` (a plain production), `a:X:i` (alternative i of a random one)
+    const textOf = (id: string): string => {
+      if (id === 'axiom') return block.axiom;
+      const [kind, sym, idx] = id.split(':');
+      const p = block.productions[sym!];
+      if (p === undefined) return '';
+      if (kind === 'p') return typeof p === 'string' ? p : '';
+      return typeof p === 'string' ? '' : (p[Number(idx)]?.to ?? '');
+    };
+    const withText = (id: string, text: string): CustomProductions => {
+      if (id === 'axiom') return { ...block, productions: { ...block.productions }, axiom: text };
+      const [kind, sym, idx] = id.split(':');
+      const prods = { ...block.productions };
+      const p = prods[sym!];
+      if (kind === 'p') prods[sym!] = text;
+      else if (p !== undefined && typeof p !== 'string') prods[sym!] = p.map((a, i) => (i === Number(idx) ? { p: a.p, to: text } : { ...a }));
+      return { ...block, productions: prods };
+    };
+    const limitOf = (id: string): number => (id === 'axiom' ? PRODUCTION_LIMITS.axiom : PRODUCTION_LIMITS.chips);
+    const groupOf = (c: string): string => {
+      if (isProductionLetter(c) && !PRODUCTION_SYMBOLS.draw.includes(c)) return 'letter';
+      for (const g of ['draw', 'move', 'turn', 'branch', 'leaf', 'mark'] as const) if (PRODUCTION_SYMBOLS[g].includes(c)) return g;
+      return 'letter';
+    };
+    const tipOf = (c: string): string => PRODUCTION_SYMBOL_TIPS[c] ?? PRODUCTION_SYMBOL_TIPS['letter']!;
+    const glyph = (c: string): string => (c === '-' ? '−' : c);
+
+    const strips = new Map<string, { el: HTMLElement; paint: () => void }>();
+    this.prodStrips = new Map();
+    const flash = (el: HTMLElement): void => {
+      el.classList.add('sl-prod-strip--reject');
+      setTimeout(() => el.classList.remove('sl-prod-strip--reject'), 300);
+    };
+    /** Apply an edit to the focused strip: a refusal flashes and shows its reason; a change commits. */
+    const apply = (id: string, edit: TextEdit): void => {
+      const s = strips.get(id);
+      if ('refused' in edit) {
+        if (s) flash(s.el);
+        this.prodMessage = edit.refused;
+        const st = sec.querySelector('.sl-prod-status');
+        if (st) { st.textContent = `⚠ ${edit.refused}`; st.className = 'sl-prod-status sl-prod-status--error'; }
+        return;
+      }
+      this.prodFocus = { strip: id, caret: edit.caret };
+      if (edit.text === textOf(id)) { s?.paint(); return; }
+      this.commitProductions(withText(id, edit.text));
+    };
+    const makeStrip = (id: string, label: string, tip: string): HTMLElement => {
+      const el = document.createElement('div');
+      el.className = 'sl-prod-strip';
+      el.tabIndex = 0;
+      el.title = tip;
+      el.setAttribute('aria-label', label);
+      const paint = (): void => {
+        el.replaceChildren();
+        const text = textOf(id);
+        const caret = this.prodFocus?.strip === id ? Math.min(text.length, this.prodFocus.caret) : -1;
+        const putCaret = (): void => { const c = document.createElement('span'); c.className = 'sl-prod-caret'; el.appendChild(c); };
+        [...text].forEach((c, i) => {
+          if (i === caret) putCaret();
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.tabIndex = -1;
+          chip.className = `sl-prod-chip sl-prod-chip--${groupOf(c)}`;
+          chip.textContent = glyph(c);
+          chip.title = tipOf(c);
+          chip.setAttribute('aria-label', tipOf(c));
+          // keep the STRIP focused: a chip only places the caret after itself
+          chip.addEventListener('mousedown', (e) => e.preventDefault());
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.prodFocus = { strip: id, caret: i + 1 };
+            el.focus();
+            paintAll();
+          });
+          el.appendChild(chip);
+        });
+        if (caret === text.length) putCaret();
+      };
+      el.addEventListener('mousedown', (e) => {
+        if (e.target !== el) return;
+        e.preventDefault();
+        this.prodFocus = { strip: id, caret: textOf(id).length };
+        el.focus();
+        paintAll();
+      });
+      el.addEventListener('focus', () => {
+        if (this.prodFocus?.strip !== id) { this.prodFocus = { strip: id, caret: textOf(id).length }; paintAll(); }
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.key === 'Tab' || e.key === 'Escape') return;
+        const text = textOf(id);
+        const caret = this.prodFocus?.strip === id ? Math.min(text.length, this.prodFocus.caret) : text.length;
+        let handled = true;
+        if (e.key === 'ArrowLeft') this.prodFocus = { strip: id, caret: Math.max(0, caret - 1) };
+        else if (e.key === 'ArrowRight') this.prodFocus = { strip: id, caret: Math.min(text.length, caret + 1) };
+        else if (e.key === 'Home') this.prodFocus = { strip: id, caret: 0 };
+        else if (e.key === 'End') this.prodFocus = { strip: id, caret: text.length };
+        else if (e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); apply(id, deleteBefore(text, caret)); return; }
+        else if (e.key === 'Delete') { e.preventDefault(); e.stopPropagation(); apply(id, deleteAfter(text, caret)); return; }
+        else if (e.key.length === 1) {
+          e.preventDefault(); e.stopPropagation();
+          apply(id, insertSymbol(text, caret, e.key, outline, limitOf(id)));
+          return;
+        } else handled = false;
+        if (handled) { e.preventDefault(); e.stopPropagation(); paintAll(); }
+      });
+      strips.set(id, { el, paint });
+      this.prodStrips.set(id, el);
+      paint();
+      return el;
+    };
+    const paintAll = (): void => {
+      for (const s of strips.values()) s.paint();
+      paintPalette();
+    };
+
+    // ---- the axiom
+    const axRow = document.createElement('div');
+    axRow.className = 'sl-prod-row';
+    const axLab = document.createElement('span');
+    axLab.className = 'sl-vfx-label';
+    axLab.textContent = 'Axiom';
+    axRow.appendChild(axLab);
+    axRow.appendChild(makeStrip('axiom', 'Axiom', TAB_TIPS['composer.prodAxiom']!));
+    sec.appendChild(axRow);
+
+    const btn = (text: string, label: string, tip: string, enabled: boolean, onClick: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sl-btn sl-gen-btn';
+      b.textContent = text;
+      b.title = tip;
+      b.setAttribute('aria-label', label);
+      b.disabled = !enabled;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+    const copyProds = (): Record<string, string | { p: number; to: string }[]> => {
+      const o: Record<string, string | { p: number; to: string }[]> = {};
+      for (const k of Object.keys(block.productions)) {
+        const p = block.productions[k]!;
+        o[k] = typeof p === 'string' ? p : p.map((a) => ({ ...a }));
+      }
+      return o;
+    };
+    // ---- one row per production
+    for (const sym of Object.keys(block.productions)) {
+      const p = block.productions[sym]!;
+      const row = document.createElement('div');
+      row.className = 'sl-prod-row';
+      const s = document.createElement('span');
+      s.className = 'sl-prod-sym';
+      s.textContent = sym;
+      row.appendChild(s);
+      const ar = document.createElement('span');
+      ar.className = 'sl-prod-arrow';
+      ar.textContent = '→';
+      row.appendChild(ar);
+      const alts = typeof p === 'string' ? null : p;
+      if (alts === null) row.appendChild(makeStrip(`p:${sym}`, `${sym} production`, TAB_TIPS['composer.prodRow']!));
+      const canAlt = (alts?.length ?? 1) < PRODUCTION_LIMITS.alternatives;
+      row.appendChild(btn('+ Alternative', `Add an alternative to ${sym}`, TAB_TIPS['composer.prodAddAlternative']!, canAlt, () => {
+        const prods = copyProds();
+        const cur = prods[sym]!;
+        const list = typeof cur === 'string' ? [{ p: 1, to: cur }] : cur;
+        const raw = [...list.map((a) => a.p), 1 / (list.length + 1)];
+        const w = normaliseWeights(raw);
+        prods[sym] = [...list, { p: 0, to: list[0]!.to }].map((a, i) => ({ p: w[i]!, to: a.to }));
+        this.commitProductions({ ...block, productions: prods });
+      }));
+      row.appendChild(btn('✕', `Remove the ${sym} production`, TAB_TIPS['composer.prodRemove']!, true, () => {
+        const prods = copyProds();
+        delete prods[sym];
+        this.commitProductions({ ...block, productions: prods });
+      }));
+      sec.appendChild(row);
+      if (alts !== null) {
+        alts.forEach((a, i) => {
+          const r2 = document.createElement('div');
+          r2.className = 'sl-prod-row sl-prod-row--alt';
+          r2.appendChild(makeStrip(`a:${sym}:${i}`, `${sym} alternative ${i + 1}`, TAB_TIPS['composer.prodRow']!));
+          const wIn = document.createElement('input');
+          wIn.type = 'number';
+          wIn.className = 'sl-gen-num sl-prod-weight';
+          wIn.min = String(PRODUCTION_WEIGHT.min);
+          wIn.max = String(1 - PRODUCTION_WEIGHT.min * (alts.length - 1));
+          wIn.step = String(PRODUCTION_WEIGHT.step);
+          wIn.value = String(Math.round(a.p * 100) / 100);
+          wIn.title = TAB_TIPS['composer.prodWeight']!;
+          wIn.setAttribute('aria-label', `${sym} alternative ${i + 1} weight`);
+          wIn.addEventListener('change', () => {
+            const v = parseFloat(wIn.value);
+            if (!Number.isFinite(v)) { wIn.value = String(Math.round(a.p * 100) / 100); return; }
+            // `44.B4`: the typed SHARE is kept exactly; the others are rescaled to fill the rest.
+            const share = Math.min(1 - PRODUCTION_WEIGHT.min * (alts.length - 1), snapWeight(v));
+            const others = alts.reduce((acc, b, j) => (j === i ? acc : acc + b.p), 0);
+            const raw = alts.map((b, j) => (j === i ? share : others > 0 ? (b.p / others) * (1 - share) : (1 - share) / (alts.length - 1)));
+            const w = normaliseWeights(raw);
+            const prods = copyProds();
+            prods[sym] = alts.map((b, j) => ({ p: w[j]!, to: b.to }));
+            this.commitProductions({ ...block, productions: prods });
+          });
+          r2.appendChild(wIn);
+          const pct = document.createElement('span');
+          pct.className = 'sl-prod-share';
+          pct.textContent = `${Math.round(a.p * 100)} %`;
+          r2.appendChild(pct);
+          r2.appendChild(btn('✕', `Remove ${sym} alternative ${i + 1}`, TAB_TIPS['composer.prodRemoveAlt']!, true, () => {
+            const rest = alts.filter((_, j) => j !== i);
+            const prods = copyProds();
+            if (rest.length === 1) prods[sym] = rest[0]!.to;
+            else { const w = normaliseWeights(rest.map((b) => b.p)); prods[sym] = rest.map((b, j) => ({ p: w[j]!, to: b.to })); }
+            this.commitProductions({ ...block, productions: prods });
+          }));
+          sec.appendChild(r2);
+        });
+      }
+    }
+
+    // ---- + Production: a letter the rule uses with no production yet, or a new one
+    const addRow = document.createElement('div');
+    addRow.className = 'sl-vfx-row';
+    const addSel = document.createElement('select');
+    addSel.className = 'sl-dropdown';
+    addSel.title = TAB_TIPS['composer.prodAddProduction']!;
+    addSel.setAttribute('aria-label', 'Add a production');
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = '+ Production…';
+    addSel.appendChild(ph);
+    const used = new Set<string>();
+    for (const t of blockTexts(block)) for (const c of t) if (isProductionLetter(c)) used.add(c);
+    const missing = [...used].filter((c) => block.productions[c] === undefined).sort();
+    for (const c of missing) {
+      const o = document.createElement('option');
+      o.value = c;
+      o.textContent = c;
+      addSel.appendChild(o);
+    }
+    const fresh = freeLetter(block);
+    if (fresh !== null) {
+      const o = document.createElement('option');
+      o.value = fresh;
+      o.textContent = `New letter (${fresh})`;
+      addSel.appendChild(o);
+    }
+    addSel.disabled = Object.keys(block.productions).length >= PRODUCTION_LIMITS.productions;
+    addSel.addEventListener('change', () => {
+      const c = addSel.value;
+      if (c === '') return;
+      const prods = copyProds();
+      prods[c] = 'F';
+      this.commitProductions({ ...block, productions: prods });
+    });
+    addRow.appendChild(addSel);
+    sec.appendChild(addRow);
+
+    // ---- the palette: acts on the focused strip's caret
+    const pal = document.createElement('div');
+    pal.className = 'sl-prod-palette';
+    pal.title = TAB_TIPS['composer.prodPalette']!;
+    pal.setAttribute('aria-label', 'Symbols');
+    const palChips: HTMLButtonElement[] = [];
+    const group = (label: string, syms: string[]): void => {
+      const g = document.createElement('span');
+      g.className = 'sl-prod-group';
+      g.textContent = label;
+      pal.appendChild(g);
+      for (const c of syms) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `sl-prod-chip sl-prod-chip--${groupOf(c)}`;
+        b.textContent = c === '[' ? '[ ]' : c === '{' ? '{ }' : glyph(c);
+        b.title = tipOf(c);
+        b.setAttribute('aria-label', `Insert ${tipOf(c)}`);
+        b.addEventListener('mousedown', (e) => e.preventDefault());
+        b.addEventListener('click', () => {
+          const f = this.prodFocus;
+          if (f === null) return;
+          apply(f.strip, insertSymbol(textOf(f.strip), f.caret, c, outline, limitOf(f.strip)));
+        });
+        palChips.push(b);
+        pal.appendChild(b);
+      }
+    };
+    group('Draw', ['F', 'f']);
+    group('Turn', ['+', '-', '&', '^', '/', '\\', '|']);
+    group('Structure', outline ? ['[', '{'] : ['[']);
+    const letters = [...new Set([...Object.keys(block.productions), ...used])].filter((c) => !PRODUCTION_SYMBOLS.draw.includes(c)).sort();
+    const nl = freeLetter(block);
+    group('Letters', nl !== null ? [...letters, nl] : letters);
+    const paintPalette = (): void => { for (const b of palChips) b.disabled = this.prodFocus === null || !strips.has(this.prodFocus.strip); };
+    sec.appendChild(pal);
+
+    // ---- the status line: a refusal, or the soft notes (set once; never ternary copy across renders)
+    const status = document.createElement('p');
+    status.className = this.prodMessage !== null ? 'sl-prod-status sl-prod-status--error' : 'sl-prod-status';
+    const notes = validateProductions(block).notes;
+    status.textContent = this.prodMessage !== null ? `⚠ ${this.prodMessage}` : notes.join('  ·  ');
+    sec.appendChild(status);
+    paintPalette();
+
+    // Re-render keeps the caret: focus the strip that had it once the section is in the document.
+    const f = this.prodFocus;
+    if (f !== null && strips.has(f.strip)) setTimeout(() => strips.get(f.strip)?.el.focus(), 0);
   }
 
   /** Commit a new generator. ⚠️ Always a NEW object: `resolveCustomRule` memoises by identity. */
@@ -4060,6 +4650,7 @@ export class ComposerTab implements TabModule {
    */
   private buildGeneratorEditor(sec: HTMLElement, gen: CustomCurveGenerator, resolved: ResolvedCurveRule): void {
     const steps = gen.steps;
+    if (resolved.kind === 'named' && resolved.customizedFrom) this.appendEditAs(sec, 'generator', resolved.rule.key);
     const head = document.createElement('div');
     head.className = 'sl-section-title';
     head.textContent = 'Generator';

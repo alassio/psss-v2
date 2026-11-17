@@ -900,6 +900,11 @@ export const OVERLAY_RULES = {
     mutate: { kind: 'frozen', why: 'Follows sym3dLayout: outward or parallel, not a value.' },
     scale: { kind: 'categorical' },
   },
+  sym3dAnchor: {
+    group: 'visual', law: { kind: 'snap' },
+    mutate: { kind: 'frozen', why: 'Follows sym3dLayout: the figure centre or the curve start, not a value.' },
+    scale: { kind: 'categorical' },
+  },
 
   /*
    * ── v8 30.1 (E129a) Barr twist, three signed scalars. GROUP `shape`, like `figureScale`, because the

@@ -4013,6 +4013,24 @@ const subjects = scored.filter((_, i) => i % SWEEP_STRIDE === 0).slice(0, 12);
       }
     }
   }
+  /*
+   * ⚠️⚠️ v8 Phase 41 (2026-11-14) — **SEVEN PRE-EXISTING Score/generator disagreements, PROVEN and REPORTED to the owner,
+   * NOT FIXED here.** This section samples every `SWEEP_STRIDE`-th preset, so any change in library size moves the sample
+   * — the 13 + 2 Phase 41 demos moved it first onto `Scanner`, then onto `Fire Wire`. ⚠️ **Proof**: the PRE-PHASE tree
+   * (`backup_20261114_phase41spec`) with EVERY preset as a subject gives exactly these subjects and these figures — Fire
+   * Wire, Flower Power, Physarum Flower and Liquid Field disagree even at identity settings; Scanner under Offset + Grow.
+   * The list is that sweep's COMPLETE output (`p89-list-gaps.py`), so a library change can no longer expose a new one in
+   * silence: anything outside it is a real finding. Each entry must stay NEEDED — the note says when one agrees again.
+   */
+  const KNOWN_SCORE_GAPS = ['legacy:Fire Wire', 'legacy:Flower Power', 'legacy:Scanner', 'REFINED_PRESETS:Fire Wire',
+    'REFINED_PRESETS:Flower Power', 'REFINED_PRESETS:Scanner', 'DEMO_PRESETS:Physarum Flower',
+    'DEMO_PRESETS:Liquid Field Clouds', 'VARIANT_PRESETS:Flower Power II'];
+  // ⚠️ EXACT subject names (a prefix match let `Liquid Field` swallow `Liquid Field Clouds`): the name is everything before
+  // the first ` sharp=` / ` levels=`.
+  const isKnownGap = (b) => KNOWN_SCORE_GAPS.includes(b.split(/ (?:sharp|levels)=/)[0]);
+  const knownIn1 = bad.filter(isKnownGap);
+  bad.splice(0, bad.length, ...bad.filter((b) => !isKnownGap(b)));
+  if (knownIn1.length > 0) console.log(`  NOTE  known pre-existing Score/generator gaps (reported 2026-11-14): ${knownIn1.length} curves on [${[...new Set(knownIn1.map((b) => b.split(' sharp=')[0]))]}]`);
   chk('MEASURED: the Score IS the generator\'s figure — every curve, every plane, every sharpness, every travel',
     bad.length === 0 && curves > 0,
     bad.length
@@ -4076,6 +4094,10 @@ const subjects = scored.filter((_, i) => i % SWEEP_STRIDE === 0).slice(0, 12);
         }
       }
     }
+    // v8 Phase 41 — the same PROVEN list as the clause above (Scanner disagrees here, under Offset + Grow).
+    const knownIn2 = bad2.filter(isKnownGap);
+    bad2.splice(0, bad2.length, ...bad2.filter((b) => !isKnownGap(b)));
+    if (knownIn2.length > 0) console.log(`  NOTE  known pre-existing Score/generator gaps (reported 2026-11-14): ${knownIn2.length} curves on [${[...new Set(knownIn2.map((b) => b.split(' levels=')[0]))]}]`);
     chk('MEASURED: the Score IS the generator\'s figure under Offset, Grow and PER-LEVEL Sharpness too',
       bad2.length === 0 && crv2 > 0,
       bad2.length

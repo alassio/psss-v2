@@ -1144,6 +1144,7 @@ async function init() {
     radius: ov?.sym3dRadius ?? SYM3D_DEFAULTS.radius,
     mirrors: ov?.sym3dMirrors ?? SYM3D_DEFAULTS.mirrors,
     facing: ov?.sym3dFacing ?? SYM3D_DEFAULTS.facing,
+    anchor: ov?.sym3dAnchor ?? SYM3D_DEFAULTS.anchor,
   });
   let sym3d: Sym3dConfig = readSym3d(preset?.overlay);
   function adoptSym3d(ov: OverlayState | undefined): void {
@@ -1155,6 +1156,8 @@ async function init() {
   const sym3dExport = (): Partial<OverlayState> => (sym3d.layout !== 'off' ? {
     sym3dLayout: sym3d.layout, sym3dLocal: sym3d.local, sym3dRadius: sym3d.radius, sym3dMirrors: sym3d.mirrors,
     sym3dFacing: sym3d.facing,
+    // Gated on its own value too: every symmetry preset that predates it exports the same bytes.
+    ...(sym3d.anchor !== 'centre' ? { sym3dAnchor: sym3d.anchor } : {}),
     ...(sym3d.layout === 'ring' || sym3d.layout === 'sphere' ? { sym3dPositions: sym3d.positions } : { sym3dOn: sym3d.on }),
   } : {});
   /*

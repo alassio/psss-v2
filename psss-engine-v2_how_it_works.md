@@ -932,9 +932,28 @@ position (`h` = half the design box's shorter side, `r` = Radius) and scaled by 
   figure's size.
 - **Density divides by C.** The row's notice multiplies the two factors out and states the particles each copy
   gets, and from 24 copies it says the figure thins; the particle count is never raised automatically.
+- **Grow from** (`sym3dAnchor`, absent = `centre`) chooses the point each copy is held by. Under **Figure centre**
+  the copies turn about the figure's middle, as above; a plant's root sits below that middle, so every copy's root
+  lands on a shell of radius `|root|` and the copies grow inward through each other. No Radius can fix that:
+  under Outward the root's offset is perpendicular to the direction the Radius moves the copy, so the root's
+  distance is `√(|root|² + (r·h)²)`, least at `r = 0`. **Curve start** holds each copy by the curve's first point
+  `s` (particle 0, which both growth mechanisms hold still) and, under Outward, first applies `S`, the rotation
+  taking the stem `−s/|s|` (the root towards the figure's centre) onto z, so `F_p` then points the stem along the
+  position:
+
+  ```
+    p' = (M_c · S · (p − s) + r · h · d_c) / (2 + r)        S = I under Parallel, or when |s| ≈ 0
+  ```
+
+  The root lands exactly on `r · h · d_c` and the copy grows outward from it; under Parallel the copies keep their
+  own orientation, so Copies at Each fan them about the root. The fit is `1 / (2 + r)` because a copy now reaches
+  a whole figure-diameter to one side instead of half to each; it is a constant, never a measured extent, so the
+  arrangement does not rescale while it grows. `s` is read each frame after the upstream stages, so the anchor is
+  wherever the start actually is. Only a self-similar curve has a start: on every other figure the value is
+  ignored (and the row is greyed), and the export writes the key only when it is `start`.
 - **Off is a branch** — the stage does not run — so a preset without the keys is bit-identical. In the Mixer
-  the arrangement, counts, mirrors and facing snap at the midpoint and the radius lerps; the Randomiser does
-  not roll them. The preview tiles apply it, so a tile shows the same arrangement as the main view.
+  the arrangement, counts, mirrors, facing and anchor snap at the midpoint and the radius lerps; the Randomiser
+  does not roll them. The preview tiles apply it, so a tile shows the same arrangement as the main view.
 
 ### 1.4 Strange attractors
 
@@ -1178,6 +1197,86 @@ scatter of disconnected branches, and the chord it leaves in the point list is a
 branch. ⚠️ It roughly doubles the list length per branch level, which is why the recursion ceiling is
 declared per rule.
 
+#### Stochastic productions, leaf outlines and the branch tree
+
+- **A production may be a weighted list** (*The Algorithmic Beauty of Plants* §1.7): the Wild Plant's `F` becomes
+  one of three replacements with probability 0.33 / 0.33 / 0.34. The choice for each occurrence is a **32-bit hash
+  of (seed, derivation step, position)**, never a sequential random stream — so the same `seed` always expands to
+  the same plant, and the next seed is an independent sibling from its very first choice (a stream seeded with
+  consecutive integers gives correlated first draws). A deterministic rule ignores the seed.
+- **`{…}` encloses a polygon.** On a rule that opts in (`polygons: 'outline'` — the book's plants), the pen-up `f`
+  *draws* inside the braces and `}` closes the outline back to its first vertex when a real gap remains (a mirrored
+  outline already returns to its start up to float error, and closing a zero-length edge would put a coincident
+  point in the stroke). Leaves and petals are therefore closed outlines inside the one continuous stroke.
+  `Coral Bush` keeps the older reading — braces ignored, `f` a pen-up move — on purpose: its preset's look is that
+  reading.
+- **The branch tree.** The walk also records, for every list point, the **tree node** it stands on (a retrace
+  point carries its original node), each node's **parent**, its arc length from the root **along the tree** (not
+  the tour) and its **bracket depth**. Nodes are created in walk order, so a parent always precedes its children.
+  Positions are untouched; the tree only labels them. Growth and taper read it.
+
+#### Builder rules: the two tetrahedra
+
+Two rules have no production and no turtle: their lists come from an **exact builder** with the same raw-list
+contract, so normalisation, the recursion lerp and smoothness apply unchanged.
+
+- **Sierpinski Tetrahedron** — a regular tetrahedron traversed from `p0` to `p3` through its four corner copies at
+  half size (`p0 → m01 → m12 → m23 → p3`), the variant whose turns are only 60° and 90°. `4^d + 1` points,
+  self-avoiding, every segment one length; depth 0 is the single segment. The middle octahedron stays empty, so
+  the figure has dimension 2 — a shell of nested pyramids, not a volume.
+- **Hill Tetrahedron** — a continuous space-filling traversal of the Hill (Kuhn) tetrahedron, one sixth of a cube,
+  through its rep-8 Maubach bisection (every third bisection generation is eight congruent copies at half size).
+  No single traversal rule is continuous on this dissection; the curve uses **seven alternating states** — each an
+  entry/exit vertex pair — and each state's eight children are chained at shared vertices, which makes the limit
+  curve continuous. It is drawn through the `8^d` piece **centres** (the shared vertices are visited by many
+  pieces). The centre steps take three lengths, so this one rule is resampled by **arc length** (`unequalSteps`).
+- Neither has a usable turn angle, so their Yaw / Pitch / Roll / Twist rows are absent and Customize is unavailable.
+  The Sierpinski Tetrahedron's zoom was measured and refused: its loop seam is exact, but its density dips to 0.68×
+  mid-octave, deeper than the shipped zoom rules (0.79–0.83×).
+
+#### Growth
+
+`generators.lsystem.growth` (`'off' | 'once' | 'loop' | 'loopNew'`, absent = off) animates the curve. The **timeline**
+is a pure function of a growth clock: grow for `growthTime`, hold for `growthPause`, wither for `growthTime`, rest as
+the seed for `growthPause`, repeat (`'once'` grows and holds). Progress `g` is smoothstep-eased; the wither is the grow
+run backwards. `'loopNew'` adds the completed cycle count to the seed, so each regrowth is a new specimen — the change
+lands at the start of a grow, when nothing of the figure is visible.
+
+- **The clock** is the generator's, in seconds of frame time (so `speedFactor` slows it), zeroed by `init()` — i.e. on
+  every preset application — and on a rule change. A preview tile starts its clock at `growthTime`, so a tile shows
+  the grown figure.
+- **Two mechanisms, chosen by the rule.** A bracketed rule on the turtle path **extends**, **by generation**: every
+  node gets an **arrival time** `a = (d + ℓ/ℓ_max(d)) / (D + 1)`, where `d` is its bracket depth, `D` the deepest,
+  `ℓ` its arc length from the node where its own branch leaves the parent branch, and `ℓ_max(d)` the longest such
+  length at depth `d`. So the trunk grows in the first `1/(D+1)` of the window, every first-order branch in the next,
+  and so on; no branch of order `d + 1` starts before every branch of order `d` is complete. The frontier `T = g`
+  cuts the tree on that time: a node inside it keeps its position, a node whose parent is inside but which is
+  outside sits on its edge at the frontier, every other node takes its parent's position — one forward pass in node
+  order. The cut tour is then resampled by **arc length**, so the particles sit on the visible part only, and
+  normalised by the **full** figure's transform, so the plant grows in place. A `Customize` generator with a
+  **retrace** step branches too, and extends on its own tree (below). Every other curve — unbranched rules,
+  builder rules, a `Customize` generator with no retrace, and a bracketed rule while Twist or Stretch is in use —
+  **unfolds**: the recursion
+  itself rises from the rule's floor (depth 0 where the axiom draws, else the first depth) to the Recursion value
+  through the ordinary recursion lerp, and **every level is aligned onto the finished figure**. A similarity
+  (rotation about the axis normal to both chords, and a uniform scale) maps each level's anchors — its first and
+  last points, or its first and farthest point on a closed curve — onto those of the target level at the exact
+  angle (the same angle-corner blend the static figure draws), and the whole morph is framed by the target's
+  transform. So the curve's ends stay fixed and each segment folds into its next level **in place**, the way a
+  folded paper strip opens into the dragon; without the alignment each level sits at its own scale and rotation,
+  and the morph reads as a tangle swirling into another.
+- **Off is a branch, and so is `g ≥ 1`**: an absent or off growth, and a fully grown one, run exactly the static code,
+  so every preset without growth draws bit for bit as before.
+- Growth is suspended while Descend is above 1× (the zoom owns the recursion). The Composer's Score draws the fully
+  grown figure.
+
+#### Taper
+
+`taper` (0–1, absent = 0) multiplies each particle's size by `max(0.2, 1 − taper·depth)`, where `depth` is the
+particle's normalised bracket depth (0 on the trunk, 1 at the deepest tips), read by the same parameterisation the
+resample used. It is written into the per-particle size channel as a third producer beside the channel amounts and
+the deformation energy, so it reaches the point and splat passes and not the Neon Lines or Ribbon renderers.
+
 #### Resampling, and the two interpolations
 
 The point list has whatever length the expansion produced; the figure needs exactly `particleCount`
@@ -1240,7 +1339,7 @@ is kept, which is why no unstretched figure changes.
 explicit junction path and each leaf emits the centre of its **tile** (the square with the copy as an edge,
 or as its diagonal). The tiles exist only at the lattice angle, so ⚠️ **on these two rules Twist and Yaw
 are mutually exclusive** — while Twist acts the turn angle is held at the landmark. Hilbert 3D, Moore,
-Bush 3D and the turtle-only rules have no Twist row.
+The growth rules, the builder rules and the turtle-only rules have no Twist row.
 
 #### Customize — the generator as data
 
@@ -1271,7 +1370,7 @@ chord; the depth-n curve is the same copy composition as the named rules', throu
   figure. A seed that leaves the plane (Hilbert 3D) stores a full 3-D basis instead — one of the 48 signed axis
   permutations, exact because both drawings lie on the cube lattice. Where the current angle leaves the generator
   with no chord, the frame is fitted at the published angle instead.
-- **Every rule seeds except Bush 3D.** A rule's structure comes from its generator flags where it has them, and
+- **Every classic rule seeds, and so do Sprig and Thicket Weed; the growth rules and the builder rules do not.** A rule's structure comes from its generator flags where it has them, and
   otherwise from a Customize-only table that does not touch the named rule's rows: ⚠️ the two questions — *does
   the named rule get a Twist row* and *can it seed Customize* — are separate tables, because Hilbert 3D has an
   exact generator but no usable Twist. Hilbert 3D is eight unit moves on the cube lattice with Turn and Lift (no
@@ -1279,9 +1378,20 @@ chord; the depth-n curve is the same copy composition as the named rules', throu
   shape**, and so are the four closed tiles: the Koch snowflake (Koch round a triangle), the pentigree (its
   six-step generator round a pentagon), the twindragon (the dragon generator out along one step and back, a
   180° turn) and the fudgeflake (the terdragon round a triangle). Each is the one plain-flag member of its exact
-  set, held equal to the turtle by `figurecheck`. Bush 3D is a growth rule (new branches at the tips, stems that lengthen) rather than a self-similar
-  subdivision, so it has no generator; `Customize` is offered but disabled there, and a plant-growth editor is a
-  future phase.
+  set, held equal to the turtle by `figurecheck`. **Sprig** and **Thicket Weed** are single-production plants like
+  `Plant` (`F → F[+F]F[-F][F]`, `F → FF-[-F+F+F]+[+F-F-F]`), derived from their depth-1 walk the same way, with no
+  flags — so their named rules keep no Twist or Stretch row. The other plants (Coral Bush, Bush 3D, Fork Tree, Fir
+  Shoot, Wind Weed, Wild Plant, Flowering Plant) are growth rules — a letter places new branches while `F → FF`
+  lengthens the stems — rather than one self-similar subdivision, so they have no generator; they are customized
+  through their **productions** instead (below). The two tetrahedron curves are builder rules with no turtle walk at
+  all; `Customize` is disabled on them, with the reason on the option.
+- **A generator with retraces carries a branch tree**, so an edited plant generator still grows by generation and
+  tapers. The tree is built from the COMPOSITION, never from point positions (two branches can share a position,
+  parent and depth): within one copy a move and its retrace are a pair — the one visited first draws new nodes, the
+  second re-walks exactly its points backwards, ending at its start, as the turtle's `]` does. A node's bracket depth
+  is the number of pairs enclosing its step, summed over the levels, where a pair that directly wraps its neighbour
+  (`[-F+F+F]` reads back as three nested pairs) counts once. On every branching seed this is the turtle's own tree —
+  equal node counts and depths, tree distance to 1e-15. A generator with no retrace has no tree and unfolds.
 - **The starting shape** (the spec's initiator) is an optional second step list walked with the same law but not
   normalised — it may close. Each of its segments carries one copy of the depth-n generator, so a starting shape
   of m segments has m · kⁿ leaves (the recursion bound divides the budget by m). One plain straight step is the
@@ -1313,6 +1423,46 @@ chord; the depth-n curve is the same copy composition as the named rules', throu
   named rule.
 - The Mixer snaps the generator with the rule and never interpolates it; the Randomiser never produces
   `Customize`, and Evolution moves the curve block whole.
+
+#### Customize on a plant — the productions as data
+
+A plant's `Customize` block is the second kind of `custom`: `{ kind: 'productions', family, axiom, productions }`,
+where `productions` has exactly the rule table's shape (a replacement string, or weighted alternatives `{ p, to }`).
+`family` is the plant it was seeded from and supplies only what the productions do not carry — the label, the
+landmark angle, the leaf-outline reading and the extra draw symbols. A block without `kind` is a generator, so every
+stored generator reads as before.
+
+- ⚠️⚠️ **Choosing it is a visual no-op, by routing.** The seed is a deep copy of the plant's axiom and productions.
+  While a block's content equals a plant's — axiom, every production, every weight, exactly — the resolver hands
+  back that plant; `family` never enters the comparison. An edited block resolves to a **synthesized rule**: the
+  family's key, label and angle, the block's axiom and productions, the generic angle range `[1°, 179°]`, and a
+  recursion range ending at the **measured** limit. Every reader then treats it as a named rule and draws it through
+  the turtle — growth by generation, Taper, Seed, leaf outlines and the Score need nothing new. An invalid block,
+  an unknown `kind`, or one that does not fit at depth 1 resolves to the default rule and is never repaired.
+- **The recursion limit is measured, not estimated**: the deepest level (at most 8) whose expansion stays within
+  the 900 000-symbol budget and whose point count stays within 65 536. The count comes from the expanded string —
+  one point per draw symbol, an `f` inside a leaf, at most one for a leaf's close, and for each `]` every point drawn
+  since its `[` (the retrace) — an upper bound of the real walk. A random block is measured at its worst over 16
+  spread seeds. The range starts at the plant's own minimum (Flowering Plant at 2).
+- ⚠️⚠️ **A synthesized rule carries its family's key, so nothing may be looked up by key alone.** The Twist / Stretch
+  flags, the angle bracket and the Twist / Stretch brackets are read through helpers that return the identity for a
+  synthesized rule (no generator, no bracket — a breathing angle rebuilds exactly each frame); the figure cache
+  compares the rule **object**, not its key, or an edited Fork Tree would reuse the named Fork Tree's lists; and the
+  angle-row measurement is memoised per object for it, or a newly added `&` would never show the Pitch row.
+- **The angle rows read three depths.** A row exists if sweeping its angle moves the figure at any of the rule's
+  first three depths. One depth was not enough for a growth-symbol plant: at depth 1 Fork Tree's turns all precede
+  a letter that draws nothing, so its Yaw row was missing; Fir Shoot, Flowering Plant's Pitch and Bush 3D's Yaw
+  were missing the same way.
+- **Validation** — the editor's hard rules, enforced again on load: a non-empty axiom of at most 16 symbols, at most
+  8 productions of at most 40 symbols, only known symbols, balanced brackets and braces with no leaf inside a leaf,
+  2–4 random alternatives whose weights sum to 1, and some draw symbol reachable from the axiom. A letter with no
+  production and a production nothing uses are notes, not failures.
+- **Editing is structural**: brackets and braces are inserted as pairs, a typed closer steps over its partner,
+  deleting either half removes both and keeps the contents, and the width and colour marks of the book (`!`, `'`)
+  are kept as inert symbols but never added. A random alternative's weight is edited as a share: the typed share is
+  kept and the others are rescaled to fill the rest; stored weights always sum to exactly 1.
+- The Mixer snaps the block with the rule, Evolution moves it whole, and the Randomiser never produces one — the
+  generator block's rules.
 
 ⚠️ **Hill tetrahedron is not in the rule set, by measurement.** Its standard refinement (Maubach bisection of
 the Kuhn simplex) is exactly self-similar — every third generation is eight copies at ½ — but no
@@ -5052,7 +5202,7 @@ fix.
 | Control | Needs | When unmet it looks like | Fix |
 |---|---|---|---|
 | **Every curve row** | `Figure type` set to **Self-similar curve** | The rows are not merely inert — they are **absent**, because the two types have mutually exclusive bodies. If you are looking for them on a wave preset there is nothing to find. | Switch the type at the top of the Composer. Your wave settings are kept. |
-| **Pitch**, **Roll** | a rule whose pattern contains pitch or roll turns | **Absent, not disabled.** Most rules are flat and turn in one plane, so two of the three angle rows simply do not appear. Only two of the fifteen rules use them, and on **Bush 3D** Yaw is absent too: its turns sit in a part of the pattern that draws nothing, so the row would move nothing. | Pick a rule that turns in three dimensions; the provenance line under **Rule** is the quickest way to tell. |
+| **Pitch**, **Roll** | a rule whose pattern contains pitch or roll turns | **Absent, not disabled.** Most rules are flat and turn in one plane, so two of the three angle rows simply do not appear. Only a few rules use them, and on **Coral Bush** Yaw is absent too: its turns sit in a part of the pattern that draws nothing, so the row would move nothing. The two tetrahedron curves have no angle rows at all: they are built from tetrahedra, not walked by the turtle. | Pick a rule that turns in three dimensions; the provenance line under **Rule** is the quickest way to tell. |
 | **Descend** | a rule whose structure can be indexed backwards | **Absent on most rules.** Without that property a zoom would select scattered pieces of the curve rather than one region — a picture, but not a zoom — so the control is withheld instead of lying. | Pick a rule that supports it. |
 | **Descend**, at depth | headroom below the cost ceiling | The figure stops revealing new detail and the spacing between particles begins to drift. The readout reports the clamp. | Lower **Recursion** to buy depth, or accept the ceiling: one level of genuinely new structure. |
 | **Twist** | a rule with copies to twist (Dragon, Lévy C, Sierpinski-Knopp, Plant, Hilbert 2D, Peano) | **Absent** on every other rule. | Pick one of those rules. |

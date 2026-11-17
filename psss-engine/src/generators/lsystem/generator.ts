@@ -134,6 +134,17 @@ export const LSYSTEM_GENERATORS: Record<RuleKey, GeneratorFlags | null> = {
   pentigree: null,
   twindragon: null,
   fudgeflake: null,
+  // v8 Phase 41 — the tetra builder and the book's plants: turtle (or own builder) only, so no Twist / Stretch rows.
+  sierpinskiTetra: null,
+  sprig: null,
+  thicketWeed: null,
+  forkTree: null,
+  firShoot: null,
+  windWeed: null,
+  wildPlant: null,
+  floweringPlant: null,
+  bush3dBook: null,
+  hillTetra: null,
 };
 
 /**
@@ -152,6 +163,9 @@ export const LSYSTEM_TWIST_BRACKET: Record<RuleKey, number> = {
   terdragon: 0, kochQuad: 0, arrowhead: 0, gosper: 0,
   hilbert2d: 0, hilbert3d: 0, peano: 0, moore: 0, bush3d: 0, koch: 0, minkowski: 0,
   kochSnowflake: 0, pentigree: 0, twindragon: 0, fudgeflake: 0,
+  // v8 Phase 41 — no generator, so no bracket.
+  sierpinskiTetra: 0, sprig: 0, thicketWeed: 0, forkTree: 0, firShoot: 0, windWeed: 0, wildPlant: 0,
+  floweringPlant: 0, bush3dBook: 0, hillTetra: 0,
 };
 export const LSYSTEM_STRETCH_BRACKET: Record<RuleKey, number> = {
   // Solved 2026-11-05 through the ARC-LENGTH resample the engine uses here; binds at depth 5, stretch 1.52.
@@ -159,9 +173,28 @@ export const LSYSTEM_STRETCH_BRACKET: Record<RuleKey, number> = {
   terdragon: 0, kochQuad: 0, arrowhead: 0, gosper: 0,
   hilbert2d: 0, hilbert3d: 0, peano: 0, moore: 0, bush3d: 0, koch: 0, minkowski: 0,
   kochSnowflake: 0, pentigree: 0, twindragon: 0, fudgeflake: 0,
+  // v8 Phase 41 — no generator, so no bracket.
+  sierpinskiTetra: 0, sprig: 0, thicketWeed: 0, forkTree: 0, firShoot: 0, windWeed: 0, wildPlant: 0,
+  floweringPlant: 0, bush3dBook: 0, hillTetra: 0,
 };
 
 /** A small 3-D affine map `p → o + A·p`, row-major `A`. Plain data so the build allocates nothing per leaf. */
+/**
+ * v8 Phase 44 (`44.B2.3`) — **the three tables, read through the RULE, never its key.** A synthesized rule (a plant's
+ * edited productions) carries its family's KEY, so a raw `TABLE[rule.key]` would hand it the named rule's Twist/
+ * Stretch flags and brackets; for it these return the identity — no generator, no Twist/Stretch bracket.
+ * ⚠️ `figurecheck` §T scans `src` for a direct read outside these helpers.
+ */
+export function generatorFlagsFor(rule: { readonly key: RuleKey; readonly synthesized?: true }): GeneratorFlags | null {
+  return rule.synthesized === true ? null : LSYSTEM_GENERATORS[rule.key];
+}
+export function twistBracketFor(rule: { readonly key: RuleKey; readonly synthesized?: true }): number {
+  return rule.synthesized === true ? 0 : LSYSTEM_TWIST_BRACKET[rule.key];
+}
+export function stretchBracketFor(rule: { readonly key: RuleKey; readonly synthesized?: true }): number {
+  return rule.synthesized === true ? 0 : LSYSTEM_STRETCH_BRACKET[rule.key];
+}
+
 export interface Affine {
   a: Float64Array; // 9
   o: Float64Array; // 3
@@ -331,7 +364,11 @@ function turtleFrame(rule: LSystemRule, yawDeg: number, depth: number): { x: num
   const lookup = (m: Map<string, SymbolEffect>) => (ch: string): SymbolEffect => m.get(ch) ?? base(ch);
   for (let m = 1; m <= depth; m++) {
     const next = new Map<string, SymbolEffect>();
-    for (const key of Object.keys(rule.productions)) next.set(key, walk(rule.productions[key]!, lookup(level)));
+    for (const key of Object.keys(rule.productions)) {
+      // v8 Phase 41 — only rules with GENERATOR flags reach here, and none is stochastic; a list is skipped, not cast.
+      const prod = rule.productions[key]!;
+      if (typeof prod === 'string') next.set(key, walk(prod, lookup(level)));
+    }
     level = next;
   }
   const a = walk(rule.axiom, lookup(level));

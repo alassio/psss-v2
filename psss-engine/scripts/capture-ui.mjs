@@ -118,6 +118,8 @@ const EXTRA_SHOTS = [
   // ⚠️ On the BOOT preset with `Cube` picked, not on a demo: loading a 3-D Symmetry demo (`Rosette Crystal`, since replaced) before opening the Lab stalled this
   // script's Lab click twice (a hand-driven probe clicks it in ~0.8 s, so it is this flow, not the engine).
   { tab: 'visual-fx', file: 'lab-visual-fx-sym3d', group: 'Figure', options: ['Cube'], scrollTo: 'Twist' },
+  // v8 2026-11-17 — the same rows LIVE on a plant: `Plant Burst` (Icosahedron, Grow from: Curve start), so the row is not greyed.
+  { tab: 'visual-fx', file: 'lab-visual-fx-sym3d-growfrom', preset: 'Plant Burst', group: 'Figure', scrollTo: 'Twist' },
   /*
    * v8 Phase 38 — the Fractal Fold switched on (2 iterations, scale −1.75, a breathing cell), so its six gated rows
    * are visible. ⚠️ `scrollTo` leaves its target at the BOTTOM, so the anchor is `4D Extent`, the row directly BELOW
@@ -252,6 +254,21 @@ const EXTRA_SHOTS = [
    * `Curve Tilt` is the only shipped preset that modulates both.
    */
   { tab: 'composer', file: 'lab-composer-curve-3d', preset: 'Curve Tilt', scrollTo: 'Pitch' },
+  /*
+   * v8 Phase 41 — the GROWTH sub-head on the stochastic plant (the one rule that shows every growth row, Seed included),
+   * and the Sierpinski Tetrahedron's reduced body (no angle rows: it is built, not walked). ⚠️ `scrollTo: 'Growth'`
+   * lands on the sub-head, the first visible exact match.
+   */
+  { tab: 'composer', file: 'lab-composer-growth', preset: 'Plant Wild', scrollTo: 'Growth' },
+  { tab: 'composer', file: 'lab-composer-tetra', preset: 'Curve Tetra Pyramids', scrollTo: 'Rule' },
+  /*
+   * v8 Phase 44 — the PRODUCTION editor: Customize picked on a growth-symbol plant (Fork Tree) and on the random one (Wild
+   * Plant, its alternatives and weights). Its PREP picks Customize and scrolls the editor to the top (`scroll`).
+   */
+  { tab: 'composer', file: 'lab-composer-productions', preset: 'Plant Fork Tree', scrollTo: 'Rule' },
+  { tab: 'composer', file: 'lab-composer-productions-random', preset: 'Plant Wild', scrollTo: 'Rule' },
+  // ...and a plant with BOTH editors: Sprig shows `Edit as` above its productions.
+  { tab: 'composer', file: 'lab-composer-editas', preset: 'Plant Sprig', scrollTo: 'Rule' },
   /*
    * v8 Phase 39 Stage C — the Customize editor. ⚠️ `Curve Rosette Chain` is the one preset AUTHORED under Customize,
    * so it opens WITH the editor and needs no option pick; `Curve Weave` is Moore, and picking Customize there shows
@@ -598,6 +615,10 @@ const PREP = {
    * The deck picker: open it, type a search, and WAIT for the tiles — each is a live renderer and under SwiftShader
    * they fill one by one (measured: 2 of 3 still black after 5 s), so a short wait photographs empty frames.
    */
+  // v8 Phase 44 — the production editor: pick Customize (a plant opens Productions), then the editor to the top.
+  'lab-composer-productions': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 150]],
+  'lab-composer-productions-random': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 150]],
+  'lab-composer-editas': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 260]],
   'lab-mixer-picker': [
     ['click', 'button[aria-label="Choose the preset for Deck B"]'],
     ['wait', 1500],
@@ -657,6 +678,21 @@ async function prep(page, file) {
       const loc = page.locator(a).first();
       if (await loc.count() === 0) { problems.push(`${file}: prep fill ${a} matched nothing`); continue; }
       await loc.fill(b);
+    } else if (kind === 'scroll') {
+      // v8 Phase 44 — bring an element to the TOP of its scroller, `b` px of context above it: `scrollTo` runs BEFORE
+      // the prep steps, and a prep that re-renders the tab (choosing Customize) leaves the scroll where it fell.
+      const ok = await page.evaluate(({ sel, up }) => {
+        const el = document.querySelector(sel);
+        if (!el) return false;
+        el.scrollIntoView({ block: 'start' });
+        let p = el.parentElement;
+        while (p && p.scrollHeight <= p.clientHeight) p = p.parentElement;
+        // ⚠️ Only the context the scroller can GIVE: near the end of the content the scroll is already clamped, and a
+        // blind `scrollTop -= up` pushed the element back out of view (measured: range 213 px, the editor at the end).
+        if (p) { const gap = el.getBoundingClientRect().top - p.getBoundingClientRect().top; if (gap < up) p.scrollTop -= up - gap; }
+        return true;
+      }, { sel: a, up: b ?? 0 });
+      if (!ok) problems.push(`${file}: prep scroll ${a} matched nothing`);
     } else if (kind === 'blur') {
       await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     }

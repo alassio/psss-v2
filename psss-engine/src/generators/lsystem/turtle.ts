@@ -47,14 +47,45 @@ export const IGNORED_SYMBOLS = '!{}';
  * Returns the string **and** whether the budget stopped it early, because a silently truncated
  * expansion draws a partial figure that looks like a different rule rather than like an error.
  */
-export function expandRule(rule: LSystemRule, depth: number): { text: string; truncated: boolean } {
+/**
+ * v8 Phase 41 (`41.S2`) — **a 32-bit HASH of (seed, derivation step, position)**, the murmur3 finaliser over a mixed
+ * key. ⚠️⚠️ **A HASH, NOT A STREAM, AND THAT IS THE WHOLE POINT:** mulberry32's first output is correlated across
+ * nearby seeds (*Verify*'s rule — 8 consecutive seeds gave 8 first draws all below 0.5), so a stream seeded by the
+ * user's `Seed` would make seed 1, 2, 3 … the SAME first choice. Hashing each (seed, step, position) independently
+ * gives the same plant for the same seed and an independent sibling for the next one from its first draw on.
+ */
+export function hash32(seed: number, step: number, pos: number): number {
+  let h = Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(step | 0, 0x85ebca77) ^ Math.imul(pos | 0, 0xc2b2ae3d);
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/** Pick one branch of a stochastic production for one occurrence (`41.S2`). */
+function stochasticPick(choices: readonly { p: number; to: string }[], seed: number, step: number, pos: number): string {
+  const u = hash32(seed, step, pos) / 4294967296;
+  let acc = 0;
+  for (const c of choices) { acc += c.p; if (u < acc) return c.to; }
+  return choices[choices.length - 1]!.to;
+}
+
+/**
+ * ⚠️ v8 Phase 41 — `seed` is read ONLY by a stochastic production; every deterministic rule ignores it, so a rule
+ * without a weighted list expands exactly as before whatever the seed (`figurecheck` §P3).
+ */
+export function expandRule(rule: LSystemRule, depth: number, seed = 0): { text: string; truncated: boolean } {
   const n = Math.max(0, Math.floor(depth));
   let s = rule.axiom;
   for (let i = 0; i < n; i++) {
     let out = '';
+    let pos = 0;
     for (const c of s) {
       const sub = rule.productions[c];
-      out += sub === undefined ? c : sub;
+      if (sub === undefined) out += c;
+      else if (typeof sub === 'string') out += sub;
+      else out += stochasticPick(sub, seed, i, pos);
+      pos++;
     }
     s = out;
     /*
@@ -113,6 +144,48 @@ export interface TurtleResult {
   readonly truncated: boolean;
   /** Bracket pushes that were never popped — a malformed production, surfaced rather than swallowed. */
   readonly unclosedBrackets: number;
+  /** v8 Phase 41 (`41.S2`) — the branch TREE behind the tour, for growth and taper. */
+  readonly branch: BranchData;
+}
+
+/**
+ * v8 Phase 41 (`41.S2`) — **the branch TREE behind the point list.** The list is an Euler TOUR (the bracket pop
+ * retraces), so one tree node can appear at several list positions; `pointNode[i]` names the node point `i` sits on
+ * (a retrace point carries its ORIGINAL node). Nodes are created in walk order, so **a parent always precedes its
+ * children** — which is what lets growth resolve every node in ONE forward pass (`figure.ts`' `growExtend`).
+ * `tau` is arc length from the root along the TREE (not the tour); `depth` the bracket nesting at the node.
+ * ⚠️ Grow-only typed arrays: only the first `nodeCount` / `count` entries are valid (invariant 7).
+ */
+export interface BranchData {
+  readonly pointNode: Int32Array;
+  readonly parent: Int32Array;
+  readonly tau: Float64Array;
+  readonly depth: Float64Array;
+  readonly nodeCount: number;
+  readonly maxDepth: number;
+}
+
+/** A growable branch-data sink, doubling like `PointSink`. */
+interface BranchSink {
+  pointNode: Int32Array;
+  parent: Int32Array;
+  tau: Float64Array;
+  depth: Float64Array;
+  nodes: number;
+}
+
+function grownI32(a: Int32Array, need: number): Int32Array {
+  if (need <= a.length) return a;
+  const g = new Int32Array(Math.max(64, a.length * 2, need));
+  g.set(a);
+  return g;
+}
+
+function grownF64(a: Float64Array, need: number): Float64Array {
+  if (need <= a.length) return a;
+  const g = new Float64Array(Math.max(64, a.length * 2, need));
+  g.set(a);
+  return g;
 }
 
 /**
@@ -144,8 +217,11 @@ export function walkTurtle(
   yawDeg: number,
   pitchDeg: number,
   rollDeg: number,
+  seed = 0,
 ): TurtleResult {
-  const { text, truncated } = expandRule(rule, depth);
+  const { text, truncated } = expandRule(rule, depth, seed);
+  // v8 Phase 41 (`41.S2`, `41.D13`) — braces DRAW only on a rule that opts in; absent means today's walk exactly.
+  const outline = rule.polygons === 'outline';
 
   const yaw = (yawDeg * Math.PI) / 180;
   const pitch = (pitchDeg * Math.PI) / 180;
@@ -164,15 +240,50 @@ export function walkTurtle(
   const sink: PointSink = { xyz: new Float64Array(96), n: 0 };
   sinkPush(sink, 0, 0, 0);
 
+  /*
+   * v8 Phase 41 — the branch tree, built in the SAME walk. Node 0 is the root at the origin. ⚠️ Positions are NOT
+   * touched by any of this: the tree only labels the points the walk already emits, so every list is bit-identical.
+   */
+  const br: BranchSink = {
+    pointNode: new Int32Array(96), parent: new Int32Array(96), tau: new Float64Array(96), depth: new Float64Array(96),
+    nodes: 1,
+  };
+  br.parent[0] = -1; br.tau[0] = 0; br.depth[0] = 0; br.pointNode[0] = 0;
+  let cur = 0;                         // the node the turtle stands on
+  let curX = 0, curY = 0, curZ = 0;    // its position (a pen-up move leaves it behind)
+  let maxDepth = 0;
+  const labelPoint = (node: number): void => {
+    br.pointNode = grownI32(br.pointNode, sink.n);
+    br.pointNode[sink.n - 1] = node;
+  };
+  const newNode = (): void => {
+    const id = br.nodes++;
+    br.parent = grownI32(br.parent, br.nodes);
+    br.tau = grownF64(br.tau, br.nodes);
+    br.depth = grownF64(br.depth, br.nodes);
+    br.parent[id] = cur;
+    br.tau[id] = br.tau[cur]! + Math.hypot(px - curX, py - curY, pz - curZ);
+    br.depth[id] = stack.length;
+    if (stack.length > maxDepth) maxDepth = stack.length;
+    cur = id; curX = px; curY = py; curZ = pz;
+  };
+
   // One flat stack of saved state; `mark` is the point-list length at the push, which is what the
   // retrace walks back to.
-  const stack: { x: number; y: number; z: number; h: Float64Array; l: Float64Array; u: Float64Array; mark: number }[] = [];
+  const stack: { x: number; y: number; z: number; h: Float64Array; l: Float64Array; u: Float64Array; mark: number;
+    node: number; nx: number; ny: number; nz: number }[] = [];
+  // v8 Phase 41 — the open polygon's first vertex (its node and position), while inside `{…}` on an outline rule.
+  let polyNode = -1, polyX = 0, polyY = 0, polyZ = 0;
 
   const advance = (emit: boolean): void => {
     px += H[0]!;
     py += H[1]!;
     pz += H[2]!;
-    if (emit) sinkPush(sink, px, py, pz);
+    if (emit) {
+      sinkPush(sink, px, py, pz);
+      newNode();
+      labelPoint(cur);
+    }
   };
 
   const draws = rule.drawSymbols;
@@ -190,7 +301,29 @@ export function walkTurtle(
         advance(true);
         break;
       case 'f':
-        advance(false);
+        // v8 Phase 41 — inside an OUTLINE polygon `f` traces the boundary, so it draws; elsewhere it is pen-up.
+        advance(outline && polyNode >= 0);
+        break;
+      case '{':
+        if (outline) { polyNode = cur; polyX = px; polyY = py; polyZ = pz; }
+        break;
+      case '}':
+        // Close the outline back to its first vertex, as one more point on the stroke (labelled with that vertex's
+        // node, so growth and taper treat the closing edge as part of the leaf).
+        if (outline && polyNode >= 0) {
+          /*
+           * ⚠️ MEASURED, not exact: a mirrored outline (`…|…`, every book leaf) returns to its first vertex up to
+           * float error (~1e-16), and an exact `!==` then emitted a ZERO-length closing edge — 2 484 of them on the
+           * Flowering Plant, which `figurecheck`'s density instrument reads as Infinity. Close only a REAL gap.
+           */
+          if (Math.hypot(px - polyX, py - polyY, pz - polyZ) > 1e-9) {
+            sinkPush(sink, polyX, polyY, polyZ);
+            labelPoint(polyNode);
+            px = polyX; py = polyY; pz = polyZ;
+            cur = polyNode; curX = polyX; curY = polyY; curZ = polyZ;
+          }
+          polyNode = -1;
+        }
         break;
       case '+':
         rotateInto(H, U, cY, sY); rotateInto(L, U, cY, sY); normalise(H); normalise(L);
@@ -249,6 +382,7 @@ export function walkTurtle(
           x: px, y: py, z: pz,
           h: H.slice(), l: L.slice(), u: U.slice(),
           mark: sink.n,
+          node: cur, nx: curX, ny: curY, nz: curZ,
         });
         break;
       case ']': {
@@ -258,10 +392,15 @@ export function walkTurtle(
         // the branch point itself, so the return leg exists in the list as geometry.
         for (let k = sink.n - 2; k >= st.mark - 1 && k >= 0; k--) {
           const b = k * 3;
+          // v8 Phase 41 — a retrace point stands on the SAME tree node as the point it re-emits.
+          const node = br.pointNode[k]!;
           sinkPush(sink, sink.xyz[b]!, sink.xyz[b + 1]!, sink.xyz[b + 2]!);
+          labelPoint(node);
         }
         px = st.x; py = st.y; pz = st.z;
         H.set(st.h); L.set(st.l); U.set(st.u);
+        cur = st.node; curX = st.nx; curY = st.ny; curZ = st.nz;
+        polyNode = -1;
         break;
       }
       default:
@@ -270,7 +409,10 @@ export function walkTurtle(
     }
   }
 
-  return { xyz: sink.xyz, count: sink.n, truncated, unclosedBrackets: stack.length };
+  return {
+    xyz: sink.xyz, count: sink.n, truncated, unclosedBrackets: stack.length,
+    branch: { pointNode: br.pointNode, parent: br.parent, tau: br.tau, depth: br.depth, nodeCount: br.nodes, maxDepth },
+  };
 }
 
 /**
@@ -286,22 +428,36 @@ export function walkTurtle(
  * the answer is a property of the rule, and the walks are a few hundred points.
  */
 const angleEffectMemo = new Map<string, { yaw: boolean; pitch: boolean; roll: boolean }>();
+/**
+ * v8 Phase 44 (`44.B2.3`) — ⚠️ a SYNTHESIZED rule (edited productions) carries its family's KEY, so the key memo would
+ * hand an edited Fork Tree the named one's answer (a new `&` would never show Pitch). Memoised by the rule OBJECT.
+ */
+const angleEffectSynth = new WeakMap<LSystemRule, { yaw: boolean; pitch: boolean; roll: boolean }>();
 export function ruleAngleEffect(
   rule: LSystemRule,
   usage: { yaw: boolean; pitch: boolean; roll: boolean },
 ): { yaw: boolean; pitch: boolean; roll: boolean } {
-  const hit = angleEffectMemo.get(rule.key);
+  const hit = rule.synthesized === true ? angleEffectSynth.get(rule) : angleEffectMemo.get(rule.key);
   if (hit) return hit;
-  const depth = Math.max(1, rule.recursionRange[0]);
+  /*
+   * ⚠️ v8 Phase 44 — **the rule's first THREE depths, not only its shallowest.** A growth-symbol plant (`X → F[+X]F[-X]+X`)
+   * puts every turn before a NON-drawing `X` at depth 1, so a depth-1 sweep moved nothing and the row was ABSENT:
+   * measured 2026-11-17, Fork Tree and Fir Shoot had NO Yaw row, Flowering Plant no Pitch, Bush 3D no Yaw — each moves
+   * one level deeper. Coral Bush's yaw (inside a legacy `{…}`, `39.A6(c)`) stays inert at every depth.
+   */
+  const d0 = Math.max(1, rule.recursionRange[0]);
+  const depths = [d0, d0 + 1, d0 + 2].filter((d) => d <= rule.recursionRange[1]);
   const a = rule.publishedAngle;
   const [lo, hi] = rule.angleRange;
   const moves = (axis: 0 | 1 | 2): boolean => {
     const pose = (v: number): number[] => [axis === 0 ? v : a, axis === 1 ? v : a, axis === 2 ? v : a];
     const p = pose(lo), q = pose(hi);
-    const A = walkTurtle(rule, depth, p[0]!, p[1]!, p[2]!);
-    const B = walkTurtle(rule, depth, q[0]!, q[1]!, q[2]!);
-    if (A.count !== B.count) return true;
-    for (let i = 0; i < A.count * 3; i++) if (Math.abs(A.xyz[i]! - B.xyz[i]!) > 1e-9) return true;
+    for (const depth of depths) {
+      const A = walkTurtle(rule, depth, p[0]!, p[1]!, p[2]!);
+      const B = walkTurtle(rule, depth, q[0]!, q[1]!, q[2]!);
+      if (A.count !== B.count) return true;
+      for (let i = 0; i < A.count * 3; i++) if (Math.abs(A.xyz[i]! - B.xyz[i]!) > 1e-9) return true;
+    }
     return false;
   };
   const out = {
@@ -309,6 +465,6 @@ export function ruleAngleEffect(
     pitch: usage.pitch && moves(1),
     roll: usage.roll && moves(2),
   };
-  angleEffectMemo.set(rule.key, out);
+  if (rule.synthesized === true) angleEffectSynth.set(rule, out); else angleEffectMemo.set(rule.key, out);
   return out;
 }
