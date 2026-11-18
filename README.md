@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.13.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.13.0](https://github.com/alassio/psss-v2/releases/tag/v1.13.0)** — **New since v1.11.0: plants that grow, two tetrahedron curves, plants that grow outward under 3-D Symmetry, and Customize for every plant.** Eight plants from *The Algorithmic Beauty of Plants* join the curves, and any curve can now grow on screen — a plant generation by generation from its trunk, the others unfolding in place. The Sierpinski and Hill tetrahedra are new curves. 3-D Symmetry can hold each copy by its root, so plants burst outward from one point. And Customize now edits a plant's own rules as rows of symbols. 22 new presets show it all.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.13.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.14.0.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.14.0](https://github.com/alassio/psss-v2/releases/tag/v1.14.0)** — **New since v1.13.0: Arrange copies — one figure, many copies along a path.** A new panel on the Composer's Detail wave turns any figure you draw into 2 to 60 copies placed along a circle, a figure eight, a pretzel, a saddle ring, a real knot or a path of your own, and can let the copies change shape along the way. Particle Number now has a field for typing an exact count, a tuned Particle Number or Rotation now survives Export, and eight new presets show the copies and more.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.14.0)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)

@@ -104,6 +104,7 @@ import {
   SPEED_STEP, SPEED_TRACK, fmtSpeed,
   PARTICLE_STEP, particleCountToPos, posToParticleCount, fmtParticleCount,
   figureScaleToPos, fmtFigureScale,
+  particleCountField, syncParticleCountField,
 } from './visual-fx.ts';
 // The log track Figure Scale shares with the Sliders tab's ten multipliers — `figureScaleToPos`'s inverse.
 import { sliderMul } from '../../../exploration/slider-mappings.ts';
@@ -209,8 +210,12 @@ import {
   modulatorSeconds, rateForSeconds, periodPhrase, breathePercent, amplitudeForPercent,
   SLOT_LABELS, AXIS_LABELS, AXES, MAX_WAVES,
   SEED_WINDING, SEED_SIZE, SEED_PARTICLE_COUNT, SEED_WAVE_SPEED,
+  COPY_LAYOUTS, COPY_LAYOUT_BY_KEY, COPIES_RANGE, COPIES_SPREAD_RANGE, COPIES_ASPECT_RANGE, COPIES_CYCLES_RANGE,
+  DEFAULT_COPIES_SETTINGS, arrangeCopies, detectCopies, removeCopies,
 } from '../composer-model.ts';
-import type { FigureModel, AxisCell, SlotModel } from '../composer-model.ts';
+import type {
+  FigureModel, AxisCell, SlotModel, CopiesSettings, CopiesState, CopyLayoutKey, CopyMorphAxis,
+} from '../composer-model.ts';
 import {
   computeScore, drawScore, PLANES, PLANE_LABELS,
   computeOverlayScores, drawOverlayScore, paneExtent,
@@ -527,6 +532,29 @@ export class ComposerTab implements TabModule {
     get: () => number; toPos: (v: number) => number; fmt: (v: number) => string;
   }> = [];
 
+  /** v8 `45.B2` — the exact Particle Number field on the Framing row (rebuilt with it, cleared with it). */
+  private countField: HTMLInputElement | null = null;
+
+  /**
+   * v8 Phase 45 — **Arrange copies.** ⚠️⚠️ **THE PANEL STORES NOTHING IN THE PRESET**: an arrangement is ordinary
+   * Detail values plus a particle count, RECOGNISED by `detectCopies` on every `sync()`. `copiesSettings` is only
+   * what the panel shows before the first Arrange (and the Custom/Aspect values a recognised figure cannot carry);
+   * a recognised figure OVERWRITES it, so the Mixer, Evolution, History and a typed count all show truthfully.
+   * ⚠️ `copiesOpen` survives a rebuild (`render()`) on purpose — the panel is a view the user opened.
+   * ⚠️ `copiesLastPerCopy` is the one piece of session memory: the `K` the last Arrange wrote, so the status line
+   * can say *"Detail's windings changed"* when the numbers alone no longer name a `K`. Cleared by `reset()` and a
+   * preset change, never written into the preset.
+   */
+  private copiesSettings: CopiesSettings = { ...DEFAULT_COPIES_SETTINGS, custom: [...DEFAULT_COPIES_SETTINGS.custom] };
+  private copiesOpen = false;
+  private copiesLastPerCopy: number | null = null;
+  private copiesUi: {
+    toggle: HTMLButtonElement; panel: HTMLElement;
+    layout: HTMLSelectElement; aspectRow: HTMLElement; customRow: HTMLElement; custom: HTMLInputElement[];
+    morph: HTMLSelectElement; cyclesRow: HTMLElement; arrange: HTMLButtonElement; remove: HTMLButtonElement;
+    status: HTMLElement; editables: Array<HTMLInputElement | HTMLSelectElement>;
+  } | null = null;
+
   /**
    * The framing section's boolean control (`Mirror`), same registry shape as the sliders above.
    *
@@ -679,6 +707,7 @@ export class ComposerTab implements TabModule {
    */
   private adoptExternalFigure(): void {
     this.resetMutes();
+    this.copiesLastPerCopy = null;
     this.rebuildModel();
     /*
      * ⚠️⚠️ **A TYPE CHANGE NEEDS THE WHOLE BODY, NOT THE SLOT BODIES.** The wave slots and the curve
@@ -758,6 +787,9 @@ export class ComposerTab implements TabModule {
     this.framingSliders = [];
     this.framingChecks = [];
     this.symmetryMirrorRow = null;
+    // v8 Phase 45 — the count field and the copies panel live in sections `render()` rebuilds.
+    this.countField = null;
+    this.copiesUi = null;
     /*
      * ⚠️ **v8 16.18: BOTH FLAGS ARE SWITCHED OFF, WHICH IS THE OPPOSITE DECISION FROM THE FRAMING CONTROLS ABOVE
      * — and the discriminator is whether the value has ANOTHER SURFACE, not whether this tab owns it.** Every
@@ -797,6 +829,7 @@ export class ComposerTab implements TabModule {
    * `EvolutionTab`'s omission in a different costume: restoring the data and not the presentation.
    */
   reset(entryPreset: UnifiedPreset): void {
+    this.copiesLastPerCopy = null;
     // ⚠️ **A mute is restored too, and it belongs here rather than only on the external path** — 16.17's flag is
     // per-level presentation state over a specific figure, and `Reset` replaces the figure wholesale. See
     // `resetMutes()`: a mute that outlives its figure exports a level the user never switched off as cleared.
@@ -847,6 +880,13 @@ export class ComposerTab implements TabModule {
   private commit(_label: string): void {
     const p = this.state?.workingPreset;
     if (!p || !this.model) return;
+    /*
+     * v8 Phase 45 — ⚠️ **THE COUNT IS RE-READ FROM `workingPreset` BEFORE `writeFigure` WRITES IT BACK.** Particle Number
+     * is edited OUTSIDE this model (the Framing slider, the exact field, Visual FX — all through `setParticleCount`,
+     * which now keeps `workingPreset` current), so the model's count can be one edit old; writing it back would undo a
+     * typed count on the next winding edit. `arrangeCopies` sets both before it commits, so it is unaffected.
+     */
+    this.model.particleCount = p.generators.particleCount ?? this.model.particleCount;
     this.refreshDerived();
     this.growSlotCountForAuthoredContent();
     /*
@@ -1035,6 +1075,9 @@ export class ComposerTab implements TabModule {
     this.framingSliders = [];
     this.framingChecks = [];
     this.symmetryMirrorRow = null;
+    // v8 Phase 45 — the count field and the copies panel live in sections `render()` rebuilds.
+    this.countField = null;
+    this.copiesUi = null;
     // ⚠️ **v8 16.18: cleared here for the same reason, and the ENGINE FLAGS ARE NOT TOUCHED** — a rebuild of the
     // DOM is not a statement about the bypass, and clearing the flags here would have a preset change silently
     // re-apply the full look while the box the user ticked came back ticked.
@@ -1491,13 +1534,23 @@ export class ComposerTab implements TabModule {
 
     // Particle Number — the cubic track with the snap-to-100 that `PARTICLE_STEP` was measured against.
     // `wideLabel` because the readout reaches six characters ("50,000") and a growing label steals track width.
-    sec.appendChild(this.framingRow('Particle Number', TAB_TIPS['composer.particleCount']!, {
+    const countRow = this.framingRow('Particle Number', TAB_TIPS['composer.particleCount']!, {
       min: 0, max: 1, step: PARTICLE_STEP,
       get: () => this.controls.getParticleCount(),
-      set: v => this.controls.setParticleCount(v),
+      // ⚠️ `sync()` after a drag: the copies status and the Shape diagram both read the count (`45.B3`).
+      set: v => { this.controls.setParticleCount(v); this.sync(); },
       toPos: particleCountToPos, fromPos: posToParticleCount, fmt: fmtParticleCount,
       wideLabel: true, settleOnRelease: true,
-    }));
+    });
+    // v8 `45.B2` — the exact field, the same builder as Visual FX's (one owner of its clamp and its keys).
+    const countWrap = countRow.querySelector<HTMLElement>('.sl-vfx-slider-wrap')!;
+    countWrap.classList.add('sl-vfx-slider-wrap--count');
+    this.countField = particleCountField(() => this.controls.getParticleCount(), (n) => {
+      this.controls.setParticleCount(n);
+      this.sync();
+    });
+    countWrap.appendChild(this.countField);
+    sec.appendChild(countRow);
 
     // Rotation X/Y/Z — the signed quartic track in `core/rotation-track.ts`, which owns every number about it.
     // ⚠️ The readout is NOMINAL rpm: `Speed` above multiplies the actual rate, and the tooltip says so.
@@ -1939,6 +1992,13 @@ export class ComposerTab implements TabModule {
     clear.title = TAB_TIPS['composer.levelClear']!;
     clear.setAttribute('aria-label', `Clear every value on ${SLOT_LABELS[slot]}`);
     clear.addEventListener('click', () => this.clearLevel(slot));
+    // v8 Phase 45 — `Arrange copies…` on DETAIL's head only (`45.D4`): Detail is the layout wave.
+    let copiesPanel: HTMLElement | null = null;
+    if (slot === MAX_WAVES - 1) {
+      const built = this.buildCopiesPanel();
+      head.appendChild(built.toggle);
+      copiesPanel = built.panel;
+    }
     head.appendChild(clear);
 
     /*
@@ -1966,6 +2026,7 @@ export class ComposerTab implements TabModule {
      * them. No checker could have found this; only a user could.
      */
     sec.appendChild(head);
+    if (copiesPanel) sec.appendChild(copiesPanel);
 
     /*
      * ---- v8 `31.C` — **a switched-off level HIDES its 21 inputs** (owner, 2026-10-25) ----
@@ -3143,6 +3204,277 @@ export class ComposerTab implements TabModule {
    * is correct, and is the reason the flag is not cleared by hand here. A level that is empty is not *off*: it is
    * empty, and the two are described by two different sentences on purpose.
    */
+  /*
+   * ======================================================================================================
+   * v8 Phase 45 — ARRANGE COPIES (the panel; the arithmetic is `composer-model.ts`' and nowhere here)
+   * ======================================================================================================
+   */
+
+  /**
+   * The arrangement the figure holds NOW, read from the numbers alone — the model's waves and the ENGINE's count.
+   * ⚠️⚠️ **The count is `controls.getParticleCount()`, NOT `model.particleCount`**: the Framing slider, Visual FX's
+   * and a typed count write the engine, and `workingPreset` only converges on a commit, so the model's count can be
+   * one edit behind. Detection on the stale one would call a just-broken arrangement intact.
+   * ⚠️ **The MUTED projection is not read**: a switched-off Detail is still the user's arrangement.
+   */
+  private liveCopies(): CopiesState | null {
+    if (!this.model || this.liveFigureType() !== 'lissajous') return null;
+    return detectCopies({ ...this.model, particleCount: this.controls.getParticleCount() });
+  }
+
+  /** The toggle and the panel. Built once per `render()`; `syncCopiesPanel()` owns every state after that. */
+  private buildCopiesPanel(): { toggle: HTMLButtonElement; panel: HTMLElement } {
+    const toggle = document.createElement('button');
+    toggle.className = 'sl-btn sl-composer-level-clear sl-composer-copies-toggle';
+    toggle.textContent = 'Arrange copies…';
+    toggle.title = TAB_TIPS['composer.copiesToggle']!;
+    toggle.setAttribute('aria-label', 'Arrange copies');
+    toggle.addEventListener('click', () => { this.copiesOpen = !this.copiesOpen; this.syncCopiesPanel(); });
+
+    const panel = document.createElement('div');
+    panel.className = 'sl-composer-copies';
+    panel.style.display = 'none';
+    const editables: Array<HTMLInputElement | HTMLSelectElement> = [];
+
+    const row = (label: string, tip: string, control: HTMLElement): HTMLElement => {
+      const r = document.createElement('div');
+      r.className = 'sl-vfx-row';
+      r.title = tip;
+      const lab = document.createElement('span');
+      lab.className = 'sl-vfx-label';
+      lab.textContent = label;
+      r.appendChild(lab);
+      r.appendChild(control);
+      return r;
+    };
+    const select = (aria: string, tip: string, options: ReadonlyArray<readonly [string, string]>, onChange: (v: string) => void): HTMLSelectElement => {
+      const sel = document.createElement('select');
+      sel.className = 'sl-vfx-select sl-dropdown';
+      sel.title = tip;
+      sel.setAttribute('aria-label', aria);
+      for (const [v, t] of options) { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); }
+      sel.addEventListener('change', () => onChange(sel.value));
+      editables.push(sel);
+      return sel;
+    };
+    /*
+     * ⚠️ The numeric rows are `framingRow()`s so `sync()` repaints them through the ONE registry — their `get`
+     * reads `copiesSettings`, which `syncCopiesPanel()` refreshes from the recognised figure first. Their inputs are
+     * collected into `editables` so an out-of-range arrangement (`Multiple`) can show them read-only.
+     */
+    const numeric = (label: string, tip: string, spec: Parameters<ComposerTab['framingRow']>[2]): HTMLElement => {
+      const r = this.framingRow(label, tip, spec);
+      editables.push(r.querySelector('input')!);
+      return r;
+    };
+
+    const layout = select('Copies layout', TAB_TIPS['composer.copiesLayout']!,
+      COPY_LAYOUTS.map((l) => [l.key, l.label] as const),
+      (v) => { this.copiesSettings.layout = v as CopyLayoutKey; this.copiesEdited(); });
+    panel.appendChild(row('Layout', TAB_TIPS['composer.copiesLayout']!, layout));
+
+    panel.appendChild(numeric('Copies', TAB_TIPS['composer.copiesCount']!, {
+      min: COPIES_RANGE[0], max: COPIES_RANGE[1], step: 1,
+      get: () => this.copiesSettings.copies,
+      set: (v) => { this.copiesSettings.copies = Math.round(v); this.copiesEdited(); },
+      fmt: (v) => String(Math.round(v)),
+    }));
+    panel.appendChild(numeric('Spread', TAB_TIPS['composer.copiesSpread']!, {
+      min: COPIES_SPREAD_RANGE[0], max: COPIES_SPREAD_RANGE[1], step: 1,
+      get: () => this.copiesSettings.spread,
+      set: (v) => { this.copiesSettings.spread = v; this.copiesEdited(); },
+      fmt: (v) => String(Math.round(v)),
+    }));
+    // Aspect on a log track (0.25–4, 1 in the middle): position p ∈ [-1, 1] ↦ 4^p.
+    const aspectRow = numeric('Aspect', TAB_TIPS['composer.copiesAspect']!, {
+      min: -1, max: 1, step: 0.0078125,
+      get: () => this.copiesSettings.aspect,
+      set: (v) => { this.copiesSettings.aspect = v; this.copiesEdited(); },
+      toPos: (v) => Math.log(Math.min(COPIES_ASPECT_RANGE[1], Math.max(COPIES_ASPECT_RANGE[0], v))) / Math.log(4),
+      fromPos: (p) => Math.round(Math.pow(4, p) * 100) / 100,
+      fmt: (v) => v.toFixed(2),
+    });
+    panel.appendChild(aspectRow);
+
+    const abc = document.createElement('div');
+    abc.className = 'sl-composer-copies-abc';
+    const custom = (['X', 'Y', 'Z'] as const).map((ax, q) => {
+      const f = document.createElement('input');
+      f.type = 'number';
+      // ⚠️ NOT `sl-composer-num`: that class IS the wave rows' raw-field census (the harness counts 21 per row) —
+      // the appearance is shared through the CSS rule's selector list instead.
+      f.className = 'sl-composer-copies-num';
+      f.min = '0'; f.max = '9'; f.step = '1';
+      f.title = TAB_TIPS['composer.copiesCustom']!;
+      f.setAttribute('aria-label', `Custom path winding ${ax}`);
+      f.addEventListener('keydown', (e) => e.stopPropagation());
+      f.addEventListener('change', () => {
+        const v = Math.round(Number(f.value));
+        if (Number.isFinite(v)) this.copiesSettings.custom[q] = Math.max(0, Math.min(9, v));
+        this.copiesEdited();
+      });
+      abc.appendChild(f);
+      editables.push(f);
+      return f;
+    });
+    const customRow = row('a / b / c', TAB_TIPS['composer.copiesCustom']!, abc);
+    panel.appendChild(customRow);
+
+    const morph = select('Copies morph', TAB_TIPS['composer.copiesMorph']!,
+      [['off', 'Off'], ['x', 'X'], ['y', 'Y'], ['z', 'Z']],
+      (v) => { this.copiesSettings.morph = v as CopyMorphAxis; this.copiesEdited(); });
+    panel.appendChild(row('Morph', TAB_TIPS['composer.copiesMorph']!, morph));
+    const cyclesRow = numeric('Cycles', TAB_TIPS['composer.copiesCycles']!, {
+      min: COPIES_CYCLES_RANGE[0], max: COPIES_CYCLES_RANGE[1], step: 1,
+      get: () => this.copiesSettings.cycles,
+      set: (v) => { this.copiesSettings.cycles = Math.round(v); this.copiesEdited(); },
+      fmt: (v) => String(Math.round(v)),
+    });
+    panel.appendChild(cyclesRow);
+
+    const actions = document.createElement('div');
+    actions.className = 'sl-composer-copies-actions';
+    const arrange = document.createElement('button');
+    arrange.className = 'sl-btn';
+    arrange.textContent = 'Arrange';
+    arrange.title = TAB_TIPS['composer.copiesArrange']!;
+    arrange.setAttribute('aria-label', 'Arrange the copies');
+    arrange.addEventListener('click', () => this.applyCopies(true));
+    const remove = document.createElement('button');
+    remove.className = 'sl-btn';
+    remove.textContent = 'Remove copies';
+    remove.title = TAB_TIPS['composer.copiesRemove']!;
+    remove.setAttribute('aria-label', 'Remove the copies');
+    remove.addEventListener('click', () => this.removeCopiesNow());
+    actions.appendChild(arrange);
+    actions.appendChild(remove);
+    panel.appendChild(actions);
+
+    const status = document.createElement('div');
+    status.className = 'sl-composer-copies-status';
+    status.title = TAB_TIPS['composer.copiesStatus']!;
+    status.setAttribute('aria-live', 'polite');
+    panel.appendChild(status);
+
+    this.copiesUi = { toggle, panel, layout, aspectRow, customRow, custom, morph, cyclesRow, arrange, remove, status, editables };
+    return { toggle, panel };
+  }
+
+  /** `45.X3` — a panel control changed: LIVE once the figure holds an editable arrangement, else only remembered. */
+  private copiesEdited(): void {
+    const st = this.liveCopies();
+    if (st !== null && st.inRange) this.applyCopies(false);
+    else this.syncCopiesPanel();
+  }
+
+  /**
+   * Write the arrangement. `explicit` = the Arrange button: a History snapshot of the figure BEFORE, Detail's
+   * Pulse/Wobble zeroed (`45.X3`: a live re-arrange keeps them, so a breathing layout keeps breathing).
+   * ⚠️ The model's count is re-read from the ENGINE first (`liveCopies`' reason), and the new count goes to the
+   * engine (`setParticleCount`) before `commit()` writes the same number into `workingPreset`.
+   * ⚠️ A muted Detail is UN-muted — an arrangement nobody can see is not what Arrange was pressed for.
+   */
+  private applyCopies(explicit: boolean): void {
+    if (!this.model || this.liveFigureType() !== 'lissajous') return;
+    if (explicit) this.snapshotBeforeCopies('before Arrange copies');
+    const before = this.liveCopies();
+    this.model.particleCount = this.controls.getParticleCount();
+    const n = arrangeCopies(this.model, this.copiesSettings, !explicit && before !== null);
+    this.muted[MAX_WAVES - 1] = false;
+    this.controls.setParticleCount(n);
+    this.copiesLastPerCopy = n / Math.round(this.copiesSettings.copies);
+    this.commit('composer-arrange-copies');
+    this.renderSlotBody(0);
+    this.renderSlotBody(MAX_WAVES - 1);
+    this.sync();
+  }
+
+  /** `45.X1` — clear Detail, take the morph out of Body, keep the count. One History snapshot before. */
+  private removeCopiesNow(): void {
+    if (!this.model) return;
+    this.model.particleCount = this.controls.getParticleCount();
+    const st = detectCopies(this.model);
+    if (st === null) { this.syncCopiesPanel(); return; }
+    this.snapshotBeforeCopies('before Remove copies');
+    removeCopies(this.model);
+    this.copiesLastPerCopy = null;
+    this.commit('composer-remove-copies');
+    this.renderSlotBody(0);
+    this.renderSlotBody(MAX_WAVES - 1);
+    this.sync();
+  }
+
+  /**
+   * `45.D7` — one History entry, the figure as it was. ⚠️ The label STARTS WITH THE PRESET NAME (`pushSnapshot`'s
+   * rule), and the copy carries the ENGINE's count, because `workingPreset`'s can be one edit behind.
+   */
+  private snapshotBeforeCopies(what: string): void {
+    const p = this.state?.workingPreset;
+    if (!p) return;
+    const copy = structuredClone(p);
+    copy.generators.particleCount = this.controls.getParticleCount();
+    this.state?.pushSnapshot(`${p.metadata.name} — ${what}`, copy);
+  }
+
+  /** Repaint the panel from the figure. Called from `sync()`, so it is right after every route that edits. */
+  private syncCopiesPanel(): void {
+    const ui = this.copiesUi;
+    if (!ui) return;
+    const isWave = this.liveFigureType() === 'lissajous';
+    ui.toggle.style.display = isWave ? '' : 'none';
+    const open = this.copiesOpen && isWave;
+    ui.panel.style.display = open ? '' : 'none';
+    ui.toggle.setAttribute('aria-expanded', String(open));
+    if (!open) return;
+
+    const st = this.liveCopies();
+    if (st !== null) {
+      // the figure is the truth: what the panel shows is what the numbers hold (Custom's a/b/c included)
+      const keepAspect = st.settings.layout === 'ellipse' ? st.settings.aspect : this.copiesSettings.aspect;
+      const keepCustom = st.settings.layout === 'custom' ? st.settings.custom : this.copiesSettings.custom;
+      this.copiesSettings = { ...st.settings, aspect: keepAspect, custom: [...keepCustom] as [number, number, number] };
+      if (st.settings.morph === 'off') this.copiesSettings.cycles = this.copiesSettings.cycles || 1;
+    }
+    const s = this.copiesSettings;
+    if (ui.layout.value !== s.layout) ui.layout.value = s.layout;
+    if (ui.morph.value !== s.morph) ui.morph.value = s.morph;
+    ui.custom.forEach((f, q) => { if (document.activeElement !== f) f.value = String(s.custom[q]); });
+    ui.aspectRow.style.display = s.layout === 'ellipse' ? '' : 'none';
+    ui.customRow.style.display = s.layout === 'custom' ? '' : 'none';
+    ui.cyclesRow.style.display = s.morph !== 'off' ? '' : 'none';
+    for (const s2 of this.framingSliders) {
+      if (!ui.panel.contains(s2.input)) continue;
+      const live = s2.get();
+      const pos = String(s2.toPos(live));
+      if (s2.input.value !== pos) s2.input.value = pos;
+      const text = s2.fmt(live);
+      if (s2.label.textContent !== text) s2.label.textContent = text;
+    }
+
+    const readOnly = st !== null && !st.inRange;
+    for (const e of ui.editables) e.disabled = readOnly;
+    ui.arrange.disabled = readOnly;
+    ui.remove.disabled = st === null;
+
+    const n = this.controls.getParticleCount();
+    const parts: string[] = [];
+    if (st === null) {
+      const k = this.copiesLastPerCopy;
+      if (k !== null && n % k !== 0) parts.push(`Broken — Particle Number ${fmtParticleCount(n)} is no longer a multiple of ${k}, so the copies join. Press Arrange to restore them.`);
+      else if (k !== null) parts.push(`Broken — Detail's windings no longer share the factor ${k}, so Detail is no longer a layout. Press Arrange to restore it.`);
+      else parts.push('Not arranged. Choose a layout and press Arrange.');
+    } else {
+      const label = COPY_LAYOUT_BY_KEY[st.settings.layout].label;
+      parts.push(`${st.copies} copies of ${fmtParticleCount(st.perCopy)} particles on ${label === 'Custom' ? `a custom path (${st.settings.custom.join(', ')})` : `the ${label}`}`
+        + (st.settings.morph !== 'off' ? `, changing shape on ${st.settings.morph.toUpperCase()}` : '') + '.');
+      if (!st.inRange) parts.push(`More than this panel's ${COPIES_RANGE[1]} copies — shown read-only; edit the Detail rows directly or press Remove copies.`);
+      if (st.overlap) parts.push('The copies overlap: raise Spread or make Body and Structure smaller.');
+      if (st.detailWobble) parts.push('Wobble on Detail joins the copies over time.');
+    }
+    const text = parts.join(' ');
+    if (ui.status.textContent !== text) ui.status.textContent = text;
+  }
+
   private clearLevel(slot: number): void {
     if (!this.model) return;
     const model = this.model.slots[slot]!;
@@ -3290,7 +3622,9 @@ export class ComposerTab implements TabModule {
       const next = c.get();
       if (c.input.checked !== next) c.input.checked = next;
     }
+    if (this.countField) syncParticleCountField(this.countField, () => this.controls.getParticleCount());
     this.syncFramingVisibility();
+    this.syncCopiesPanel();
 
     /*
      * ---- v8 16.18 — the two bypass checkboxes and their shared notice ----
@@ -3583,7 +3917,10 @@ export class ComposerTab implements TabModule {
      */
     const design = this.state?.workingPreset?.metadata.designResolution;
     const sharpLevels = this.controls.getSharpnessLevels();
+    // v8 `45.B4` — a recognised arrangement is drawn copy by copy, at the real count (`WaveOps.copies`).
+    const copies = this.liveCopies();
     const ops: WaveOps = {
+      ...(copies ? { copies: { particles: copies.copies * copies.perCopy, copies: copies.copies } } : {}),
       sharpness: sharpLevels[0],
       sharpnessStructure: sharpLevels[1],
       sharpnessDetail: sharpLevels[2],

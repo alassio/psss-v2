@@ -632,6 +632,14 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Plant Custom Fork',
       'Plant Custom Wild',
       'Plant Custom Bloom',
+      'Lord of the Rings',
+      'Candystore',
+      'Copies Figure Eight',
+      'Copies Knot',
+      'Copies Saddle',
+      'Copies Morph Ring',
+      'Earth at Night',
+      'Dancing Lovers',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
@@ -659,7 +667,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   },
   {
     name: 'Materials',
-    // GENERATED (97) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
+    // GENERATED (98) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
     // `'None'` (invariant 18: a material's inactive state is the STRING `'None'`, not absence).
     presets: [
       "Anima Electrica",
@@ -759,6 +767,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       "Plant Fir Shoot",
       "Plant Flowering",
       "Plant Custom Bloom",
+      "Copies Saddle",
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,

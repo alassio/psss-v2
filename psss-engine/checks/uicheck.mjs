@@ -1548,6 +1548,131 @@ console.log('\n=== AD. v8 Phase 44 — the production editor: chips, the keyboar
   await ctxAD.close();
 }
 
+console.log('\n=== AE. v8 Phase 45 — Arrange copies: the panel, the exact count field, History, Remove, Multiple ===\n');
+/*
+ * The panel through the USER's route, read back through the app's own Export (the hook publishes no figure). Every
+ * numeric claim is about the EXPORTED preset, so a panel that painted the right words over the wrong figure fails.
+ * ⚠️ The count fields are driven by a `change` event: the Framing group can be collapsed, and `fill()` refuses an
+ * invisible input — the event is what the field listens to, so it is the same route.
+ */
+{
+  const ctxAE = await browser.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+  const pAE = await ctxAE.newPage();
+  const aeErrs = [];
+  pAE.on('pageerror', (e) => aeErrs.push(String(e)));
+  const baseAE = process.env.DEMO_URL ?? 'http://localhost:5190/';
+  const tab = pAE.locator('.tab-content[data-tab="composer"]');
+  const open = async (name) => {
+    await pAE.goto(`${baseAE}?testhook=1&preset=${encodeURIComponent(name)}`, { waitUntil: 'load' });
+    await pAE.locator('button.pg-mode-btn', { hasText: 'Lab' }).first().click({ timeout: 120000 });
+    await pAE.locator('.sl-tab-btn[data-tab="composer"]').click({ timeout: 120000 });
+    await pAE.waitForTimeout(1200);
+  };
+  const exported = async () => {
+    const [dl] = await Promise.all([pAE.waitForEvent('download', { timeout: 30000 }),
+      pAE.locator('button', { hasText: /^Export$/ }).first().click()]);
+    const fs = await import('node:fs');
+    return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  };
+  const status = async () => (await tab.locator('.sl-composer-copies-status').textContent()) ?? '';
+  const field = tab.locator('input[aria-label="Particle Number, exact"]');
+  const typeCount = async (loc, v) => { await loc.evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, v); await pAE.waitForTimeout(500); };
+  const detail = (e) => (e.generators.waves[2]?.axes ?? []).map((a) => a.fm.base);
+  const hook = () => pAE.evaluate(() => window.__psss?.presetName);
+
+  await open('Cylinder Viviani');
+  chk('ONE "Arrange copies" toggle, on Detail\'s head', (await tab.locator('button[aria-label="Arrange copies"]').count()) === 1
+    && (await tab.locator('.sl-composer-slot[data-slot="2"] button[aria-label="Arrange copies"]').count()) === 1);
+  await tab.locator('button[aria-label="Arrange copies"]').click();
+  await pAE.waitForTimeout(300);
+  chk('...the panel opens on "Not arranged" (a figure without copies)', /^Not arranged/.test(await status()), await status());
+  await pAE.locator('.sl-tab-btn[data-tab="history"]').click(); await pAE.waitForTimeout(500);
+  // ⚠️ VISIBLE tiles: History pre-creates all ten and hides the empty ones, so `count()` reads 10 whatever it holds.
+  const visibleTiles = () => pAE.locator('.sl-history-tile:visible').count();
+  const hist0 = await visibleTiles();
+  await pAE.locator('.sl-tab-btn[data-tab="composer"]').click(); await pAE.waitForTimeout(500);
+  await tab.locator('select[aria-label="Copies layout"]').selectOption('figureEight');
+  await pAE.waitForTimeout(300);
+  const e0 = await exported();
+  chk('...choosing a layout BEFORE Arrange writes nothing (`45.X3`: Detail still empty in the export)', detail(e0).every((w) => w === 0), JSON.stringify(detail(e0)));
+  await tab.locator('button[aria-label="Arrange the copies"]').click();
+  await pAE.waitForTimeout(800);
+  const e1 = await exported();
+  const n1 = e1.generators.particleCount, d1 = detail(e1);
+  chk('Arrange (20 copies, Figure Eight) exports Detail windings K × (1, 2, 0) with N = 20 K',
+    n1 % 20 === 0 && d1[0] === n1 / 20 && d1[1] === 2 * n1 / 20 && d1[2] === 0, `N ${n1}, Detail ${JSON.stringify(d1)}`);
+  chk('...the status line names the arrangement it now holds', /^20 copies of [\d,]+ particles on the Figure Eight/.test(await status()), await status());
+  await pAE.locator('.sl-tab-btn[data-tab="history"]').click(); await pAE.waitForTimeout(500);
+  const hist1 = await visibleTiles();
+  const labels = await pAE.locator('.sl-history-tile:visible .sl-history-tile-label').allTextContents();
+  const label = labels.find((l) => /before Arrange copies/.test(l)) ?? labels.join(' | ');
+  chk('...and ONE History snapshot of the figure BEFORE, captioned with the preset name', hist1 === hist0 + 1 && /^Cylinder Viviani — before Arrange copies/.test(label ?? ''),
+    `${hist0} -> ${hist1} tiles; "${label}"`);
+  await pAE.locator('.sl-tab-btn[data-tab="composer"]').click(); await pAE.waitForTimeout(500);
+
+  // the exact field: an unsnapped count breaks the arrangement, and the status says why
+  await typeCount(field, String(n1 + 1));
+  const e2 = await exported();
+  chk('the exact Particle Number field writes an UNSNAPPED count (N + 1) into the engine and the export', e2.generators.particleCount === n1 + 1, `${e2.generators.particleCount}`);
+  chk('...and the status line reports the arrangement BROKEN, naming the count', /^Broken — Particle Number [\d,]+ is no longer a multiple/.test(await status()), await status());
+  await tab.locator('button[aria-label="Arrange the copies"]').click(); await pAE.waitForTimeout(600);
+  chk('...Arrange restores it (back to an exact multiple)', (await exported()).generators.particleCount % 20 === 0);
+
+  // keys typed in the field reach no app shortcut — calibrated by the same key sent to the document.
+  // ⚠️ The Framing group is OPENED first: a field inside a collapsed group cannot take focus, and the keys would go to
+  // the document — the clause's first run read that as a leak.
+  const framingHead = tab.locator('button.sl-vfx-group-head', { hasText: 'Framing & Preview' });
+  if ((await framingHead.getAttribute('aria-expanded')) !== 'true') await framingHead.click();
+  await pAE.waitForTimeout(300);
+  const before = await hook();
+  await field.focus();
+  const focused = await field.evaluate((el) => document.activeElement === el);
+  for (const k of ['l', 'ArrowRight']) await pAE.keyboard.press(k);
+  await pAE.waitForTimeout(600);
+  const afterField = await hook();
+  await field.evaluate((el) => el.blur());
+  await pAE.locator('body').click({ position: { x: 300, y: 300 } });
+  await pAE.keyboard.press('ArrowRight'); await pAE.waitForTimeout(800);
+  const afterDoc = await hook();
+  chk('keys typed in the count field trigger NO app shortcut (preset unchanged)', focused && afterField === before, `focused ${focused}; ${before} -> ${afterField}`);
+  chk('...calibration: ArrowRight sent to the document DOES change the preset', afterDoc !== before, `${before} -> ${afterDoc}`);
+
+  // live after Arrange, and Remove
+  await open('Cylinder Viviani');
+  await tab.locator('button[aria-label="Arrange copies"]').click();
+  await tab.locator('button[aria-label="Arrange the copies"]').click(); await pAE.waitForTimeout(600);
+  await tab.locator('.sl-composer-copies input[aria-label="Copies"]').evaluate((el) => { el.value = '30'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pAE.waitForTimeout(600);
+  const e3 = await exported();
+  chk('after Arrange every control is LIVE: Copies → 30 moves N to the nearest multiple of 30 and Detail to K × (1, 1, 0)',
+    e3.generators.particleCount % 30 === 0 && detail(e3)[0] === e3.generators.particleCount / 30, `N ${e3.generators.particleCount}, Detail ${JSON.stringify(detail(e3))}`);
+  await tab.locator('button[aria-label="Remove the copies"]').click(); await pAE.waitForTimeout(600);
+  const e4 = await exported();
+  chk('Remove copies clears Detail and KEEPS Particle Number', detail(e4).every((w) => w === 0) && e4.generators.particleCount === e3.generators.particleCount,
+    `N ${e4.generators.particleCount}, Detail ${JSON.stringify(detail(e4))}`);
+
+  // Visual FX's exact field is the same control
+  await pAE.locator('.sl-tab-btn[data-tab="visual-fx"]').click(); await pAE.waitForTimeout(600);
+  const vfx = pAE.locator('.tab-content[data-tab="visual-fx"] input[aria-label="Particle Number, exact"]');
+  const hasVfx = (await vfx.count()) === 1;
+  if (hasVfx) await typeCount(vfx, '12345');
+  chk('Visual FX carries the same exact field, and a typed 12 345 reaches the export unsnapped', hasVfx && (await exported()).generators.particleCount === 12345);
+
+  // Multiple: recognised, out of range, read-only
+  await open('Multiple');
+  await tab.locator('button[aria-label="Arrange copies"]').click(); await pAE.waitForTimeout(400);
+  chk('`Multiple` reads as 120 copies of 168 — beyond the panel\'s 60, so Arrange and the controls are read-only, Remove is not',
+    /^120 copies of 168 particles/.test(await status()) && await tab.locator('button[aria-label="Arrange the copies"]').isDisabled()
+      && await tab.locator('select[aria-label="Copies layout"]').isDisabled() && !(await tab.locator('button[aria-label="Remove the copies"]').isDisabled()),
+    await status());
+
+  // a curve figure has no copies panel
+  await open('Plant Fork Tree');
+  chk('on a curve figure (Plant Fork Tree) the toggle is not offered', !(await tab.locator('button[aria-label="Arrange copies"]').isVisible().catch(() => false)));
+  chk('...with no page error across the section', aeErrs.length === 0, aeErrs[0] ?? 'none');
+  await ctxAE.close();
+}
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

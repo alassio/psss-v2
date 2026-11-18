@@ -120,6 +120,14 @@ export interface WaveOps {
   grow?: readonly [number, number, number];
   /** `min(designW, designH) * 0.5`. ⚠️ Absent means the generator's own `?? 100` design box. */
   halfExtent?: number;
+  /**
+   * v8 `45.B4` — **a recognised copy arrangement** (`detectCopies`): draw the COMBINED figure as `copies` separate
+   * paths, sampled at the real `particles`. ⚠️ Absent means unchanged, bit for bit. ⚠️ Only the combined figure
+   * (`slot === null`) reads it: a per-slot pane draws one wave, and Detail alone IS the layout path.
+   * ⚠️⚠️ Without it the diagram samples at its own count (`sampleCountFor`, ≠ N), so the copies' arithmetic
+   * — particles `r, r + M, …` share a place — does not hold on the samples and the diagram draws one tangle.
+   */
+  copies?: { readonly particles: number; readonly copies: number };
 }
 
 /**
@@ -701,6 +709,8 @@ export interface OverlayCurves {
   size: Float32Array | null;
   /** The instant whose FM sum differs most from `now` — what `Wobble` does. `null` when nothing wobbles. */
   winding: Float32Array | null;
+  /** v8 `45.B4` — points per separate path (a copy arrangement, drawn copy by copy). Absent: one path. */
+  segment?: number;
 }
 
 export interface OverlayScore {
@@ -843,13 +853,28 @@ export function computeOverlayScores(
     ? waves
     : (waves[slot] ? [waves[slot]!] : []);
 
-  const { samples, maxWinding, undersampled } = sampleCountFor(subject);
+  const counted = sampleCountFor(subject);
   const { now, size, winding } = chooseOverlayInstants(subject);
+  // v8 `45.B4` — a recognised arrangement on the combined figure: sample at N, draw copy by copy.
+  const cp = slot === null ? ops.copies : undefined;
+  const arranged = cp !== undefined && Number.isInteger(cp.particles) && Number.isInteger(cp.copies)
+    && cp.copies >= 2 && cp.particles % cp.copies === 0;
+  const samples = arranged ? cp!.particles : counted.samples;
+  const { maxWinding } = counted;
+  const undersampled = arranged ? false : counted.undersampled;
+  const order = arranged ? copyDrawOrder(cp!.particles, cp!.copies) : null;
+  const regroup = (arr: Float32Array): Float32Array => {
+    if (order === null) return arr;
+    const out = new Float32Array(arr.length);
+    for (let k = 0; k < order.length; k++) { out[k * 2] = arr[order[k]! * 2]!; out[k * 2 + 1] = arr[order[k]! * 2 + 1]!; }
+    return out;
+  };
 
   const build = (plane: ScorePlane): OverlayCurves => ({
-    now: evaluate(subject, now, samples, plane, ops),
-    size: size === null ? null : evaluate(subject, size, samples, plane, ops),
-    winding: winding === null ? null : evaluate(subject, winding, samples, plane, ops),
+    now: regroup(evaluate(subject, now, samples, plane, ops)),
+    size: size === null ? null : regroup(evaluate(subject, size, samples, plane, ops)),
+    winding: winding === null ? null : regroup(evaluate(subject, winding, samples, plane, ops)),
+    ...(arranged ? { segment: cp!.particles / cp!.copies } : {}),
   });
 
   const xy = build('xy'), xz = build('xz'), yz = build('yz');
@@ -954,12 +979,14 @@ export function drawOverlayScore(canvas: HTMLCanvasElement, curves: OverlayCurve
     ctx.strokeStyle = style;
     ctx.lineWidth = width * dpr;
     ctx.beginPath();
+    const seg = curves.segment ?? 0;
     for (let i = 0; i < arr.length / 2; i++) {
       // ⚠️ Y NEGATED — model space is Y-up, canvas Y-down. On the library's many symmetric figures omitting
       // this is INVISIBLE, and on an asymmetric one it reads as a phase error in the engine.
       const px = cx + arr[i * 2]! * s;
       const py = cy - arr[i * 2 + 1]! * s;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      // v8 `45.B4` — a copy arrangement starts a new path at each copy, so no line joins two copies.
+      if (i === 0 || (seg > 0 && i % seg === 0)) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     // Never `closePath()` — the curve closes iff the winding is an integer, and drawing the seam shut would
     // hide exactly what the `closes` / `open` badge is about (v8 16.13).
@@ -969,4 +996,16 @@ export function drawOverlayScore(canvas: HTMLCanvasElement, curves: OverlayCurve
   if (curves.winding) stroke(curves.winding, OVERLAY_STYLES.winding.style, OVERLAY_STYLES.winding.width);
   if (curves.size) stroke(curves.size, OVERLAY_STYLES.size.style, OVERLAY_STYLES.size.width);
   stroke(curves.now, OVERLAY_STYLES.now.style, OVERLAY_STYLES.now.width);
+}
+
+/**
+ * v8 `45.B4` — the order to DRAW a copy arrangement in: copy by copy, particles `r, r + M, …`, so each copy is its
+ * own path. ⚠️ In chain order consecutive particles belong to DIFFERENT copies, and a polyline through them would
+ * zig-zag across the whole layout.
+ */
+export function copyDrawOrder(n: number, copies: number): Int32Array {
+  const out = new Int32Array(n);
+  let k = 0;
+  for (let r = 0; r < copies; r++) for (let i = r; i < n; i += copies) out[k++] = i;
+  return out;
 }

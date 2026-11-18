@@ -906,6 +906,10 @@
 
 /* ⚠️ The stepper is the Lab's first `input[type=number]`. The spinner arrows are KEPT — they are the whole
    point of a stepper for an integer winding, where ±1 is the meaningful move. */
+/* v8 Phase 45 — the copies panel's a/b/c and the exact count field share this appearance by SELECTOR, not by the class:
+   `sl-composer-num` is the wave rows' raw-field census. */
+.sl-composer-copies-num,
+.sl-vfx-count,
 .sl-composer-num {
   flex: 1;
   min-width: 0;
@@ -918,6 +922,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+.sl-composer-copies-num:focus,
+.sl-vfx-count:focus,
 .sl-composer-num:focus {
   outline: none;
   border-color: #7ec8e3;
@@ -2006,3 +2012,46 @@
 .sl-prod-group:first-child { margin-left: 0; }
 .sl-prod-status { margin: 2px 0 6px; font-size: 12px; color: #8aa2bd; }
 .sl-prod-status--error { color: #e0906a; }
+
+/* ---- v8 Phase 45 — the exact Particle Number field and the Arrange copies panel ----------------------------
+
+   The field REPLACES the slider's readout on its two rows: the readout stays in the DOM (`syncControl` finds it as
+   the range input's next sibling) and is hidden here, so one number is shown once. */
+.sl-vfx-slider-wrap--count > .sl-vfx-value {
+  display: none;
+}
+.sl-vfx-count {
+  flex: 0 0 64px;
+  margin-left: 6px;
+}
+.sl-composer-copies-toggle {
+  margin-left: auto;
+  margin-right: 6px;
+}
+/* The toggle takes the head's free space, so the `Clear` after it sits beside it at the right edge. */
+.sl-composer-copies-toggle + .sl-composer-level-clear {
+  margin-left: 0;
+}
+.sl-composer-copies {
+  margin: 6px 0 4px;
+  padding: 6px 8px;
+  border: 1px solid #2a2a5a;
+  border-radius: 4px;
+  background: #101024;
+}
+.sl-composer-copies-abc {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.sl-composer-copies-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sl-composer-copies-status {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9fb4d0;
+  line-height: 1.35;
+}

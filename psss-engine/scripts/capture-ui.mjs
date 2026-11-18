@@ -269,6 +269,8 @@ const EXTRA_SHOTS = [
   { tab: 'composer', file: 'lab-composer-productions-random', preset: 'Plant Wild', scrollTo: 'Rule' },
   // ...and a plant with BOTH editors: Sprig shows `Edit as` above its productions.
   { tab: 'composer', file: 'lab-composer-editas', preset: 'Plant Sprig', scrollTo: 'Rule' },
+  // v8 Phase 45 — the Arrange copies panel, opened on a demo that already holds an arrangement (its status line reads it).
+  { tab: 'composer', file: 'lab-composer-copies', preset: 'Copies Saddle' },
   /*
    * v8 Phase 39 Stage C — the Customize editor. ⚠️ `Curve Rosette Chain` is the one preset AUTHORED under Customize,
    * so it opens WITH the editor and needs no option pick; `Curve Weave` is Moore, and picking Customize there shows
@@ -619,6 +621,7 @@ const PREP = {
   'lab-composer-productions': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 150]],
   'lab-composer-productions-random': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 150]],
   'lab-composer-editas': [['option', 'customize'], ['wait', 1200], ['scroll', '.sl-prod-row', 260]],
+  'lab-composer-copies': [['click', 'button[aria-label="Arrange copies"]'], ['wait', 1200], ['scroll', '.sl-composer-copies', 200]],
   'lab-mixer-picker': [
     ['click', 'button[aria-label="Choose the preset for Deck B"]'],
     ['wait', 1500],

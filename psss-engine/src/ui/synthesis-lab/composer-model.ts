@@ -736,3 +736,253 @@ export function amplitudeForPercent(percent: number, base: number): number | nul
   if (base === 0 || !Number.isFinite(base) || !Number.isFinite(percent)) return null;
   return (percent / 100) * base;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ * v8 Phase 45 — ARRANGE COPIES: the Detail wave as a LAYOUT for the figure Body and Structure draw.
+ *
+ * THE ARITHMETIC (measured 2026-11-17, `p98m`/`p98v`/`p98w`/`p98y`). A wave of winding `w` runs its curve `w` times
+ * along the particle chain. If every visible Detail winding is a multiple of `K` and Particle Number `N` is a multiple
+ * of `K`, Detail repeats every `M = N / K` particles: particles `r, r + M, …` share its position, so it visits only
+ * `M` places. Made LARGE it places `M` copies; the `K` particles at each place still differ through Body and
+ * Structure, which DRAW the copy. ⚠️⚠️ **`K` is the number of PARTICLES PER COPY and `M` the number of copies.**
+ * ⚠️ A wave's phase is MULTIPLIED by its winding (`effectivePhase`), so every layout phase is divided by `K · a`
+ * (`phaseForTarget`) — at winding 200 a 90° phase is 200 whole turns and a ring collapses into a line.
+ * ⚠️ **MORPH adds `cycles · K` (particles per copy, NOT the copy count) to one Body winding**: inside a copy it still
+ * acts as the low winding, but its phase moves by `cycles / M` of a turn from one copy to the next, so the copies
+ * change shape along the layout. (The Phase 45 spec said `cycles × M` — a slip, corrected at the build.)
+ * ⚠️ **No state is stored**: an arrangement is ordinary wave values plus a particle count, RECOGNISED by
+ * `detectCopies` from the numbers alone — so Export, the Mixer and Evolution carry it with no new key, and an
+ * existing preset built the same way (`Multiple`) is recognised too.
+ * ════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/** `45.D5` — copies 2–60, each drawn with at least 150 particles; the particle ceiling is the track's. */
+export const COPIES_RANGE = [2, 60] as const;
+export const COPIES_MIN_PER_COPY = 150;
+export const COPIES_MAX_PARTICLES = 50_000;
+/** `45.X2` — the layout's size (Detail's size, design units) and the Ellipse's aspect. */
+export const COPIES_SPREAD_RANGE = [5, 80] as const;
+export const COPIES_SPREAD_DEFAULT = 40;
+export const COPIES_ASPECT_RANGE = [0.25, 4] as const;
+/** `45.D3` — Morph cycles. */
+export const COPIES_CYCLES_RANGE = [1, 3] as const;
+/** Below this ratio of Spread to the figure's own reach the copies OVERLAP — a status hint, never a refusal. */
+export const COPIES_OVERLAP_RATIO = 2;
+/**
+ * …and below this ratio Detail is not a layout at all but TEXTURE: `Aurora Borealis II`, `Millenium Falcon`, `Mirrors In
+ * Mirror`, `Penta Spirals`, `Rubber Penta Spirals` carry a Detail of winding 625 dividing N at size ≈ 1/30 of the
+ * figure — the arithmetic of copies, none visible (census 2026-11-18, `p99c`). ¼ keeps every arrangement whose Spread
+ * is at least a quarter of the figure's own reach.
+ */
+export const COPIES_MIN_SHARE = 0.25;
+
+export type CopyLayoutKey = 'ellipse' | 'figureEight' | 'pretzel' | 'saddle' | 'knot' | 'custom';
+export type CopyMorphAxis = 'off' | 'x' | 'y' | 'z';
+
+export interface CopyLayout {
+  readonly key: CopyLayoutKey;
+  readonly label: string;
+  /** The path's windings per axis, `(a, b, c)` — multiplied by `K` on Detail. */
+  readonly windings: readonly [number, number, number];
+  /** Target phases in degrees, BEFORE the division by the winding. */
+  readonly phases: readonly [number, number, number];
+  /** Each axis' size as a fraction of Spread (the Ellipse's y also takes the Aspect). */
+  readonly sizes: readonly [number, number, number];
+}
+
+/**
+ * `45.D2` — the layouts, ONE table. Only paths a single sine per axis can draw (3-D Lissajous paths): the Lissajous
+ * Knot (3, 2, 5) is a real knot; its phases (25°, 149°, 0°) were FOUND by search (`p99a-knot-phases.mjs`: clearance
+ * 0.26 of its size; the naive (0°, 0°) touches itself). None duplicates 3-D Symmetry except the plain circle, which
+ * is kept because Morph and the figure-baked copies need it.
+ */
+export const COPY_LAYOUTS: readonly CopyLayout[] = [
+  { key: 'ellipse', label: 'Ellipse / Circle', windings: [1, 1, 0], phases: [90, 0, 0], sizes: [1, 1, 0] },
+  { key: 'figureEight', label: 'Figure Eight', windings: [1, 2, 0], phases: [0, 0, 0], sizes: [1, 1, 0] },
+  { key: 'pretzel', label: 'Pretzel', windings: [3, 2, 0], phases: [90, 0, 0], sizes: [1, 1, 0] },
+  { key: 'saddle', label: 'Saddle Ring', windings: [1, 1, 2], phases: [90, 0, 0], sizes: [1, 1, 0.35] },
+  { key: 'knot', label: 'Lissajous Knot', windings: [3, 2, 5], phases: [25, 149, 0], sizes: [1, 1, 1] },
+  { key: 'custom', label: 'Custom', windings: [1, 1, 1], phases: [90, 0, 0], sizes: [1, 1, 1] },
+];
+export const COPY_LAYOUT_BY_KEY: Readonly<Record<CopyLayoutKey, CopyLayout>> =
+  Object.fromEntries(COPY_LAYOUTS.map((l) => [l.key, l])) as Record<CopyLayoutKey, CopyLayout>;
+
+export interface CopiesSettings {
+  layout: CopyLayoutKey;
+  copies: number;
+  spread: number;
+  aspect: number;
+  /** Custom (a, b, c), each 0–9, at least one non-zero. */
+  custom: [number, number, number];
+  morph: CopyMorphAxis;
+  cycles: number;
+}
+
+export const DEFAULT_COPIES_SETTINGS: CopiesSettings = {
+  layout: 'ellipse', copies: 20, spread: COPIES_SPREAD_DEFAULT, aspect: 1, custom: [1, 2, 3], morph: 'off', cycles: 1,
+};
+
+/** What `detectCopies` recognises. `inRange` false = a valid arrangement the panel's range cannot edit (`Multiple`). */
+export interface CopiesState {
+  copies: number;
+  perCopy: number;
+  settings: CopiesSettings;
+  inRange: boolean;
+  /** Wobble on Detail joins the copies over time (`45.X5`) — reported, not blocked. */
+  detailWobble: boolean;
+  /** Spread is under `COPIES_OVERLAP_RATIO` × the reach of Body + Structure: neighbouring copies overlap. */
+  overlap: boolean;
+}
+
+const gcd = (a: number, b: number): number => { let x = Math.abs(a), y = Math.abs(b); while (y) { [x, y] = [y, x % y]; } return x; };
+const reach = (slot: SlotModel | undefined): number =>
+  (slot ? Math.max(0, ...slot.axes.map((c) => (c.silent ? 0 : Math.abs(c.size) + Math.abs(c.pulse)))) : 0);
+const clampTo = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+
+/**
+ * `45.D6` — **the NEAREST multiple of `copies`** to `n`, clamped to `[copies · 150, the largest multiple ≤ 50 000]`.
+ * Returns the count and `K = count / copies` (particles per copy).
+ */
+export function nearestCopyCount(n: number, copies: number): { particleCount: number; perCopy: number } {
+  const m = Math.round(clampTo(copies, COPIES_RANGE[0], COPIES_RANGE[1]));
+  const lo = m * COPIES_MIN_PER_COPY;
+  const hi = Math.floor(COPIES_MAX_PARTICLES / m) * m;
+  const near = Math.round((Number.isFinite(n) ? n : lo) / m) * m;
+  const particleCount = clampTo(near, lo, hi);
+  return { particleCount, perCopy: particleCount / m };
+}
+
+/** The windings `(a, b, c)` a settings object lays out — the Custom row's, or the layout's. */
+export function layoutWindings(s: CopiesSettings): [number, number, number] {
+  if (s.layout !== 'custom') return [...COPY_LAYOUT_BY_KEY[s.layout].windings] as [number, number, number];
+  const c = s.custom.map((v) => clampTo(Math.round(Number.isFinite(v) ? v : 0), 0, 9)) as [number, number, number];
+  return c.some((v) => v > 0) ? c : [1, 1, 1];
+}
+
+const MORPH_AXIS: Record<Exclude<CopyMorphAxis, 'off'>, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
+
+/**
+ * `45.A` — **arrange the copies**: write Detail as the layout, set the particle count to the nearest exact multiple,
+ * and (Morph) add `cycles · K` to one Body winding. Mutates `model` (the Composer commits it). `keepModulation`
+ * preserves Detail's Pulse/Wobble on a LIVE re-arrange (`45.X3`), so a breathing layout keeps breathing; the FIRST
+ * arrange zeroes them. Returns the adjusted count.
+ */
+export function arrangeCopies(model: FigureModel, s: CopiesSettings, keepModulation: boolean): number {
+  const { particleCount, perCopy: K } = nearestCopyCount(model.particleCount, s.copies);
+  const prev = detectCopies(model);
+  // undo a previous morph first, so re-arranging never stacks it
+  if (prev !== null) removeMorph(model, prev);
+  const w = layoutWindings(s);
+  const L = COPY_LAYOUT_BY_KEY[s.layout];
+  const spread = clampTo(s.spread, COPIES_SPREAD_RANGE[0], COPIES_SPREAD_RANGE[1]);
+  const aspect = clampTo(s.aspect, COPIES_ASPECT_RANGE[0], COPIES_ASPECT_RANGE[1]);
+  const detail = model.slots[2]!;
+  /*
+   * ⚠️⚠️ **THE HALF-STEP SHIFT (found at the build, 2026-11-18).** Copy `r` sits at path parameter `θ = 2πr/M`, so on a
+   * SELF-CROSSING path two copies can land on the crossing together: the Figure Eight (`sin θ`, `sin 2θ`) crosses at
+   * `θ = 0` and `θ = π`, and for every EVEN `M` copies `0` and `M/2` sit there — one copy drawn twice, one missing.
+   * Shifting the grid by half a copy step (`θ + π/M`, i.e. `a · 180/M` degrees on an axis of winding `a`) moves both off
+   * the crossing; on a path without one it is a rotation along the path and changes nothing visible.
+   * `composercheck` §COPIES measures the coincidence, seeded with the unshifted phases.
+   */
+  const M = particleCount / K;
+  const axes = [0, 1, 2].map((q) => {
+    const old = detail.axes[q]!;
+    const winding = K * w[q]!;
+    const size = w[q] === 0 ? 0 : spread * L.sizes[q]! * (s.layout === 'ellipse' && q === 1 ? aspect : 1);
+    return readAxisValues({
+      winding,
+      size,
+      phase: winding === 0 ? 0 : (phaseForTarget(L.phases[q]! + (w[q]! * 180) / M, winding) ?? 0),
+      pulse: keepModulation && size !== 0 ? old.pulse : 0,
+      pulseRate: keepModulation && size !== 0 ? old.pulseRate : 0,
+      wobble: keepModulation && size !== 0 ? old.wobble : 0,
+      wobbleRate: keepModulation && size !== 0 ? old.wobbleRate : 0,
+    });
+  }) as [AxisCell, AxisCell, AxisCell];
+  detail.axes = axes;
+  if (s.morph !== 'off') {
+    const q = MORPH_AXIS[s.morph];
+    const body = model.slots[0]!.axes[q]!;
+    const cycles = clampTo(Math.round(s.cycles), COPIES_CYCLES_RANGE[0], COPIES_CYCLES_RANGE[1]);
+    model.slots[0]!.axes[q] = readAxisValues({ ...body, winding: body.winding + cycles * K });
+  }
+  model.particleCount = particleCount;
+  model.slotCount = MAX_WAVES;
+  return particleCount;
+}
+
+/** Take a recognised morph back out of Body (the low winding returns). */
+function removeMorph(model: FigureModel, st: CopiesState): void {
+  if (st.settings.morph === 'off') return;
+  const q = MORPH_AXIS[st.settings.morph];
+  const body = model.slots[0]!.axes[q]!;
+  model.slots[0]!.axes[q] = readAxisValues({ ...body, winding: body.winding - st.settings.cycles * st.perCopy });
+}
+
+/** `45.X1` — **remove**: clear Detail (the slot's `Clear` law) and take the morph out; Particle Number is kept. */
+export function removeCopies(model: FigureModel): boolean {
+  const st = detectCopies(model);
+  if (st === null) return false;
+  removeMorph(model, st);
+  model.slots[2]!.axes = [blankAxisCell(), blankAxisCell(), blankAxisCell()];
+  return true;
+}
+
+/** An `AxisCell` from its stored values, with the derived fields recomputed (one route, `readAxis`). */
+function readAxisValues(v: { winding: number; size: number; pulse: number; pulseRate: number; wobble: number; wobbleRate: number; phase: number }): AxisCell {
+  return readAxis({
+    phase: v.phase,
+    am: { base: v.size, amplitude: v.pulse, frequency: v.pulseRate },
+    fm: { base: v.winding, amplitude: v.wobble, frequency: v.wobbleRate },
+  });
+}
+
+/**
+ * `45.A` — **RECOGNISE an arrangement from the numbers alone.** Detail's visible windings must be whole numbers
+ * sharing a factor `K ≥ 150` that divides Particle Number, with at least 2 copies. The layout is found by matching
+ * `windings / K` against the table (else Custom); Morph is a Body winding of at least `K` (the spec's `≥ M` was the
+ * same slip as its `cycles × M`). ⚠️ Only DETAIL is read: a layout on Structure (`Candystore`, `Lord of the Rings`,
+ * built by hand before the panel) is not an arrangement to this panel — Structure as the layout is out of scope.
+ * ⚠️ Size is a criterion only at `COPIES_MIN_SHARE` (below it Detail is texture); between it and
+ * `COPIES_OVERLAP_RATIO` the copies are recognised but overlap (`overlap` says so).
+ */
+export function detectCopies(model: FigureModel): CopiesState | null {
+  const n = model.particleCount;
+  const detail = model.slots[2];
+  if (!detail || !Number.isInteger(n) || n < 2) return null;
+  const vis = detail.axes.filter((c) => !c.silent && c.winding !== 0);
+  if (vis.length === 0 || vis.some((c) => !Number.isInteger(c.winding))) return null;
+  const K = vis.reduce((g, c) => gcd(g, c.winding), 0);
+  if (K < COPIES_MIN_PER_COPY || n % K !== 0 || n / K < 2) return null;
+  const figureReach = reach(model.slots[0]) + reach(model.slots[1]);
+  if (reach(detail) < COPIES_MIN_SHARE * figureReach) return null;
+  const M = n / K;
+  const w = detail.axes.map((c) => (c.silent ? 0 : Math.round(c.winding / K))) as [number, number, number];
+  const named = COPY_LAYOUTS.find((l) => l.key !== 'custom' && l.windings.every((v, q) => v === Math.abs(w[q]!)));
+  const sizes = detail.axes.map((c) => Math.abs(c.size));
+  // ⚠️ The Ellipse's Spread is its X size — its Y is Spread × Aspect, so the larger axis is not Spread at Aspect > 1.
+  const spread = named?.key === 'ellipse' ? sizes[0]! : Math.max(...sizes);
+  const settings: CopiesSettings = {
+    ...DEFAULT_COPIES_SETTINGS,
+    layout: named?.key ?? 'custom',
+    copies: M,
+    spread,
+    aspect: named?.key === 'ellipse' && sizes[0]! > 0 ? sizes[1]! / sizes[0]! : 1,
+    custom: w.map((v) => Math.abs(v)) as [number, number, number],
+  };
+  const body = model.slots[0];
+  if (body) {
+    for (const [ax, q] of [['x', 0], ['y', 1], ['z', 2]] as const) {
+      const bw = body.axes[q]!.winding;
+      if (Math.abs(bw) >= K) { settings.morph = ax; settings.cycles = Math.floor(Math.abs(bw) / K); break; }
+    }
+  }
+  return {
+    copies: M,
+    perCopy: K,
+    settings,
+    inRange: M >= COPIES_RANGE[0] && M <= COPIES_RANGE[1] && K >= COPIES_MIN_PER_COPY,
+    detailWobble: detail.axes.some((c) => c.wobble !== 0),
+    overlap: spread < COPIES_OVERLAP_RATIO * figureReach,
+  };
+}

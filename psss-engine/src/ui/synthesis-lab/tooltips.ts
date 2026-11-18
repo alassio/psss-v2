@@ -52,9 +52,9 @@ export const CONTROL_TIPS: Record<string, string> = {
   speedFactor: 'Master time multiplier: scales wave motion AND every rotation rate together, so the figure '
     + 'keeps its shape and only its tempo changes. At 0 the figure freezes in its current pose, which is the '
     + 'way to study a still frame. Saved with the preset.',
-  particleCount: 'How many particles trace the curve, 100–200 000. More particles fill the curve into a '
-    + 'continuous surface; fewer leave it as discrete points and cost less per frame. Raise this after '
-    + 'raising Symmetry, which divides the same particles between the arms.',
+  particleCount: 'How many particles trace the curve, 1–50 000; the slider moves in steps of 100. More particles '
+    + 'fill the curve into a continuous surface; fewer leave it as discrete points and cost less per frame. Raise '
+    + 'this after raising Symmetry, which divides the same particles between the arms.',
   symmetryFold: 'Folds the figure into n identical sectors in model space, so the symmetry axis tumbles with '
     + 'the 3D rotation instead of being pinned to the screen. Integer only — a half fold is a figure whose '
     + 'arms do not close. Each arm carries 1/n of the density, so raise Particle Number to compensate.',
@@ -1535,7 +1535,27 @@ export const TAB_TIPS: Record<string, string> = {
     + 'keeps its shape and only its tempo changes. At 0 it freezes in its current pose, which is the way to study '
     + 'a still frame. ⚠️ The seconds on the Pulse and Wobble rows are quoted at the figure’s own stored rate, and '
     + 'this multiplies them — at 0.5× every one of those labels really takes twice as long.',
-  'composer.particleCount': 'How many particles trace the curve, 100–200 000. More particles fill it into a '
+  'composer.copiesToggle': 'Show or hide Arrange copies: turn Detail into a path that places several copies of the '
+    + 'figure Body and Structure draw.',
+  'composer.copiesLayout': 'The path the copies sit on. Ellipse / Circle, Figure Eight, Pretzel, Saddle Ring and '
+    + 'Lissajous Knot are fixed paths; Custom takes the three whole numbers below. Copies are spaced evenly along '
+    + 'the path’s own timing, not by distance, so they bunch where the path turns.',
+  'composer.copiesCount': 'How many copies, 2–60. Particle Number moves to the nearest exact multiple, so every '
+    + 'copy gets the same number of particles (at least 150).',
+  'composer.copiesSpread': 'The size of the path the copies sit on (Detail’s size). Make it at least twice the '
+    + 'figure’s own size, or neighbouring copies overlap.',
+  'composer.copiesAspect': 'Height to width of the ellipse; 1 is a circle.',
+  'composer.copiesCustom': 'How many times the path winds on X, Y and Z, each 0–9 (at least one above 0). '
+    + 'Different numbers give knotted and looped paths.',
+  'composer.copiesMorph': 'Let the copies change shape along the path: one Body axis is wound once more per copy '
+    + 'cycle, so its phase shifts gradually from copy to copy. Off keeps every copy identical.',
+  'composer.copiesCycles': 'How many times the shape change goes through a full cycle around the path, 1–3.',
+  'composer.copiesArrange': 'Write the layout into Detail and set Particle Number to the nearest exact multiple. '
+    + 'After that every control here applies at once. Undo with History.',
+  'composer.copiesRemove': 'Clear Detail and take the shape change back out of Body. Particle Number is kept.',
+  'composer.copiesStatus': 'What the figure currently holds, read from its numbers: an arrangement is recognised '
+    + 'whenever Detail’s windings share a factor that divides Particle Number.',
+  'composer.particleCount': 'How many particles trace the curve, 1–50 000; the slider moves in steps of 100. More particles fill it into a '
     + 'continuous surface; fewer leave it as discrete points and cost less per frame. A folded figure divides the '
     + 'same particles between its arms, so raise this after raising the fold on the Visual FX tab.',
   'composer.rotation': 'Full turns per minute about each axis, ±10 — left of centre is clockwise, right '
@@ -2085,3 +2105,13 @@ export const PRODUCTION_SYMBOL_TIPS: Record<string, string> = {
   "'": "' — the book's colour mark; it has no effect here.",
   letter: 'A letter: replaced by its own production at every level; it draws nothing itself.',
 };
+
+/**
+ * v8 `45.B2` — the EXACT Particle Number field's tooltip. ⚠️ ONE text, read by its builder (`particleCountField`
+ * in `tabs/visual-fx.ts`): the field is the same control on Visual FX and on the Composer, so it is neither a
+ * Visual FX descriptor (`CONTROL_TIPS`, `tipcheck` §B) nor one tab's (`TAB_TIPS`).
+ */
+export const PARTICLE_COUNT_EXACT_TIP = 'The exact particle count — type any whole number from 1 to 50 000 and press '
+  + 'Enter, where the slider’s steps of 100 are too coarse. Arrange copies on the Composer tab sets it for you: every '
+  + 'copy needs the same number of particles, so a count changed by hand keeps the copies only as a multiple of the '
+  + 'copy count.';

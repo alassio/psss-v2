@@ -634,6 +634,50 @@ Composer prints `repeats every N s`. If they are not, there is no single period 
 `slowest cycle N s` instead. This matters for any readout that samples one instant of a periodic
 quantity, which is why the Score's envelope traces exist.
 
+#### Copies — one wave as the layout for the others
+
+Particle `i` of `N` sits at angle `(i · 360/N + phase) · f` on each axis, so a wave whose windings on every visible
+axis are whole multiples of one number `K` repeats every `M = N / K` particles **when `N` is a multiple of `K`**:
+particles `r, r + M, r + 2M, …` share its position exactly. That wave then visits only `M` places. Made large, it
+places `M` copies; the `K` particles at each place still differ through the other waves, which draw the copy.
+`K` is the particles per copy and `M` the copy count.
+
+**Arrange copies** (Composer, Detail slot) writes this with Detail as the layout:
+
+- Detail's winding on an axis of path winding `a` is `K · a`; its size is Spread (the Ellipse's Y is Spread × Aspect).
+- **The phase is divided by the winding.** The stored phase is multiplied by the winding, so a target phase `φ`
+  is stored as `φ / (K · a)` (`phaseForTarget`). Stored undivided, 90° at winding 500 is 500 whole quarter-turns and
+  the ellipse collapses onto a line.
+- **The copy grid is shifted by half a step.** Copy `r` sits at path parameter `θ = 2π (r + ½) / M`, i.e. each
+  axis's target phase gains `a · 180 / M` degrees. Without it, a self-crossing path puts two copies on one crossing:
+  the Figure Eight `(sin θ, sin 2θ)` crosses at `θ = 0` and `θ = π`, so for every even `M` copies `0` and `M/2`
+  coincide.
+- **Particle Number goes to the nearest multiple of `M`**, clamped to `[150 M, ⌊50 000 / M⌋ · M]`.
+- **Morph adds `cycles · K` to one Body winding.** Within a copy the extra winding advances by a whole number of
+  turns, so the copy keeps its shape; from copy `r` to `r + 1` its phase advances by `cycles / M` of a turn, so the
+  shapes change gradually along the path. (Adding `cycles · M` instead breaks every copy.)
+- Re-arranging keeps Detail's Pulse/Wobble; the first Arrange zeroes them. **Remove** clears Detail and subtracts the
+  morph; Particle Number is kept.
+
+**Nothing is stored.** An arrangement is ordinary wave values plus a count; `detectCopies` recognises one from the
+numbers on every sync, so Export, the Mixer, Evolution and History need no new key, and a preset built by hand the
+same way is recognised too. The test: Detail's visible windings are whole numbers with `gcd = K ≥ 150`, `N mod K = 0`,
+`M ≥ 2`, and Detail's reach (`|size| + |pulse|`) is at least ¼ of Body's plus Structure's — below that, a Detail
+with the copies' arithmetic is texture (five spiral presets carry winding 625 at about 1/30 of the figure). The layout
+is the table entry matching `winding / K`, else Custom; Morph is a Body winding of at least `K`. `M > 60` is
+recognised but shown read-only (`Multiple`: 168 × 120). Only Detail is read; a layout on Structure is not recognised.
+
+**The Shape diagram** samples the waves at its own rate (`sampleCountFor`), at which the copies' arithmetic does not
+hold, so a recognised arrangement is drawn from a bundle `WaveOps.copies = { particles: N, copies: M }`: the combined
+figure is sampled at `N` and regrouped copy by copy (`copyDrawOrder`: `r, r + M, …`), one path per copy
+(`OverlayCurves.segment = K`). Without the bundle the diagram is unchanged, bit for bit.
+
+**The count's route.** Particle Number and Rotation are generator fields, written by `setParticleCount` /
+`setRotationSpeed` into the engine, `main.ts`'s preset **and the Lab's working preset** — Export and Snapshot copy
+the working preset, a separate object. The Composer's `commit()` re-reads the count from the working preset before
+writing the figure back, so a figure edit never restores an older count. The exact Particle Number field (Visual FX
+Figure row, Composer Framing row; one builder) writes any whole number 1–50 000 unsnapped; the slider snaps to 100.
+
 ### 1.3 Model-space operators
 
 **Eight operators act on the figure in model space, after every displacement field and before the

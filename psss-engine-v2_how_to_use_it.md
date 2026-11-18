@@ -716,7 +716,7 @@ the drifting. These are saved with the preset.
 |---|---|---|
 | **Figure Scale** | 0.2×–5× | Multiplies the automatic canvas fit. The fit keeps the preset's authored aspect ratio, so a wide window letterboxes rather than stretching — raise this to fill the screen, or go past 1× to frame part of a large figure |
 | **Speed** | 0.01×–5× | Master time multiplier. It scales the wave motion *and* every rotation rate together, so the figure keeps its exact shape and only its tempo changes. At **0** the figure freezes in its current pose, which is how to study a still frame |
-| **Particle Number** | 100–200 000 | How many particles trace the curve. More fills the curve into a continuous surface; fewer leaves it as discrete points and costs less per frame |
+| **Particle Number** | 1–50 000 | How many particles trace the curve. More fills the curve into a continuous surface; fewer leaves it as discrete points and costs less per frame. The slider moves in steps of 100; the field beside it takes any whole number (type it and press Enter) — Arrange copies on the Composer tab needs exact counts |
 | **Rotation X / Y / Z** | ±10 rpm | Full turns per minute, one slider per axis. Left of centre is clockwise, right counter-clockwise, centre none. X and Y tumble the figure toward and across the camera; Z spins it in the picture plane |
 | **Travel X / Y / Z** | ±1.00 half-extent | Slides the figure steadily along each axis **as it is drawn**, so instead of a closed loop you get an open arc — a spring, a conical spiral, a barber-pole stripe. One slider per axis, centre is off and the slider snaps to it |
 | **Stretch X / Y / Z** | ±1.00 half-extent | Makes **Travel** breathe, so the open arc extends and retracts instead of sitting at one length. One slider per axis |
@@ -2628,6 +2628,89 @@ presets use.
 > **A wave can wind entirely by wobbling.** With Winding at 0 and Wobble above 0, the axis has no fixed
 > wrap count at all — it only ever has the one the wobble is giving it at that instant. Body in the
 > screenshot above is exactly this case.
+
+#### Many copies from one figure — Arrange copies
+
+Some presets — `Multiple` is the clearest — do not draw one large connected figure but a crowd of small, identical
+ones arranged along a larger shape. No setting says *copies*: the effect comes from two ordinary settings lining up,
+the **Winding** of one wave and the **Particle Number**. The **Arrange copies** panel on the **Detail** slot sets
+them up for you.
+
+**Why it happens.** The particles are one long chain, and each wave is a curve drawn along that chain. A wave with
+Winding 500 runs its curve 500 times from the first particle to the last. If the chain has 10 000 particles, that
+wave repeats exactly every 20 particles: particles 0, 20, 40, … all land on the **same** point of its curve. So that
+wave visits only 20 places, and every particle belongs to one of them. If the wave is **large**, it sets where the
+20 places are. The 500 particles that share a place still differ through the other, **small** waves, so they trace
+the small figure there. The result is 20 copies of the figure Body and Structure draw, arranged along the large
+wave's path. In `Multiple`, the Detail wave winds 168 × (3, 6, 8) times over 20 160 = 168 × 120 particles, so 120
+small butterflies sit along one large knot.
+
+![The Arrange copies panel on the Detail slot](manual-images/lab-composer-copies.png)
+
+**Using the panel.** Draw the figure you want to multiply on **Body** (and **Structure**), then click
+**Arrange copies…** on the **Detail** slot's title row.
+
+| Control | What it does |
+|---|---|
+| **Layout** | The path the copies sit on: **Ellipse / Circle**, **Figure Eight**, **Pretzel**, **Saddle Ring** (a circle that rises and falls twice), **Lissajous Knot** (a real knot that never touches itself), or **Custom** |
+| **Copies** | How many copies, 2–60. Particle Number moves to the nearest exact multiple, so every copy gets the same number of particles — never fewer than 150 |
+| **Spread** | The size of the path. Make it at least twice the size of the figure itself, or neighbouring copies overlap (the status line says so) |
+| **Aspect** | Ellipse only: height to width, 1 is a circle |
+| **a / b / c** | Custom only: how many times the path winds on X, Y and Z, each 0–9 |
+| **Morph** | Off keeps every copy identical. **X**, **Y** or **Z** lets the copies change shape gradually along the path, going through **Cycles** (1–3) full changes on the way round |
+| **Arrange** | Writes the layout into Detail and sets Particle Number. From then on every control applies immediately |
+| **Remove copies** | Clears Detail and takes the shape change back out of Body. Particle Number is kept |
+
+**Arrange** and **Remove copies** each leave a History snapshot of the figure as it was before, so either is one
+click to undo. Copies are spaced evenly along the path's own timing, not by distance, so on the Figure Eight, the
+Pretzel and the Knot they bunch where the path turns.
+
+**The status line** reads the figure's numbers every time, so it is right whatever changed them — the Mixer,
+Evolution, a typed Particle Number, or an imported preset:
+
+| It may say | Meaning |
+|---|---|
+| *20 copies of 500 particles on the Figure Eight* | The figure holds an arrangement, and the panel is showing its settings |
+| *Not arranged* | Detail is not a layout — choose one and press **Arrange** |
+| *Broken — Particle Number … is no longer a multiple …* | The count was changed by hand; the copies have joined up. **Arrange** restores them |
+| *Broken — Detail's windings no longer share …* | A Detail winding was edited off the layout's numbers |
+| *The copies overlap* | Spread is less than twice the figure's own size |
+| *Wobble on Detail joins the copies over time* | Wobble on the layout wave keeps moving its winding off the exact multiple |
+| *More than this panel's 60 copies — shown read-only* | An arrangement beyond the panel's range, such as `Multiple`'s 120; edit the Detail rows directly |
+
+The **Shape** diagram draws a recognised arrangement as its separate copies, at the real Particle Number. The panel
+works only with the **Detail** wave as the layout; a preset that uses **Structure** for it — `Candystore` and
+`Lord of the Rings` do — still shows its copies in the main view, but the diagram draws one tangle and the panel
+reads *Not arranged*.
+
+**What keeps the copies, and what breaks them** — measured on a 50-copy figure; the settings that act on the
+finished picture never see the chain at all. The rule behind the table: the copies survive as long as **every
+particle of a copy is treated the same way**. A change that shifts the layout wave's repeat, or treats particles of
+one copy differently because of where they sit in the chain, joins the copies up or smears them.
+
+| Change | Result |
+|---|---|
+| **Pulse** or **Wobble** on Body or Structure | ✅ the copies breathe or re-wrap and stay separate |
+| **Pulse** on the **layout** wave | ✅ the arrangement breathes; the copies stay whole |
+| **Wobble** on the **layout** wave | ❌ its winding stops being an exact multiple, and the copies smear into long sweeps |
+| a layout **Winding** changed by even 1, or **Particle Number** changed by even 1 | ❌ the copies run together into one connected figure |
+| **Rotation**, **Figure Scale**, **Film Look**, **Materials**, **Translation Map** | ✅ unaffected — they act on the whole picture |
+| **Taper**, **Bend**, **Curl Noise** | ✅ each copy is bent or carried along with its neighbourhood, and stays separate |
+| **Twist** | ⚠️ a strong twist shears the copies far from the axis into arcs; keep it small |
+| **Grow** | ⚠️ the copies open into hooks — each copy's particles are spread along the whole chain, and Grow ramps along it |
+| **Symmetry** (2-D) | ✅ mostly — copies that cross a mirror line are cut, as on every figure |
+| **3-D Symmetry** | ✅ the whole arrangement is repeated, but each 3-D copy takes only every *n*-th particle, so the small copies thin out |
+
+**By hand.** The panel only writes ordinary wave values, so the same effect can be built on the rows directly:
+give a free wave a large **Size** and Windings that are all multiples of one number G, and set Particle Number to a
+multiple of G. ⚠️ **A wave's Shift ° is multiplied by its Winding**: at Winding 200 a Shift of 90° becomes 200 × 90°,
+a whole number of turns, and the offset disappears — a ring collapses into a straight line. Use 90 ÷ 200 = 0.45°.
+The panel does this division for you.
+
+**Demos.** **`Copies Figure Eight`** (sixteen copies of `Modern Art`'s ribbon), **`Copies Knot`** (`Shell` threaded
+on the Lissajous Knot), **`Copies Saddle`** (twenty copies of `Fire Smoke Crossover`'s figure on the Saddle Ring) and
+**`Copies Morph Ring`** (`Advection Carry`'s figure changing shape around a circle) are built with the panel.
+**`Lord of the Rings`** and **`Candystore`** are built by hand, with the layout on Structure.
 
 #### The readout line
 

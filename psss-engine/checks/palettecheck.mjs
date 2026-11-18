@@ -560,6 +560,9 @@ const AUTHORED_INDEX_PALETTES = {
   'Plant Custom Fork': 'Cycle: Solar',
   // `Plant Custom Wild` left this list 2026-11-17: the owner's finetuned export maps its palette (Prismatic) by PHASE.
   'Plant Custom Bloom': 'Material: fire',
+  // 2026-11-17 — the two "copies" demos (owner), cloned from Cylinder Viviani with their own palettes.
+  'Lord of the Rings': 'Cycle: Solar',   // the owner's finetuned Viviani Ring, renamed 2026-11-18
+  'Candystore': 'Prismatic',   // the owner's finetuned Viviani Scatter, renamed 2026-11-18
   // 2026-11-13 — v8 Phase 37, the strand demos: each authors its OWN palette under `index`, because a gradient along
   // the stroke is the free half of the feature (the plan's demo table). Two of the four are the first presets ever
   // authored on their attractor type (`nose-hoover`, `halvorsen`).

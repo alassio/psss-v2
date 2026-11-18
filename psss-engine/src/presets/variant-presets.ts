@@ -45963,4 +45963,2155 @@ export const VARIANT_PRESETS: VariantPreset[] = [
       },
     },
   },
+  /**
+   * **Lord of the Rings** — demo of the "copies" effect (owner 2026-11-17): fifty small Viviani curves on a ring, breathing (Pulse on the small wave) — the layout wave winds 200 times over 10 000 particles, so particles 50 apart share a place on the ring. Body cloned from `Cylinder Viviani`;
+   * only the name, waves 0–1 and the palette differ. ⚠️ The split needs Particle Number to stay a multiple of 50 × 200
+   * windings' common factor — change the particle count and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT of `Viviani Ring`, TAKEN VERBATIM and renamed `Lord of the Rings` —
+   * do not re-tune it.** (Taken from the owner's export file; the name is the one change.)
+   */
+  {
+    after: 'Cylinder Viviani',
+    name: 'Lord of the Rings',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Lord of the Rings',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'geo'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 10000,
+        waveSpeed: 0.05,
+        rotation: [9.33, 14, 0],
+        angle: [0, 1, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 4,
+                  amplitude: 4,
+                  frequency: 8,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 4,
+                  amplitude: 4,
+                  frequency: 8,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 8,
+                  amplitude: 6,
+                  frequency: 8,
+                },
+                fm: {
+                  base: 0.5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.45,
+                am: {
+                  base: 40,
+                  amplitude: 4,
+                  frequency: 4,
+                },
+                fm: {
+                  base: 200,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 200,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 15,
+                  frequency: 4,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [12.74, 8.831, 2.051],
+        colorShift: [0.6, 0.9, 1.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.359,
+        blurRadius: 0,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Cycle: Solar',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1,
+        particleSize: 2.73,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.05,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.6,
+          vignette: 0.2,
+          palette: 'Cycle: Solar',
+          paletteMapping: 'phase',
+        },
+      },
+    },
+  },
+  /**
+   * **Candystore** — demo of the "copies" effect (owner 2026-11-17): fifty small Viviani curves scattered along a 3-D Lissajous figure (layout windings 200 × (2, 3, 1)), each re-wrapping as it goes (Wobble on the small wave). Body cloned from `Cylinder Viviani`;
+   * only the name, waves 0–1 and the palette differ. ⚠️ The split needs Particle Number to stay a multiple of 50 × 200
+   * windings' common factor — change the particle count and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT of `Viviani Scatter`, TAKEN VERBATIM and renamed `Candystore` —
+   * do not re-tune it.** (Taken from the owner's export file; the name is the one change.)
+   */
+  {
+    after: 'Cylinder Viviani',
+    name: 'Candystore',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Candystore',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'geo'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 10000,
+        waveSpeed: 0.05,
+        rotation: [3, 14, 0],
+        angle: [0, 1, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 4,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0.5,
+                  frequency: 5,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 4,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0.5,
+                  frequency: 5,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 8,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0.5,
+                  amplitude: 0.25,
+                  frequency: 5,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 40,
+                  amplitude: 4,
+                  frequency: 4,
+                },
+                fm: {
+                  base: 400,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 600,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 40,
+                  amplitude: 6,
+                  frequency: 6,
+                },
+                fm: {
+                  base: 200,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [12.74, 8.831, 2.051],
+        colorShift: [0.6, 0.9, 1.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.951,
+        blurRadius: 0,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        palette: 'Prismatic',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 6,
+        fluidFeedback: {
+          persist: 0.96,
+          amplify: 1,
+          dispersion: 0,
+          fieldDecay: 0.985,
+          glowBoost: 0,
+        },
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 0.7,
+        particleSize: 2.73,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.05,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.6,
+          vignette: 0.2,
+          palette: 'Prismatic',
+          paletteMapping: 'phase',
+        },
+      },
+    },
+  },
+  /**
+   * **Copies Figure Eight** — v8 Phase 45 demo of Arrange copies: sixteen copies of the figure `Modern Art` draws, spaced along a figure-eight path. Cloned from `Modern Art`; only the name, the
+   * waves and the particle count differ. Body and Structure are the base's, scaled to 26.7 % so the copies stand
+   * apart; Detail and the count are the panel's own output (`arrangeCopies`, 16 copies, Spread 40). ⚠️ Change the
+   * particle count off a multiple of 16 and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Modern Art',
+    name: 'Copies Figure Eight',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Copies Figure Eight',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 60,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'retro'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 20000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0],
+        angle: [0, 0, 30],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 13.3333,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 32,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 8,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 32,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10.6667,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 32,
+                  frequency: 1.2,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 2.6667,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 24,
+                  amplitude: 6,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 2.6667,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 24,
+                  amplitude: 7,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.009,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1250,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.009,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 2500,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.847,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 0.5,
+        filmLook: 'Customize',
+        palette: 'Cycle: Neutral',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.2,
+        figureScale: 1,
+        particleSize: 1.52,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.5,
+          depthSize: 0.35,
+          depthBrightness: 0.35,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.2,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+      },
+    },
+  },
+  /**
+   * **Copies Knot** — v8 Phase 45 demo of Arrange copies: twenty-four copies of the figure `Shell` draws, threaded on the Lissajous Knot (3, 2, 5). Cloned from `Shell`; only the name, the
+   * waves and the particle count differ. Body and Structure are the base's, scaled to 25.0 % so the copies stand
+   * apart; Detail and the count are the panel's own output (`arrangeCopies`, 24 copies, Spread 40). ⚠️ Change the
+   * particle count off a multiple of 24 and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Shell',
+    name: 'Copies Knot',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Copies Knot',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 30000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 12.5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 48,
+                  amplitude: 32,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 12.5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 48,
+                  amplitude: 32,
+                  frequency: 1.01,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 16,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.012666666666666666,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 3750,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.0656,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 2500,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.006,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 6250,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [0.1, 0.2, 0.3],
+        colorShift: [0.1, 0.2, 0.3],
+      },
+      renderer: {
+        mode: 'blend',
+        glow: 2,
+        decayFactor: 0.825,
+        blurRadius: 4,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: true,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Legacy Graded',
+        palette: 'Cycle: Neutral',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'blend',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        transMapBeforeParticles: true,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 1,
+        figureScale: 1,
+        particleSize: 1.52,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+      },
+    },
+  },
+  /**
+   * **Copies Saddle** — v8 Phase 45 demo of Arrange copies: twenty copies of the figure `Fire Smoke Crossover` draws, on the Saddle Ring — a circle that rises and falls twice. Cloned from `Fire Smoke Crossover`; only the name, the
+   * waves and the particle count differ. Body and Structure are the base's, scaled to 42.7 % so the copies stand
+   * apart; Detail and the count are the panel's own output (`arrangeCopies`, 20 copies, Spread 40). ⚠️ Change the
+   * particle count off a multiple of 20 and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Fire Smoke Crossover',
+    name: 'Copies Saddle',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Copies Saddle',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 75,
+        },
+        tags: ['demo', 'material', 'fire'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 5000,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0.06],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 0,
+                  amplitude: 8,
+                  frequency: 1,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 8,
+                  frequency: 2,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 30,
+                am: {
+                  base: 0,
+                  amplitude: 8,
+                  frequency: 3,
+                },
+                fm: {
+                  base: 3,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 8,
+                  frequency: 4,
+                },
+                fm: {
+                  base: 3,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.396,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 250,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.036,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 250,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.036,
+                am: {
+                  base: 14,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 500,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [160, 96, 48],
+        colorAmp: [64, 48, 24],
+        colorFreq: [0.02, 0.03, 0.05],
+        colorShift: [0.4, 0.25, 0.1],
+      },
+      renderer: {
+        mode: 'splat',
+        glow: 2,
+        decayFactor: 0.9,
+        blurRadius: 3,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Legacy Graded',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'splat',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.45,
+        figureScale: 0.7247796636776956,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        material: {
+          preset: 'Organic',
+          splatRadius: 10,
+          coreBrightness: 1.3,
+          haloStrength: 1,
+          falloffExponent: 3,
+          thermalLag: 0.35,
+          emissionIntensity: 1.2,
+          heatMode: 'age',
+          heatGain: 1,
+          blendMode: 'alpha',
+          colourRamp: 'organic',
+          velocityStretch: 1,
+        },
+      },
+    },
+  },
+  /**
+   * **Copies Morph Ring** — v8 Phase 45 demo of Arrange copies: eighteen copies of the figure `Advection Carry` draws, on a circle, each a step further through one cycle of change (Morph on Y). Cloned from `Advection Carry`; only the name, the
+   * waves and the particle count differ. Body and Structure are the base's, scaled to 47.8 % so the copies stand
+   * apart; Detail and the count are the panel's own output (`arrangeCopies`, 18 copies, Spread 40). ⚠️ Change the
+   * particle count off a multiple of 18 and the copies join up. A DRAFT for the owner's finetuning.
+   * ⚠️⚠️ **2026-11-18: THE BODY IS THE OWNER'S FINETUNED EXPORT, TAKEN VERBATIM — do not re-tune it.**
+   */
+  {
+    after: 'Advection Carry',
+    name: 'Copies Morph Ring',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Copies Morph Ring',
+        version: 2,
+        designResolution: {
+          width: 100,
+          height: 100,
+        },
+        tags: ['demo', 'advection', 'field'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 7992,
+        waveSpeed: 0.05,
+        rotation: [0, 0, 0.6],
+        angle: [0, 0, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 90,
+                am: {
+                  base: 7.875,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 16,
+                  frequency: 1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 10.85,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 445,
+                  amplitude: 16,
+                  frequency: 1.1,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 5.76,
+                  amplitude: 10.24,
+                  frequency: 10,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 64,
+                  frequency: 1,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.22522522522522523,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 444,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.02252252252252252,
+                am: {
+                  base: 40,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 444,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [96, 128, 176],
+        colorAmp: [96, 64, 64],
+        colorFreq: [0.6316, 0.5602, 0.3],
+        colorShift: [0.15, 0.35, 0.55],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2.2,
+        decayFactor: 0.94,
+        blurRadius: 3,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: false,
+        lineWidth: 2,
+        filmLook: 'Customize',
+        paletteMapping: 'index',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 0.45,
+        figureScale: 1,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0.75,
+          returnForce: 0.9,
+        },
+        customFilmLookParams: {
+          glow: 6,
+          depthSize: 0,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0.5, -0.7, 0.3],
+          rimPower: 3,
+          bloomEnabled: true,
+          bloomThreshold: 0.6,
+          bloomIntensity: 0.3,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 2.2,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+          saturation: 1.25,
+          vignette: 0,
+          palette: 'none',
+          paletteMapping: 'depth',
+        },
+      },
+    },
+  },
+  /**
+   * **Earth at Night** — the owner's own preset (2026-11-18), finetuned from `Cylinder Spherical Spiral` and exported. ⚠️⚠️ **THE BODY IS
+   * THE OWNER'S EXPORT, TAKEN VERBATIM and renamed `Earth at Night` — do not re-tune it.** (Taken from the
+   * owner's export file; the name is the one change.)
+   */
+  {
+    after: 'Cylinder Spherical Spiral',
+    name: 'Earth at Night',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Earth at Night',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'geo'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 100,
+        waveSpeed: 0.05,
+        rotation: [4, 27, -8.98],
+        angle: [0, 1, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 18,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 90,
+                am: {
+                  base: 30,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 36,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 39,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.6, 0.9, 1.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.99,
+        blurRadius: 0,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: true,
+        lineWidth: 6.5,
+        filmLook: 'Customize',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 2.03,
+        figureScale: 1.2937048333339858,
+        particleSize: 4,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.3,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.13,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Neon',
+          paletteMapping: 'phase',
+        },
+      },
+    },
+  },
+  /**
+   * **Dancing Lovers** — the owner's own preset (2026-11-18), finetuned from `Cylinder Spherical Spiral` and exported. ⚠️⚠️ **THE BODY IS
+   * THE OWNER'S EXPORT, TAKEN VERBATIM and renamed `Dancing Lovers` — do not re-tune it.** (Taken from the
+   * owner's export file; the name is the one change.)
+   */
+  {
+    after: 'Cylinder Spherical Spiral',
+    name: 'Dancing Lovers',
+    atEnd: true,
+    preset: {
+      metadata: {
+        name: 'Dancing Lovers',
+        version: 2,
+        designResolution: {
+          width: 75,
+          height: 100,
+        },
+        createdWith: 'refined-presets generator',
+        tags: ['refined', 'geo'],
+      },
+      generators: {
+        type: 'lissajous',
+        particleCount: 752,
+        waveSpeed: 0.05,
+        rotation: [4, 27, -8.98],
+        angle: [0, 1, 0],
+        waves: [
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 18,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 90,
+                am: {
+                  base: 30,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 1,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 36,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 5,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 39,
+                am: {
+                  base: 15,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 7,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+          {
+            speed: 0.05,
+            axes: [
+              {
+                phase: 0.4787234042553192,
+                am: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 376,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0.2393617021276596,
+                am: {
+                  base: 25,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 376,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+              {
+                phase: 0,
+                am: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+                fm: {
+                  base: 0,
+                  amplitude: 0,
+                  frequency: 0,
+                },
+              },
+            ],
+          },
+        ],
+        colorBase: [128, 128, 128],
+        colorAmp: [128, 128, 128],
+        colorFreq: [1, 1, 1],
+        colorShift: [0.6, 0.9, 1.3],
+      },
+      renderer: {
+        mode: 'star',
+        glow: 2,
+        decayFactor: 0.976,
+        blurRadius: 0,
+        depthSize: 0,
+        streaks: 0,
+      },
+      postProcessors: {
+        transMap: {
+          enabled: false,
+          style: 0,
+          beforeParticles: false,
+          sinMagicParams: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [1, 0, 0, 0],
+            [8, 0, 0, 0],
+          ],
+          sinMagicParams2: [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+          ],
+          zoomCenter: {
+            x: 50,
+            y: 50,
+          },
+        },
+        bloom: {
+          enabled: false,
+          threshold: 0.8,
+          intensity: 0.3,
+          radius: 5,
+        },
+        toneMap: {
+          curve: 'none',
+          exposure: 1,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1, 1, 1],
+        },
+      },
+      overlay: {
+        ribbonMode: 'off',
+        splatShear: 'tangent',
+        ribbonWidth: 3,
+        linesEnabled: true,
+        lineWidth: 6.5,
+        filmLook: 'Customize',
+        attractorIndex: -1,
+        attractorBlend: 0.6,
+        renderMode: 'star',
+        transMapEnabled: false,
+        transMapStyle: 0,
+        curlNoise: {
+          enabled: false,
+          turbulence: 0,
+          scale: 1,
+          evolutionSpeed: 0.5,
+        },
+        speedFactor: 2.03,
+        figureScale: 0.8243726967146906,
+        particleSize: 4,
+        physarum: {
+          blend: 0,
+          sensorAngle: 30,
+          sensorDistance: 20,
+          turnSpeed: 45,
+          decayRate: 0.2,
+          depositAmount: 0.05,
+          showTrail: true,
+          trailOpacity: 0.8,
+        },
+        fluidAdvection: {
+          blend: 0,
+          returnForce: 0.5,
+        },
+        customFilmLookParams: {
+          glow: 5.4,
+          depthSize: 0.3,
+          depthBrightness: 0,
+          depthDof: 0,
+          depthColorShift: 0,
+          lightingMode: 2,
+          lightDir: [0, 0, 1],
+          rimPower: 2.5,
+          bloomEnabled: true,
+          bloomThreshold: 0.3,
+          bloomIntensity: 0.55,
+          toneMapEnabled: true,
+          toneMapCurve: 'aces',
+          exposure: 1.13,
+          lift: [0, 0, 0],
+          gamma: [1, 1, 1],
+          gain: [1.1, 1.1, 1.1],
+          saturation: 1.4,
+          vignette: 0.2,
+          palette: 'Neon',
+          paletteMapping: 'phase',
+        },
+      },
+    },
+  },
 ];

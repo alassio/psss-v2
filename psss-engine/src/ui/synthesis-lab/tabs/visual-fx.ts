@@ -94,7 +94,7 @@ import { getAllPaletteNames } from '../../../presets/palettes.ts';
 import { PHYSARUM_TRAIL_COLOUR_AUTO, PHYSARUM_TRAIL_COLOUR_PRESET } from '../../../generators/physarum.ts';
 import { sliderMul } from '../../../exploration/slider-mappings.ts';
 import { ROT_STEP, fmtRotationRpm, posToRotation, rotationToPos } from '../../../core/rotation-track.ts';
-import { CONTROL_TIPS, HEADER_TIPS } from '../tooltips.ts';
+import { CONTROL_TIPS, HEADER_TIPS, PARTICLE_COUNT_EXACT_TIP } from '../tooltips.ts';
 import { makeCollapsible, type Collapsible } from '../collapsible.ts';
 import type { ChannelDriver } from '../../../core/interfaces.ts';
 // v8 Phase 30 — the deformation clamps, shared with the generator's own setters rather than typed
@@ -859,6 +859,44 @@ export function posToParticleCount(pos: number): number {
  */
 export function fmtParticleCount(count: number): string {
   return count.toLocaleString('en-US');
+}
+
+/**
+ * v8 `45.B2` — **the EXACT Particle Number field** beside the slider (Visual FX's Figure row and the Composer's
+ * Framing row, ONE builder). The slider snaps to multiples of 100 (`snapParticleCount`); a copy arrangement needs an
+ * exact multiple of its copy count (`10 008` for 24 copies), and a field is the only way to type one.
+ * ⚠️ **Unsnapped and clamped to `MIN_PARTICLE_COUNT`–`MAX_PARTICLE_COUNT`, whole numbers** — the setter clamps
+ * too; the field then re-reads `get()`, so it shows what the engine holds, never what was typed.
+ * ⚠️ The slider's own readout is HIDDEN on these rows (`sl-vfx-slider-wrap--count`), not removed: `syncControl`
+ * finds it as the range input's next sibling, and the field shows the same number.
+ * ⚠️ Every key is `stopPropagation()`ed — `main.ts`' document shortcuts must never see digits typed here.
+ */
+export function particleCountField(get: () => number, set: (n: number) => void): HTMLInputElement {
+  const field = document.createElement('input');
+  field.type = 'number';
+  field.className = 'sl-vfx-count'; // ⚠️ not `sl-composer-num` — the Composer's raw-field census class
+  field.min = String(MIN_PARTICLE_COUNT);
+  field.max = String(MAX_PARTICLE_COUNT);
+  field.step = '1';
+  field.title = PARTICLE_COUNT_EXACT_TIP;
+  field.setAttribute('aria-label', 'Particle Number, exact');
+  field.value = String(get());
+  field.addEventListener('keydown', (e) => e.stopPropagation());
+  field.addEventListener('change', () => {
+    const raw = Number(field.value);
+    if (Number.isFinite(raw) && field.value.trim() !== '') {
+      set(Math.max(MIN_PARTICLE_COUNT, Math.min(MAX_PARTICLE_COUNT, Math.round(raw))));
+    }
+    field.value = String(get());
+  });
+  return field;
+}
+
+/** Write the live count into a `particleCountField` — never while it has focus (it would eat the typing). */
+export function syncParticleCountField(field: HTMLInputElement, get: () => number): void {
+  if (document.activeElement === field) return;
+  const v = String(get());
+  if (field.value !== v) field.value = v;
 }
 
 /**
@@ -2028,6 +2066,7 @@ export class VisualFxTab implements TabModule {
 
   syncFromControls(): void {
     for (const c of this.controlList) this.syncControl(c);
+    this.syncCountField();
     // Before `syncVisibility()`: the rows are what the shared panels get moved INTO, so they must exist
     // and match the chain first. A preset change RESYNCS the whole tab by design, and a preset can arrive
     // carrying a chain of a different length.
@@ -2123,6 +2162,12 @@ export class VisualFxTab implements TabModule {
     for (const c of this.controlList) {
       if (c.key.startsWith(prefix)) this.syncControl(c);
     }
+  }
+
+  /** v8 `45.B2` — the exact Particle Number field (rebuilt with the section; `null` before the first build). */
+  private countField: HTMLInputElement | null = null;
+  private syncCountField(): void {
+    if (this.countField) syncParticleCountField(this.countField, () => this.controls.getParticleCount());
   }
 
   private slider(spec: SliderSpec): HTMLElement {
@@ -2878,13 +2923,21 @@ export class VisualFxTab implements TabModule {
      * mutation all show up here. ⚠️ Those three paths are NOT snapped — only this slider is — which is why
      * `Multiple`'s 4 032 keeps its exact count until someone drags the handle.
      */
-    tgt.appendChild(this.makeRow('Particle Number', this.slider({
+    const countWrap = this.slider({
       key: 'particleCount', min: 0, max: 1, step: PARTICLE_STEP,
       get: () => this.controls.getParticleCount(),
-      set: v => this.controls.setParticleCount(v),
+      set: v => { this.controls.setParticleCount(v); this.syncCountField(); },
       toPos: particleCountToPos, fromPos: posToParticleCount, fmt: fmtParticleCount,
       wideLabel: true, settleOnRelease: true,
-    })));
+    });
+    // v8 `45.B2` — the exact field; a typed count re-syncs the slider through the same `syncControl` path.
+    countWrap.classList.add('sl-vfx-slider-wrap--count');
+    this.countField = particleCountField(() => this.controls.getParticleCount(), (n) => {
+      this.controls.setParticleCount(n);
+      for (const c of this.controlList) if (c.key === 'particleCount') this.syncControl(c);
+    });
+    countWrap.appendChild(this.countField);
+    tgt.appendChild(this.makeRow('Particle Number', countWrap));
 
     /**
      * X / Y / Z rotation speed, ±10 RPM on the signed quartic track in `core/rotation-track.ts`.

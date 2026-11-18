@@ -4391,6 +4391,262 @@ const subjects = scored.filter((_, i) => i % SWEEP_STRIDE === 0).slice(0, 12);
     + 'the same defect a second time');
 }
 
+
+// ===================================================================================================
+console.log('\n§COPIES — v8 Phase 45: Arrange copies, measured THROUGH THE GENERATOR');
+// ===================================================================================================
+/*
+ * ⚠️⚠️ **THE SUBJECT IS THE ENGINE'S OUTPUT, NOT THE MODEL'S NUMBERS.** `arrangeCopies` writes Detail and a count;
+ * whether that DRAWS M separate copies is a property of the wave law, so every geometric clause runs the real
+ * `LissajousGenerator` (one frame, `waveSpeed` 0, no rotation) and measures `getState().positions` — SCREEN
+ * coordinates (CLAUDE.md), which is why every threshold is RELATIVE (a copy's own radius, a ratio), never pixels.
+ * The test figure is the small Viviani the owner's own copies demos use (Body (1, 1, 0.5), sizes (4, 4, 8)).
+ * ⚠️ Copy `r` is the class `i mod M` — the arithmetic the whole feature stands on, asserted exactly below.
+ */
+{
+  const { LissajousGenerator } = await import('../src/generators/lissajous.ts');
+  const { loadLibrary } = await import('../src/presets/library.ts');
+  const { PresetManager } = await import('../src/presets/manager.ts');
+  const {
+    COPY_LAYOUTS, DEFAULT_COPIES_SETTINGS, COPIES_RANGE, arrangeCopies, detectCopies, removeCopies, nearestCopyCount,
+  } = M;
+  const SIZE = { width: 1024, height: 768 };
+  const AX = (phase, size, winding) => ({ phase, am: { base: size, amplitude: 0, frequency: 0 }, fm: { base: winding, amplitude: 0, frequency: 0 } });
+  const SILENT = AX(0, 0, 0);
+  /** The test figure as a preset-shaped object: Body only, Detail empty, N particles. */
+  const figure = (n) => ({
+    metadata: { name: 'copies-test' },
+    generators: { particleCount: n, waveSpeed: 0, waves: [
+      { speed: 0, axes: [AX(90, 4, 1), AX(0, 4, 1), AX(0, 8, 0.5)] },
+      { speed: 0, axes: [SILENT, SILENT, SILENT] },
+      { speed: 0, axes: [SILENT, SILENT, SILENT] },
+    ] },
+  });
+  const arranged = (n, s) => {
+    const p = figure(n);
+    const m = readFigure(p);
+    arrangeCopies(m, { ...DEFAULT_COPIES_SETTINGS, custom: [1, 2, 3], ...s }, false);
+    writeFigure(p, m);
+    return p;
+  };
+  /** One frame through the generator: positions as a Float64Array of `3 · count`. */
+  const positions = (p) => {
+    const g = new LissajousGenerator();
+    g.init({ particleCount: p.generators.particleCount, waveSpeed: 0, rotation: [0, 0, 0], angle: [0, 0, 0],
+      waves: structuredClone(p.generators.waves) }, SIZE);
+    g.update(16.667);
+    const st = g.getState();
+    return Float64Array.from(st.positions.subarray(0, st.count * 3));
+  };
+  /** Per-copy centroids (class `i mod M`), each copy's radius, and the closest pair of centroids. */
+  const copyStats = (pos, m) => {
+    const n = pos.length / 3, c = new Float64Array(m * 3), cnt = new Float64Array(m);
+    for (let i = 0; i < n; i++) { const r = i % m; cnt[r]++; for (let q = 0; q < 3; q++) c[r * 3 + q] += pos[i * 3 + q]; }
+    for (let r = 0; r < m; r++) for (let q = 0; q < 3; q++) c[r * 3 + q] /= cnt[r];
+    let rho = 0;
+    for (let i = 0; i < n; i++) { const r = i % m; rho = Math.max(rho, Math.hypot(pos[i * 3] - c[r * 3], pos[i * 3 + 1] - c[r * 3 + 1], pos[i * 3 + 2] - c[r * 3 + 2])); }
+    let gap = Infinity;
+    for (let a = 0; a < m; a++) for (let b = a + 1; b < m; b++) gap = Math.min(gap, Math.hypot(c[a * 3] - c[b * 3], c[a * 3 + 1] - c[b * 3 + 1], c[a * 3 + 2] - c[b * 3 + 2]));
+    return { c, rho, gap };
+  };
+  /** How many distinct places a figure's particles occupy (rounded to 1e-3 px). */
+  const distinct = (pos) => { const s = new Set(); for (let i = 0; i < pos.length; i += 3) s.add(`${pos[i].toFixed(3)},${pos[i + 1].toFixed(3)},${pos[i + 2].toFixed(3)}`); return s.size; };
+  /**
+   * MODEL-space positions through the engine's OWN wave law (`core/wave-law.ts`' `sumWaveAxesBulk`, the bulk hot path
+   * the generator runs). ⚠️ For the Morph clauses: on SCREEN a copy far from the centre is seen at an angle, so its
+   * projection differs from copy 0's by up to 0.21 of a copy radius with Morph OFF (measured, `p99m`) — the camera,
+   * not the figure. In model space the Off copies agree to 0.005.
+   */
+  const { sumWaveAxesBulk } = await import('../src/core/wave-law.ts');
+  const DEG_ = 180 / Math.PI;
+  const modelPositions = (p) => {
+    const n = p.generators.particleCount, ws = p.generators.waves;
+    const out = new Float64Array(n * 3);
+    sumWaveAxesBulk(out, n, 360 / n,
+      ws.map((w) => w.axes.map((a) => a.am.base)), ws.map((w) => w.axes.map((a) => a.fm.base / DEG_)),
+      ws.map((w) => w.axes.map((a) => a.phase)), ws.map(() => 0));
+    return out;
+  };
+  const detailOnly = (p) => { const q = structuredClone(p); for (const w of [0, 1]) q.generators.waves[w].axes = [SILENT, SILENT, SILENT]; return q; };
+
+  // ---- nearestCopyCount: a table, both clamps
+  const TABLE = [[10000, 24, 10008], [10000, 20, 10000], [5000, 16, 5008], [100, 60, 9000], [50000, 60, 49980], [1, 2, 300], [7993, 18, 7992]];
+  const bad = TABLE.filter(([n, m, want]) => nearestCopyCount(n, m).particleCount !== want);
+  chk('nearestCopyCount is the NEAREST multiple, clamped to [copies × 150, the largest multiple ≤ 50 000]', bad.length === 0,
+    bad.length ? `wrong: ${JSON.stringify(bad.map(([n, m, w]) => [n, m, w, nearestCopyCount(n, m).particleCount]))}` : `${TABLE.length} rows`);
+
+  // ---- the arithmetic: Detail alone occupies exactly M places, and particle i shares copy r = i mod M's place
+  {
+    const p = arranged(10000, { layout: 'knot', copies: 20 });
+    const pos = positions(detailOnly(p));
+    let worst = 0;
+    for (let i = 0; i + 20 < pos.length / 3; i++) worst = Math.max(worst, Math.hypot(pos[i * 3] - pos[(i + 20) * 3], pos[i * 3 + 1] - pos[(i + 20) * 3 + 1], pos[i * 3 + 2] - pos[(i + 20) * 3 + 2]));
+    const places = distinct(pos);
+    chk('Detail ALONE (the layout) puts the 10 000 particles on exactly 20 places, particle i on i + 20\'s (through the engine)',
+      places === 20 && worst < 1e-3, `${places} places, worst |p(i) − p(i+20)| = ${worst.toExponential(2)} px`);
+    const q = structuredClone(p); q.generators.particleCount += 1;
+    seed('Particle Number off by ONE (10 001 — the copies join)', distinct(positions(detailOnly(q))) > 1000 ? 1 : 0,
+      'a count that is not a multiple of the windings\' factor must scatter the layout over the whole path');
+  }
+
+  // ---- every layout draws M copies, none on top of another (the half-step shift)
+  const GAP_MIN = 0.25;
+  for (const L of COPY_LAYOUTS) {
+    for (const copies of [20, 21]) {
+      const { rho, gap } = copyStats(positions(arranged(10000, { layout: L.key, copies })), nearestCopyCount(10000, copies).particleCount / nearestCopyCount(10000, copies).perCopy);
+      chk(`${L.label}, ${copies} copies: no two copies coincide — the closest pair of copy centres is ≥ ${GAP_MIN} × a copy's radius`,
+        gap >= GAP_MIN * rho, `closest pair ${gap.toFixed(2)} px, copy radius ${rho.toFixed(2)} px (ratio ${(gap / rho).toFixed(2)})`);
+    }
+  }
+  {
+    // SEED: the Figure Eight WITHOUT the half-step shift — copies 0 and M/2 both on the crossing
+    const p = arranged(10000, { layout: 'figureEight', copies: 20 });
+    for (const q of [0, 1]) p.generators.waves[2].axes[q].phase = 0;
+    const { rho, gap } = copyStats(positions(p), 20);
+    seed('the Figure Eight\'s copy grid UNSHIFTED (phases 0, 0) — two copies on the crossing', gap < GAP_MIN * rho ? 1 : 0,
+      `closest pair ${gap.toFixed(3)} px against a copy radius ${rho.toFixed(2)} px — the clause above cannot see a coincident pair`);
+  }
+
+  // ---- the phase law: a circle stays a circle (phase ÷ winding)
+  {
+    /*
+     * ⚠️ The ROUNDNESS of the copy centres: the ratio of the two eigenvalues of their x/y covariance (1 = a circle,
+     * 0 = a line). ⚠️⚠️ **An x/y SPREAD ratio was the first metric and could not see the defect**: an undivided phase
+     * puts x and y in step, so the circle collapses onto the DIAGONAL — equal spreads, ratio 1 (calibration, 2026-11-18).
+     */
+    const shape = (p) => {
+      const { c } = copyStats(positions(detailOnly(p)), 20);
+      let mx = 0, my = 0;
+      for (let r = 0; r < 20; r++) { mx += c[r * 3] / 20; my += c[r * 3 + 1] / 20; }
+      let sxx = 0, syy = 0, sxy = 0;
+      for (let r = 0; r < 20; r++) { const x = c[r * 3] - mx, y = c[r * 3 + 1] - my; sxx += x * x; syy += y * y; sxy += x * y; }
+      const tr = sxx + syy, det = sxx * syy - sxy * sxy, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      return (tr / 2 - disc) / (tr / 2 + disc);
+    };
+    const p = arranged(10000, { layout: 'ellipse', copies: 20 });
+    const ratio = shape(p);
+    chk('the Ellipse at Aspect 1 places its copies on a CIRCLE (covariance eigenvalue ratio of the copy centres ≈ 1, through the engine)', ratio > 0.9, `ratio ${ratio.toFixed(3)}`);
+    const q = structuredClone(p); q.generators.waves[2].axes[0].phase = 90;
+    const r2 = shape(q);
+    seed('the layout phase NOT divided by the winding (90 at winding 500 — 500 whole turns of 90°: the circle becomes a line)', r2 < 0.9 ? 1 : 0, `ratio ${Number.isFinite(r2) ? r2.toFixed(3) : r2}`);
+  }
+
+  // ---- Morph: Off keeps the copies identical, Morph changes them monotonically to the far side of the path
+  {
+    const shapeDiff = (pos, m) => {
+      const { c, rho } = copyStats(pos, m);
+      const k = pos.length / 3 / m;
+      const d = [];
+      for (let r = 0; r <= m / 2; r++) {
+        let s = 0;
+        for (let j = 0; j < k; j++) {
+          const a = (r + j * m) * 3, b = j * m * 3;
+          s += (pos[a] - c[r * 3] - (pos[b] - c[0])) ** 2 + (pos[a + 1] - c[r * 3 + 1] - (pos[b + 1] - c[1])) ** 2 + (pos[a + 2] - c[r * 3 + 2] - (pos[b + 2] - c[2])) ** 2;
+        }
+        d.push(Math.sqrt(s / k) / rho);
+      }
+      return d;
+    };
+    const off = shapeDiff(modelPositions(arranged(10000, { layout: 'ellipse', copies: 20 })), 20);
+    const on = shapeDiff(modelPositions(arranged(10000, { layout: 'ellipse', copies: 20, morph: 'y', cycles: 1 })), 20);
+    const offMax = Math.max(...off);
+    const mono = on.every((v, i) => i === 0 || v >= on[i - 1] - 1e-9);
+    chk('Morph Off: every copy has the SAME shape as copy 0 in model space (RMS difference < 0.02 of a copy\'s radius)', offMax < 0.02, `max ${offMax.toFixed(4)}`);
+    chk('Morph on Y, 1 cycle: the copies change shape MONOTONICALLY out to the far side of the circle, and by a lot there',
+      mono && on[on.length - 1] > 0.5, `difference from copy 0 at r = 0…10: ${on.map((v) => v.toFixed(2)).join(' ')}`);
+    seed('Morph adding cycles × M (the spec\'s slip) instead of cycles × K', (() => {
+      const p = arranged(10000, { layout: 'ellipse', copies: 20 });
+      p.generators.waves[0].axes[1].fm.base += 20;
+      const d = shapeDiff(modelPositions(p), 20);
+      return d.every((v, i) => i === 0 || v >= d[i - 1] - 1e-9) && d[d.length - 1] > 0.5 ? 0 : 1;
+    })(), 'a Body winding raised by the copy count must NOT read as a morph — it breaks each copy instead');
+  }
+
+  // ---- detect ∘ arrange is the identity; remove restores Body and clears Detail
+  {
+    let fails = [];
+    for (const L of COPY_LAYOUTS) for (const morph of ['off', 'x', 'y', 'z']) for (const copies of [COPIES_RANGE[0], 20, COPIES_RANGE[1]]) {
+      const s = { layout: L.key, copies, morph, cycles: 2, spread: 30, aspect: L.key === 'ellipse' ? 2 : 1 };
+      const p = arranged(12000, s);
+      const st = detectCopies(readFigure(p));
+      const ok = st && st.copies === copies && st.settings.layout === L.key && st.settings.morph === morph
+        && (morph === 'off' || st.settings.cycles === 2) && st.settings.spread === 30 && st.settings.aspect === s.aspect;
+      const m = readFigure(p);
+      removeCopies(m);
+      const body0 = readFigure(figure(12000)).slots[0].axes.map((c) => c.winding).join();
+      const back = m.slots[0].axes.map((c) => c.winding).join() === body0 && m.slots[2].axes.every((c) => c.winding === 0 && c.size === 0);
+      if (!ok || !back) fails.push(`${L.key}/${morph}/${copies}`);
+    }
+    chk('detectCopies ∘ arrangeCopies is the IDENTITY (every layout × morph off/x/y/z × 2, 20, 60 copies), and Remove restores Body + clears Detail',
+      fails.length === 0, fails.length ? `failed: ${fails.slice(0, 6).join(', ')}` : `${COPY_LAYOUTS.length * 4 * 3} cases`);
+  }
+
+  {
+    // ⚠️ Found by MUTATION (`p99o`: detecting Morph from a Body winding ≥ M survived every clause above, whose test
+    // figure winds once). A Body winding between M and K — `Pipes` winds 32, against 20 copies of 500 — is the
+    // figure's own, not a morph.
+    const p = figure(10000);
+    p.generators.waves[0].axes[0].fm.base = 32;
+    const m = readFigure(p);
+    arrangeCopies(m, { ...DEFAULT_COPIES_SETTINGS, layout: 'ellipse', copies: 20 }, false);
+    const st = detectCopies(m);
+    chk('a Body winding between the copy count and K (32, with 20 copies of 500) is the figure\'s own — NOT read as a Morph',
+      st !== null && st.settings.morph === 'off', JSON.stringify(st && { morph: st.settings.morph, cycles: st.settings.cycles }));
+  }
+
+  // ---- the composed library: Multiple is recognised, texture is not
+  {
+    const legacyText = readFileSync(join(ROOT, 'public', 'psss_presets.json'), 'utf8');
+    const mgr = new PresetManager();
+    loadLibrary(mgr, JSON.parse(legacyText.slice(legacyText.indexOf('{')).replace(/;\s*$/, '')));
+    const hit = (n) => detectCopies(readFigure(mgr.get(n)));
+    const mul = hit('Multiple');
+    chk('`Multiple` (the preset that started the phase) is recognised as 120 copies of 168 particles, OUTSIDE the panel\'s range',
+      mul !== null && mul.copies === 120 && mul.perCopy === 168 && mul.inRange === false, JSON.stringify(mul && { c: mul.copies, k: mul.perCopy, inRange: mul.inRange }));
+    const texture = ['Aurora Borealis II', 'Millenium Falcon', 'Mirrors In Mirror', 'Penta Spirals', 'Rubber Penta Spirals'];
+    const wrong = texture.filter((n) => hit(n) !== null);
+    chk('...and the five presets whose Detail has the copies\' ARITHMETIC but texture SIZE (winding 625 at ~1/30 of the figure) are not',
+      wrong.length === 0, wrong.length ? `recognised: ${wrong.join(', ')}` : '');
+    const demos = ['Copies Figure Eight', 'Copies Knot', 'Copies Saddle', 'Copies Morph Ring'];
+    const missing = demos.filter((n) => { const st = mgr.get(n) && hit(n); return !st || st.overlap || !st.inRange; });
+    chk('...and the four Phase 45 demos are recognised, in range, without overlap', missing.length === 0, missing.length ? `not: ${missing.join(', ')}` : '');
+  }
+
+  // ---- the Shape diagram: copy by copy when recognised, unchanged otherwise
+  {
+    const p = arranged(10000, { layout: 'saddle', copies: 20 });
+    const withCopies = SC.computeOverlayScores(p.generators.waves, null, { copies: { particles: 10000, copies: 20 } });
+    const plain = SC.computeOverlayScores(p.generators.waves, null, {});
+    const plain2 = SC.computeOverlayScores(p.generators.waves, null);
+    chk('the combined Shape diagram of an arrangement samples at N and draws one path per copy (segment = K)',
+      withCopies.xy.now.length === 20000 && withCopies.xy.segment === 500 && !withCopies.undersampled, `samples ${withCopies.xy.now.length / 2}, segment ${withCopies.xy.segment}`);
+    chk('...and without the bundle it is unchanged, bit for bit (no segment, the old sample count)',
+      plain.xy.segment === undefined && plain.xy.now.length === plain2.xy.now.length && plain.xy.now.every((v, i) => v === plain2.xy.now[i]));
+    /*
+     * ⚠️ Found by MUTATION (`p99o`: skipping the regrouping left the two clauses above green — they read the length and
+     * the segment, not the ORDER). Inside a copy's path consecutive points are neighbours on the small figure; in chain
+     * order consecutive particles belong to different copies and jump across the layout.
+     */
+    const stepLen = (arr, seg) => {
+      let s2 = 0, n2 = 0;
+      for (let i = 1; i < arr.length / 2; i++) {
+        if (seg && i % seg === 0) continue;
+        s2 += Math.hypot(arr[i * 2] - arr[i * 2 - 2], arr[i * 2 + 1] - arr[i * 2 - 1]); n2++;
+      }
+      return s2 / n2 / withCopies.extent;
+    };
+    const grouped = stepLen(withCopies.xy.now, withCopies.xy.segment);
+    chk('...and each copy\'s path is CONTINUOUS: the mean step between consecutive points is a small fraction of the reach',
+      grouped < 0.05, `mean step ${grouped.toFixed(4)} of the extent`);
+    const raw = SC.computeOverlayScores(p.generators.waves, null, {});
+    seed('the Score drawing the arrangement in CHAIN order (one path hopping between copies)',
+      stepLen(raw.xy.now, 0) >= 0.05 ? 1 : 0, 'the unregrouped samples must read as discontinuous, or the clause above cannot see the order');
+    // copy 0's first two points are particles 0 and M: the regrouping, checked against an ungrouped N-sample read
+    const order = SC.copyDrawOrder(10000, 20);
+    chk('...the draw order is copy by copy: particles r, r + M, … (first copy 0, 20, 40 …; second starts at 1)',
+      order[0] === 0 && order[1] === 20 && order[500] === 1 && order[9999] === 9999);
+  }
+}
 // ---------------------------------------------------------------------------------------------------
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'}  composercheck: ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

@@ -5662,6 +5662,16 @@ async function init() {
   const notifyExternalChange = (): void => {
     for (const cb of externalChangeCallbacks) cb();
   };
+  /*
+   * v8 Phase 45 (found by `uicheck` §AE, 2026-11-18) — ⚠️⚠️ **THE LAB'S WORKING PRESET, LATE-BOUND.** `setParticleCount`
+   * and `setRotationSpeed` write `preset.generators` *"so it survives Export"* — but Export and Snapshot copy the Lab's
+   * `state.workingPreset`, a DIFFERENT object (`labPanel.init` deep-copies), so a dragged or typed count reached the
+   * engine and was silently LOST on Export (measured: engine 6 300, export 10 000, on both tabs). Both setters now also
+   * write the Lab's copy. ⚠️ A reader rather than a reference: `labPanel` is declared ~2 000 lines below in this
+   * scope, and a setter reached during boot would hit its temporal dead zone — so this answers `null` until the panel
+   * exists and is bound right after it is built.
+   */
+  let labWorkingPreset: () => UnifiedPreset | null = () => null;
   const visualFxControls: VisualFxControls = {
     getSplatShear: () => splatShear,
     setSplatShear: (v) => {
@@ -5871,6 +5881,9 @@ async function init() {
       next[axis] = v;
       generator.setRotationSpeed(next);
       if (preset) preset.generators.rotation = generator.getRotationSpeed();
+      // ⚠️ The Lab's copy too — the same Export defect as `setParticleCount`'s (see `labWorkingPreset`).
+      const working = labWorkingPreset();
+      if (working && working !== preset) working.generators.rotation = generator.getRotationSpeed();
     },
     getSym3d: () => ({ ...sym3d }),
     getSym3dCopies: () => generator.getSymmetry3dCopies(),
@@ -6118,6 +6131,9 @@ async function init() {
       // the figure back to its opening pose on every step. See `setParticleCount` there for what is
       // preserved and what is deliberately dropped.
       generator.setParticleCount(n);
+      // ⚠️ The Lab's copy too (see `labWorkingPreset`), with the generator's CLAMPED value — what is drawn.
+      const working = labWorkingPreset();
+      if (working && working !== preset) working.generators.particleCount = generator.getParticleCount();
     },
     /*
      * v8 16.3 (E94) — the Composer's wave-table door. The first read/write surface onto the Lissajous curve
@@ -7852,6 +7868,8 @@ async function init() {
     mixerTileRenderer,
     getGridOrderedNames: () => previewGrid.getOrderedNames(),
   });
+  // v8 Phase 45 — see `labWorkingPreset`: the two setters can reach the Lab's copy from here on.
+  labWorkingPreset = () => labPanel.getState().workingPreset ?? null;
 
   if (preset) labPanel.init(preset, rightPanel);
 
