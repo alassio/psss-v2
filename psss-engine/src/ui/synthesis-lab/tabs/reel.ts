@@ -1,7 +1,7 @@
 /**
  * The Reel tab (v8 Phase 19) — assemble an ordered collection of presets and play it full screen.
  *
- * ⚠️ **Read `research_paper_psss_fractal_v8.md` → *Phase 19* → 19.6/19.7 before editing.** The layout is two
+ * ⚠️ **Read `psss-engine-v2_phase-plan.md` → *Phase 19* → 19.6/19.7 before editing.** The layout is two
  * panes: the reel being edited on the left, the preset library on the right, **both animating**. That is the
  * owner's requirement and it is the expensive part of this tab, because the two panes share ONE
  * `GridTileRenderer` — see `TILE` below.

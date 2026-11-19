@@ -46,8 +46,8 @@ import { resolve } from 'node:path';
  *                           deliberately: it states the requirement for any reader who changes `format`,
  *                           and removing it to silence a warning would make the fold depend on an implication.**
  *   `cssCodeSplit: false`   one stylesheet, so the packer below has exactly one file to inline.
- *   `copyPublicDir: false`  `public/` also holds `icons.svg` (referenced NOWHERE) and the 939 KB
- *                           `legacy_presets_original_177.json` reference dump; neither belongs in a
+ *   `copyPublicDir: false`  `public/` also holds the 939 KB `legacy_presets_original_177.json`
+ *                           reference dump, which does not belong in a
  *                           deployment, and the two files that do are written by `scripts/export-library.mjs`.
  *   `modulePreload: false`  a `<link rel="modulepreload">` is dead weight with no module graph.
  *

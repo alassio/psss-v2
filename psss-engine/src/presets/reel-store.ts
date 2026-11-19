@@ -1,7 +1,7 @@
 /**
  * The reel library — three sources, one merged view, and the engine's FIRST persistence of any kind.
  *
- * ⚠️ **Read `research_paper_psss_fractal_v8.md` → *Phase 19* → 19.2 before editing.** Three properties here
+ * ⚠️ **Read `psss-engine-v2_phase-plan.md` → *Phase 19* → 19.2 before editing.** Three properties here
  * fail silently and none of them is visible to `tsc`:
  *
  * 1. **`localStorage` holds ONLY the user's own reels, never the merged view.** Writing the merge back is the

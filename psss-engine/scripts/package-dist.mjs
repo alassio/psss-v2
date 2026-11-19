@@ -316,15 +316,17 @@ if (bad > 0) {
 const mb = (statSync(OUT).size / (1024 * 1024)).toFixed(1);
 console.log(`${TAG} ${OUT.slice(ROOT.length + 1)}  ${names.length} entries, ${mb} MB`);
 
-// See the OUT header: nothing is overwritten, so say how many are now there. A release artefact that
-// quietly accumulates is a disk problem the build is in the best position to notice.
+// ⚠️ **ONLY THE NEWEST ARCHIVE IS KEPT (owner rule).** Once the new archive has passed every assertion above,
+// every OLDER distribution archive in the repository root is deleted — never before, so a failed build never
+// leaves the root without a working archive. A released version's archive is attached to its GitHub release,
+// so nothing deleted here is the only copy of a release.
 const archives = readdirSync(ROOT)
   // ⚠️ `(_web)?` is load-bearing: without it a `--web` archive does not match, so web archives would
-  // pile up uncounted by the one instrument that exists to notice exactly that (Phase 29.D20).
+  // pile up untouched by the one step that exists to remove them.
   .filter((n) => /^psss-engine-v2-distribution_\d{8}_\d{6}(_web)?\.zip$/.test(n))
   .sort();
-if (archives.length > 1) {
-  console.log(`${TAG} note: ${archives.length} archives now in the repository root `
-    + `(${archives[0]} … ${archives[archives.length - 1]}) — none is deleted by this step`);
-}
+const newest = OUT.slice(ROOT.length + 1);
+const older = archives.filter((n) => n !== newest);
+for (const n of older) rmSync(join(ROOT, n));
+if (older.length > 0) console.log(`${TAG} removed ${older.length} older archive(s): ${older.join(', ')} — only the newest is kept`);
 console.log(`${TAG} OK — ${checks.length} assertions passed`);

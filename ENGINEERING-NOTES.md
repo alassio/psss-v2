@@ -1,22 +1,38 @@
 # Engineering notes — how to read this repository's comments
 
-This file exists to answer one question a reader of the source will ask quickly.
+This file answers the questions a reader of the source asks first: what the comments' many references
+point to, and why so few of their targets are in this repository. For **where things are**, start with
+`psss-engine/README.md`, the code map: every file of the engine, one line each.
 
-## `CLAUDE.md` is cited a lot and is not in this repository
+## The comments cite a private engineering record, and nothing is missing
 
-Comments throughout `psss-engine/src/`, `psss-engine/checks/` and `psss-engine/tests/` cite a file
-called `CLAUDE.md`, and occasionally a development plan or an engineering log. Those are the project's
-**private engineering index** and are not published.
+Comments throughout `psss-engine/src/`, `psss-engine/checks/`, `psss-engine/tests/` and the screensaver
+host cite the project's **private engineering record**, which is not published. The citations take
+several forms:
 
-**Nothing is missing.** Those citations are *pointers, not definitions*. `CLAUDE.md` is an index: one
-line per rule, with the rule's reasoning living elsewhere. Every comment that cites it **states its own
-rule inline** — the citation records where that rule is catalogued, not where it is explained. A comment
-reading
+| A comment says | It points to |
+|---|---|
+| `CLAUDE.md`, *"invariant 4"*, *"the sink"* | the private rules index — one line per rule — its numbered invariants, and the archive that holds each rule's full write-up |
+| *"the plan"*, *"Phase 41"*, `33.22`, `41.D3`, `D1`–`D8` | the development plan: a phase, a step within it, or a binding decision of a phase |
+| `E92`, *"ideation"*, `ENGINE-NOTES` | the design notes each phase was scoped from |
+| *"triage"*, `I6`, `H1`, `B14` | the reverse-engineering triage, the worklist the engine's structure was settled by |
+| a file name such as `p81-hill-search.mjs` or `MEASUREMENT-…` | a one-off measurement probe |
+| a date | when a measurement was taken or a decision made |
+| *"the owner"* | the project's maintainer, whose decisions the plan records |
+
+**None of these is needed to read the code.** They are *pointers, not definitions*: every comment that
+cites one **states its own rule inline**, and the citation records where the rule is catalogued or how it
+was established, not where it is explained. A comment reading
 
 > ⚠️ **Assign every sampler its unit unconditionally and always bind a texture** — `CLAUDE.md`
 > invariant 4
 
-tells you the whole rule. The reference adds provenance and nothing else.
+tells you the whole rule. The reference adds provenance and nothing else. The same holds for the probe's
+run record under `psss-engine/screensaver/probe/`, which is a dated log by nature.
+
+The documents a reader needs are all here, and they name no private file: this repository's `README.md`,
+the code map `psss-engine/README.md`, the technical reference `psss-engine-v2_how_it_works.md`, the user
+manual `psss-engine-v2_how_to_use_it.md`, and the screensaver host's `psss-engine/screensaver/README.md`.
 
 ## How this was built
 
@@ -44,8 +60,7 @@ whether a picture is worth looking at. Several features in this engine were buil
 correct and then cut on exactly that basis.
 
 ⚠️ **None of those artefacts are in this repository.** The specifications, the research vault, the
-ideation notes and the phase plan are part of the private engineering tree described above. They are
-cited by comments here for provenance, and the comments state their own rules inline.
+ideation notes and the phase plan are part of the private engineering record described above.
 
 ## What the comments are for
 
@@ -62,15 +77,17 @@ with the measurement in hand, and the disagreement is worth reporting.
 
 `npm run verify` runs `tsc --noEmit` plus every static checker in `psss-engine/checks/`. Several of
 them *measure* rather than grep — they import the engine's own modules under Node and compute against
-them — and their comments carry the derivations, the worked examples and the calibration records.
+them — and their comments carry the derivations, the worked examples and the calibration records. One of
+them, `mapcheck`, holds the code map complete.
 
-If you want to know what this engine guarantees, read `checks/`. If you want to know what it looks
-like, read `psss-engine-v2_how_it_works.md`. If you want to use it, read
-`psss-engine-v2_how_to_use_it.md`.
+If you want to know what this engine guarantees, read `checks/`. If you want to know how it works, read
+`psss-engine-v2_how_it_works.md`. If you want to use it, read `psss-engine-v2_how_to_use_it.md`.
 
 ## A note on the test suite
 
 `psss-engine/tests/` is a Playwright suite whose comments are authoritative about its own fixtures and
-mutation technique. It is **not** wired into the push CI, on purpose: it has not been run green in full
-at its pinned configuration, and a suite that makes every commit red teaches people to ignore the
-badge. It runs on manual dispatch, and `retries` stays `0`.
+mutation technique. It is **not** wired into the push CI, on purpose: a full run is long — a development
+server serving it slows down after a few dozen pages, so `npm run verify:browser:chunks` runs it in groups,
+each on a fresh server — and two of its tests are known to be red over open defects, so a suite on every
+push would make every commit red and teach people to ignore the badge. It runs on manual dispatch, and
+`retries` stays `0`.

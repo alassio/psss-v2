@@ -52,6 +52,17 @@ const SWIFTSHADER_ARGS = [
   '--force-color-profile=srgb',
 ];
 
+/*
+ * ⚠️⚠️ **THE SUITE'S OWN PORT (2026-11-19).** It used to pin 5173 with `reuseExistingServer: true`, so it ran through
+ * whatever was there — usually the owner's own dev server, which ~150 heavy test pages wore out until it stalled (1.9 GB
+ * hung; 35 s per page). Now the default is a FRESH server on 5176 that Playwright starts and stops. `PSSS_TEST_PORT`
+ * picks another port; `PSSS_TEST_REUSE=1` reuses a server already running there (the old behaviour, opt-in).
+ * ⚠️ Even a fresh server stalls within ~40–90 test page loads (measured three times) — for the full suite use
+ * `npm run verify:browser:chunks`, which gives every group of spec files its own fresh server.
+ */
+const TEST_PORT = Number(process.env.PSSS_TEST_PORT ?? 5176);
+const TEST_URL = `http://localhost:${TEST_PORT}/`;
+
 export default defineConfig({
   testDir: './tests',
 
@@ -124,16 +135,16 @@ export default defineConfig({
    * makes the harness fail loudly on a port clash instead of silently testing whatever else is on 5173.
    */
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://localhost:5173/',
-    reuseExistingServer: true,
+    command: `npm run dev -- --port ${TEST_PORT} --strictPort`,
+    url: TEST_URL,
+    reuseExistingServer: process.env.PSSS_TEST_REUSE === '1',
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
   },
 
   use: {
-    baseURL: 'http://localhost:5173/',
+    baseURL: TEST_URL,
 
     /*
      * ⚠️ **A FIXED VIEWPORT IS LOAD-BEARING FOR THIS ENGINE SPECIFICALLY, NOT JUST FOR SCREENSHOT STABILITY.**

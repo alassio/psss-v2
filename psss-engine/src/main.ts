@@ -7615,7 +7615,7 @@ async function init() {
   // ═══════════════════════════════════════════════════════════════════════════════════════════════════
   // The reel runner (v8 Phase 19)
   //
-  // ⚠️ **Read `research_paper_psss_fractal_v8.md` → *Phase 19* → 19.4/19.5 before editing.** The division of
+  // ⚠️ **Read `psss-engine-v2_phase-plan.md` → *Phase 19* → 19.4/19.5 before editing.** The division of
   // labour is fixed and each part is silent when it moves: **the runner ARMS a transition, `applyPresetChange`
   // is what CAPTURES the outgoing frame, and the frame loop RELEASES the capture.** Every timing figure lives
   // in `reel-model.ts` and none is duplicated here.

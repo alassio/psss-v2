@@ -7,7 +7,7 @@
  * persistence, the tab owns the DOM, `main.ts` owns the engine effects; everything that can be decided by
  * arithmetic alone is decided here so that it can be measured without a browser.
  *
- * Plan: `research_paper_psss_fractal_v8.md` → Phase 19 (19.1). The transition design and the two-mode
+ * Plan: `psss-engine-v2_phase-plan.md` → Phase 19 (19.1). The transition design and the two-mode
  * decision are recorded there; the figures below are derived, not chosen.
  */
 

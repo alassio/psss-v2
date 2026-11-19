@@ -2104,7 +2104,7 @@ console.log('\n=== M. the depth field and the warp agree on which end of the sca
 //   depth-field.ts  vDepth = 1.0 - aDepth         inverts, ONCE
 //   trans-map.ts  mix(uParallaxFar, uParallaxNear, d)   1 = NEAR
 //
-// ⚠️ **This section exists because the SPEC had it backwards.** `research_paper_psss_fractal_v8.md`'s own
+// ⚠️ **This section exists because the SPEC had it backwards.** `psss-engine-v2_phase-plan.md`'s own
 // snippet for this step comments the texture as `// 0 = near, 1 = far`, which is the opposite of the shader
 // that shipped. Implementing from the plan would have inverted the whole effect — far strands sweeping while
 // near ones hold — and that is a PLAUSIBLE-LOOKING result, not a visible fault, so nothing downstream would
