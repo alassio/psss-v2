@@ -1,8 +1,8 @@
 # PSSS V2 — new generation Particle Systems Screen Saver
 
-<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.14.0.md; edit that file, never this block -->
-> **🆕 Latest release: [v1.14.0](https://github.com/alassio/psss-v2/releases/tag/v1.14.0)** — **New since v1.13.0: Arrange copies — one figure, many copies along a path.** A new panel on the Composer's Detail wave turns any figure you draw into 2 to 60 copies placed along a circle, a figure eight, a pretzel, a saddle ring, a real knot or a path of your own, and can let the copies change shape along the way. Particle Number now has a field for typing an exact count, a tuned Particle Number or Rotation now survives Export, and eight new presets show the copies and more.
-> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.14.0)
+<!-- LATEST-RELEASE:BEGIN — generated from release-notes/v1.15.1.md; edit that file, never this block -->
+> **🆕 Latest release: [v1.15.1](https://github.com/alassio/psss-v2/releases/tag/v1.15.1)** — **New since v1.14.0: Mystery Curves — ready-made rosettes of 2- to 7-fold symmetry in the Composer.** The Composer's **Stack ▾** menu now offers Frank Farris's "mystery curve" from *Creating Symmetry* and its relatives: one click turns the figure into a rosette that repeats itself exactly 2, 3, 4, 5, 6 or 7 times around its centre. Sparks now show again under Neon Lines and Ribbon when the figure is hidden, the period readout under each wave follows the Speed slider, and three new presets show the rosettes.
+> [What's new, and the downloads →](https://github.com/alassio/psss-v2/releases/tag/v1.15.1)
 <!-- LATEST-RELEASE:END -->
 
 [![A live frame from the PSSS V2 engine — click to run it in your browser](manual-images/hero.png)](https://alassio.github.io/psss-v2/)

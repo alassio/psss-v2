@@ -2712,6 +2712,34 @@ on the Lissajous Knot), **`Copies Saddle`** (twenty copies of `Fire Smoke Crosso
 **`Copies Morph Ring`** (`Advection Carry`'s figure changing shape around a circle) are built with the panel.
 **`Lord of the Rings`** and **`Candystore`** are built by hand, with the layout on Structure.
 
+#### Rosettes — the Mystery Curve
+
+![A 5-fold Mystery Curve](manual-images/lab-composer-mystery.png)
+
+The mathematician Frank Farris opens his book *Creating Symmetry* with a "mystery curve" that turns out to repeat
+itself exactly five times around its centre. The **Stack ▾** menu offers it, and its relatives, ready made: the
+entries under **Mystery Curve (Farris) — a new figure** replace the whole figure with a rosette of **2-, 3-, 4-, 5-,
+6- or 7-fold** symmetry. The 5-fold one is Farris's own.
+
+**How it works.** Each of the three waves becomes one *rotating* term: the same Winding on X and Y, with X's Shift a
+quarter turn ahead, so the wave traces a circle. Body, Structure and Detail turn at different speeds — for the 5-fold
+curve 1, 6 and 14 times, the last one in the opposite direction — with sizes in the proportion 1 : ½ : ⅓. Because all
+three speeds differ by multiples of five, the figure comes round to the same shape every fifth of a turn.
+
+| Change | Result |
+|---|---|
+| **Size** of a wave (on X and Y alike) | ✅ a different rosette, same symmetry |
+| **Shift** on X and Y of a wave by the same amount | ✅ the rosette's petals move, same symmetry |
+| **Pulse** on X and Y of a wave alike | ✅ the rosette breathes and keeps its symmetry |
+| **Pulse** or **Size** on only one of a wave's X and Y | ❌ that term becomes an ellipse and the symmetry is lost |
+| **Wobble** | ❌ the winding stops being a whole number and the symmetry is lost |
+| a **Winding** changed | ❌ unless every winding still differs from the others by multiples of the same number — that number is the new symmetry |
+| **Particle Number** | the symmetry is exact when it is a multiple of the fold; the entry sets that for you |
+| **Z** | the curve is flat; a Z wave adds depth, and the rosette stays symmetric only if its Z windings are multiples of the fold (so the depth repeats with the shape) |
+
+Each entry leaves a History snapshot of the figure it replaced. Render mode, material and look are left alone. The
+demos **`Mystery Curve 3`**, **`Mystery Curve 5`** (Farris's own) and **`Mystery Curve 7`** show three of them.
+
 #### The readout line
 
 Under each wave slot is a line of plain-language findings about that wave. It is the fastest way to
@@ -2725,6 +2753,8 @@ understand a preset you did not write, and it reports things that are otherwise 
 | `flat here — no reach in this plane` | The wave does not extend in the plane being drawn |
 | `repeats every 120 s` | The modulation rates line up, so the whole wave has one repeating period |
 | `slowest cycle 120 s` | The rates do **not** line up, so there is no single period — this is the longest of them |
+
+Both times are the time you watch: they include **Speed**, so at 2× a `repeats every 120 s` wave reads `repeats every 60 s`. The seconds on the Pulse and Wobble rows are different — they set the figure's own timing and stay at Speed 1×.
 
 #### Working in the Composer
 

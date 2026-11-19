@@ -986,3 +986,67 @@ export function detectCopies(model: FigureModel): CopiesState | null {
     overlap: spread < COPIES_OVERLAP_RATIO * figureReach,
   };
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ * v8 Phase 46 — THE MYSTERY CURVE: m-fold rosettes from three wave slots (Farris, *Creating Symmetry*, ch. 1).
+ *
+ * A curve `f(t) = a₁e^{in₁t} + a₂e^{in₂t} + a₃e^{in₃t}` has m-fold rotational symmetry when `n₁ ≡ n₂ ≡ n₃ (mod m)` (and
+ * the common residue shares no factor with m) — the order is the gcd of the pairwise frequency differences.
+ * ⚠️⚠️ **ONE ORDINARY WAVE SLOT IS ONE ROTATING TERM**: the same winding `|n|` on X and Y with X a quarter turn ahead
+ * gives `x + iy = e^{i|n|θ}`; Y's phase at 180° instead gives `e^{−i|n|θ}`. (Phase `27.9` concluded the opposite —
+ * a 2-fold cap — by counting frequencies whose coefficients CANCEL; corrected 2026-11-18.) So three slots author any
+ * three-term rosette, and no new slot type exists or is needed.
+ * ⚠️ **Exact only with UNMODULATED windings** (a Wobble makes the winding non-integer) and with Particle Number a
+ * multiple of m (the symmetry maps particle i onto i + N/m). Z is left flat: the theorem is about the plane.
+ * Every entry below is MEASURED m-fold through `sumWaveAxesBulk` (`composercheck` §MYSTERY), not assumed.
+ * ════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+export interface MysteryCurve {
+  readonly fold: number;
+  readonly label: string;
+  /** The three signed frequencies, one per slot (Body, Structure, Detail). */
+  readonly frequencies: readonly [number, number, number];
+}
+
+/** Farris's term weights, `1, ½, ⅓`, applied to Body, Structure and Detail. */
+export const MYSTERY_AMPLITUDES = [1, 1 / 2, 1 / 3] as const;
+
+/**
+ * `46.D1` — the entries, ONE table. Each set's pairwise differences have gcd exactly `fold` (verified in §MYSTERY).
+ * The 5-fold entry is Farris's own `e^{it} − e^{6it}/2 + i·e^{−14it}/3` up to the sign and phase of its terms.
+ */
+export const MYSTERY_CURVES: readonly MysteryCurve[] = [
+  { fold: 2, label: 'Mystery Curve — 2-fold', frequencies: [1, 3, -5] },
+  { fold: 3, label: 'Mystery Curve — 3-fold', frequencies: [1, -2, 4] },
+  { fold: 4, label: 'Mystery Curve — 4-fold', frequencies: [1, -3, 5] },
+  { fold: 5, label: 'Mystery Curve — 5-fold (Farris)', frequencies: [1, 6, -14] },
+  { fold: 6, label: 'Mystery Curve — 6-fold', frequencies: [1, -5, 7] },
+  { fold: 7, label: 'Mystery Curve — 7-fold', frequencies: [1, 8, -6] },
+];
+
+/**
+ * The three waves of a Mystery Curve: slot `k` carries frequency `nₖ` at size `MYSTERY_AMPLITUDES[k] · size` on X and
+ * Y — X phase 90°, Y phase 0° (`n > 0`) or 180° (`n < 0`), both divided by the winding (`phaseForTarget`: the engine
+ * MULTIPLIES a phase by its winding). Z silent. No Pulse, no Wobble.
+ */
+export function mysteryCurveWaves(curve: MysteryCurve, size: number, speed: number): WaveConfig[] {
+  const silentZ: AxisWave = { phase: 0, am: { base: 0, amplitude: 0, frequency: 0 }, fm: { base: 0, amplitude: 0, frequency: 0 } };
+  return curve.frequencies.map((n, k) => {
+    const w = Math.abs(n);
+    const a = size * MYSTERY_AMPLITUDES[k]!;
+    const axis = (targetDeg: number): AxisWave => ({
+      phase: phaseForTarget(targetDeg, w) ?? 0,
+      am: { base: a, amplitude: 0, frequency: 0 },
+      fm: { base: w, amplitude: 0, frequency: 0 },
+    });
+    return { speed, axes: [axis(90), axis(n > 0 ? 0 : 180), silentZ] };
+  });
+}
+
+/** Particle Number for an m-fold curve: the nearest multiple of `fold`, within `[fold, ⌊50 000 / fold⌋ · fold]`. */
+export function mysteryParticleCount(n: number, fold: number): number {
+  const f = Math.max(1, Math.round(fold));
+  const hi = Math.floor(50_000 / f) * f;
+  const near = Math.round((Number.isFinite(n) ? n : SEED_PARTICLE_COUNT) / f) * f;
+  return Math.min(hi, Math.max(f, near));
+}

@@ -1374,8 +1374,14 @@ chk('ANCHOR: the THIRD wholesale-replacement path — the `New Figure` handler �
   `${newFigureBody.length} chars, containing the seed call — an anchor that matched nothing would exonerate the `
   + 'one path this clause was added for');
 const oracleMutes = (b) => (/this\.resetMutes\(\);/.test(b) ? 0 : 1);
-chk('ALL THREE wholesale-replacement paths rebuild the bodies AND switch every level back on',
+// v8 Phase 46 — ⚠️ **THE FOURTH PATH: a Mystery Curve entry replaces the whole figure exactly as `New Figure` does**,
+// so it is enumerated here in the SAME edit that added it — the rule this section's post-mortem exists for.
+const mysteryBody = bodyOfTab('private applyMysteryCurve(fold: number): void');
+chk('ANCHOR: the FOURTH wholesale-replacement path — `applyMysteryCurve` — is locatable',
+  mysteryBody.length > 0 && /mysteryCurveWaves\(/.test(mysteryBody), `${mysteryBody.length} chars`);
+chk('ALL FOUR wholesale-replacement paths rebuild the bodies AND switch every level back on',
   oracleBodies(adoptBody) === 0 && oracleBodies(resetBody) === 0 && oracleBodies(newFigureBody) === 0
+  && oracleBodies(mysteryBody) === 0 && oracleMutes(mysteryBody) === 0
   && oracleMutes(adoptBody) === 0 && oracleMutes(resetBody) === 0 && oracleMutes(newFigureBody) === 0,
   'one behaviour, THREE entry points — the two-path version of this clause was green while `New Figure` '
   + 'carried the very defect the section is a post-mortem of');
@@ -1383,8 +1389,8 @@ seed('`New Figure` left out of the list, i.e. the two-entry-point clause this on
   oracleBodies(newFigureBody.replace(/for \(let w = 0; w < MAX_WAVES; w\+\+\) this\.renderSlotBody\(w\);/, '')),
   'if `New Figure` did not need the rebuild, widening the clause from two paths to three would be decorative');
 seed('a mute left set across a figure replacement — the worse half, because it EXPORTS the loss',
-  ['adopt', 'reset', 'new'].filter((_, i) =>
-    oracleMutes([adoptBody, resetBody, newFigureBody][i].replace(/this\.resetMutes\(\);/, '')) === 1).length,
+  ['adopt', 'reset', 'new', 'mystery'].filter((_, i) =>
+    oracleMutes([adoptBody, resetBody, newFigureBody, mysteryBody][i].replace(/this\.resetMutes\(\);/, '')) === 1).length,
   'a clause reading only the body rebuild would pass on all three paths while a stale mute emptied a level');
 
 /*
@@ -3644,10 +3650,10 @@ console.log('\n§Q — the per-level switch and the per-level `Clear`: a PROJECT
    * shows the incoming preset's real numbers, the box reads *off*, and the next `commit()` exports that level
    * cleared. Silent data loss on a figure the user never touched.
    */
-  chk('SOURCE: `resetMutes()` is a named owner with THREE call sites — one per wholesale figure replacement',
+  chk('SOURCE: `resetMutes()` is a named owner with FOUR call sites — one per wholesale figure replacement',
     /this\.muted = \[false, false, false\];/.test(resetMutesBody)
-    && (tabSrc.match(/this\.resetMutes\(\);/g) ?? []).length === 3,
-    `${(tabSrc.match(/this\.resetMutes\(\);/g) ?? []).length} call sites (adoptExternalFigure, reset, New Figure) `
+    && (tabSrc.match(/this\.resetMutes\(\);/g) ?? []).length === 4,
+    `${(tabSrc.match(/this\.resetMutes\(\);/g) ?? []).length} call sites (adoptExternalFigure, reset, New Figure, applyMysteryCurve) `
     + '— §J asserts they are the right three; this asserts there is ONE owner rather than three inline lines');
   seed('the reset inlined at its call sites, so a fourth replacement path can silently omit it',
     /this\.muted = \[false, false, false\];/.test('') ? 0 : 1,
@@ -4645,6 +4651,106 @@ console.log('\n§COPIES — v8 Phase 45: Arrange copies, measured THROUGH THE GE
     const order = SC.copyDrawOrder(10000, 20);
     chk('...the draw order is copy by copy: particles r, r + M, … (first copy 0, 20, 40 …; second starts at 1)',
       order[0] === 0 && order[1] === 20 && order[500] === 1 && order[9999] === 9999);
+  }
+}
+
+// ===================================================================================================
+console.log('\n§MYSTERY — v8 Phase 46: the Mystery Curve entries are m-fold, MEASURED through the wave law');
+// ===================================================================================================
+/*
+ * ⚠️⚠️ **THE SUBJECT IS THE ENGINE'S WAVE LAW** (`sumWaveAxesBulk`, the bulk hot path the generator runs) fed the
+ * entry's own `mysteryCurveWaves()` output — never a re-derivation of the curve here. A point set's m-fold symmetry is
+ * measured as: rotate every point by 360°/m, distance to the nearest original point, worst over the set, relative to
+ * the reach. ⚠️⚠️ **N MUST BE DIVISIBLE BY m**: the symmetry maps particle i onto i + N/m, so at N = 4 000 the 3-, 6-
+ * and 7-fold curves read as ASYMMETRIC (the rotated point falls between samples) — the instrument's first defect,
+ * 2026-11-18. 5 040 divides by every m ≤ 10.
+ * ⚠️ `27.9` claimed this engine is capped at 2-fold; every row below above 2 is the refutation, held permanently.
+ */
+{
+  const { sumWaveAxesBulk } = await import('../src/core/wave-law.ts');
+  const { MYSTERY_CURVES, mysteryCurveWaves, mysteryParticleCount } = M;
+  const N = 5040;
+  const DEG_ = 180 / Math.PI;
+  const pointsOf = (waves) => {
+    const out = new Float64Array(N * 3);
+    sumWaveAxesBulk(out, N, 360 / N,
+      waves.map((w) => w.axes.map((a) => a.am.base)), waves.map((w) => w.axes.map((a) => a.fm.base / DEG_)),
+      waves.map((w) => w.axes.map((a) => a.phase)), waves.map(() => 0));
+    const pts = []; for (let i = 0; i < N; i++) pts.push([out[i * 3], out[i * 3 + 1], out[i * 3 + 2]]);
+    return pts;
+  };
+  const symErr = (pts, k) => {
+    const c = Math.cos(2 * Math.PI / k), s = Math.sin(2 * Math.PI / k);
+    const reach = Math.max(...pts.map(([x, y]) => Math.hypot(x, y)));
+    let w = 0;
+    for (let i = 0; i < pts.length; i += 13) {
+      const [x, y] = pts[i]; const rx = c * x - s * y, ry = s * x + c * y;
+      let best = Infinity; for (const [px, py] of pts) best = Math.min(best, (px - rx) ** 2 + (py - ry) ** 2);
+      w = Math.max(w, Math.sqrt(best));
+    }
+    return w / reach;
+  };
+  const measuredFold = (pts) => { for (let k = 12; k >= 2; k--) if (symErr(pts, k) < 1e-6) return k; return 1; };
+  const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+
+  chk('the table offers 2- to 7-fold, one entry each', JSON.stringify(MYSTERY_CURVES.map((c) => c.fold)) === '[2,3,4,5,6,7]');
+  const bad = [];
+  for (const c of MYSTERY_CURVES) {
+    const [a, b, d] = c.frequencies;
+    const theory = gcd(Math.abs(b - a), Math.abs(d - a));
+    const pts = pointsOf(mysteryCurveWaves(c, 30, 0.05));
+    const got = measuredFold(pts);
+    const flatZ = pts.every((p) => p[2] === 0);
+    if (theory !== c.fold || got !== c.fold || !flatZ) bad.push(`${c.label}: theory ${theory}, measured ${got}, flat Z ${flatZ}`);
+  }
+  chk('EVERY entry measures EXACTLY its fold through the engine\'s wave law (and its frequencies\' difference-gcd IS that fold), Z flat',
+    bad.length === 0, bad.length ? bad.join(' | ') : `${MYSTERY_CURVES.length} entries`);
+  {
+    // SEED 1: a frequency off by one — the congruence broken, the symmetry must go
+    const c = MYSTERY_CURVES.find((x) => x.fold === 5);
+    const broken = { ...c, frequencies: [c.frequencies[0], c.frequencies[1] + 1, c.frequencies[2]] };
+    seed('one frequency off by one (Farris 1, 7, −14)', measuredFold(pointsOf(mysteryCurveWaves(broken, 30, 0.05))) !== 5 ? 1 : 0,
+      'the measured fold must leave 5 when the congruence does');
+    // SEED 2: the phase NOT divided by the winding — the engine multiplies it back, the rotating terms fall apart
+    const waves = mysteryCurveWaves(c, 30, 0.05);
+    waves[1].axes[0].phase = 90; waves[2].axes[0].phase = 90;
+    seed('the X phases stored UNDIVIDED (90° at windings 6 and 14)', measuredFold(pointsOf(waves)) !== 5 ? 1 : 0,
+      'an undivided phase is 6 × 90° and 14 × 90° — no longer a quarter turn, so the terms stop rotating');
+  }
+  {
+    // the formula itself: the 5-fold entry is f(t) = e^{it} + e^{6it}/2 + e^{−14it}/3 — Farris's frequencies and
+    // weights (his signs and the factor i on the third term only rotate or reflect it), i.e.
+    // x = cos t + ½cos 6t + ⅓cos 14t, y = sin t + ½sin 6t − ⅓sin 14t
+    const c = MYSTERY_CURVES.find((x) => x.fold === 5);
+    const pts = pointsOf(mysteryCurveWaves(c, 1, 0.05));
+    let worst = 0;
+    for (let i = 0; i < N; i++) {
+      const t = (2 * Math.PI * i) / N;
+      const ex = Math.cos(t) + Math.cos(6 * t) / 2 + Math.cos(14 * t) / 3;
+      const ey = Math.sin(t) + Math.sin(6 * t) / 2 - Math.sin(14 * t) / 3;
+      worst = Math.max(worst, Math.hypot(pts[i][0] - ex, pts[i][1] - ey));
+    }
+    chk('...and the 5-fold entry IS the closed form e^{it} + e^{6it}/2 + e^{−14it}/3 (Farris\'s frequencies and weights) to 1e-12', worst < 1e-12, `worst ${worst.toExponential(2)}`);
+  }
+  {
+    // the manual's Z row: depth repeats with the rosette — z(i + N/m) = z(i) — iff Z's winding is a multiple of the fold
+    const c = MYSTERY_CURVES.find((x) => x.fold === 5);
+    const zRepeats = (zw) => {
+      const waves = mysteryCurveWaves(c, 30, 0.05);
+      waves[0].axes[2] = { phase: 0, am: { base: 10, amplitude: 0, frequency: 0 }, fm: { base: zw, amplitude: 0, frequency: 0 } };
+      const pts = pointsOf(waves), step = N / c.fold;
+      let w = 0; for (let i = 0; i < N; i++) w = Math.max(w, Math.abs(pts[i][2] - pts[(i + step) % N][2]));
+      return w;
+    };
+    chk('a Z wave of winding 10 (a multiple of 5) repeats the depth with the 5-fold rosette (the manual\'s Z row)', zRepeats(10) < 1e-9, `worst ${zRepeats(10).toExponential(2)}`);
+    seed('a Z wave of winding 3 (not a multiple of 5)', zRepeats(3) > 1e-3 ? 1 : 0, 'the depth must NOT repeat, or the clause above cannot see the rule');
+  }
+  {
+    // ⚠️ NEAREST, so 20 000 / 7 = 2 857.1 → 19 999 and 20 000 / 3 = 6 666.7 → 20 001 (the first draft of this table
+    // expected 20 006 and 19 998 — my arithmetic, read as a failure until the function was checked by hand)
+    const T = [[20000, 7, 19999], [20000, 3, 20001], [10000, 5, 10000], [1, 6, 6], [50000, 7, 49994]];
+    const wrong = T.filter(([n, f, want]) => mysteryParticleCount(n, f) !== want);
+    chk('mysteryParticleCount is the nearest multiple of the fold, clamped to [fold, the largest multiple ≤ 50 000]', wrong.length === 0, JSON.stringify(wrong));
   }
 }
 // ---------------------------------------------------------------------------------------------------

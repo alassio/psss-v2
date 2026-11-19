@@ -4246,9 +4246,11 @@ void main() {
     //
     // ⚠️ The rule that avoids this class generally: **derive a MIDDLE block's bounds from both of its
     // neighbours, never from one end of the array.** `sparkLast` is the FIRST liquid index by construction.
-    const sparkFirst = state.waveCount ?? 0;
-    const sparkLast = state.count - (state.crystalCount ?? 0) - (state.liquidCount ?? 0);
-    const sparkOn = this.sparkRadius !== null && state.waveCount !== undefined && sparkLast > sparkFirst;
+    // ⚠️ v8 Phase 28 re-test (2026-11-18): a SPARK SUBSET (Neon / Ribbon draw the spark block on its own, with no
+    // `waveCount`) is the spark range [0, count) — without this it drew at the material's radius, ~4× too large.
+    const sparkFirst = state.sparkSubset ? 0 : (state.waveCount ?? 0);
+    const sparkLast = state.sparkSubset ? state.count : state.count - (state.crystalCount ?? 0) - (state.liquidCount ?? 0);
+    const sparkOn = this.sparkRadius !== null && (state.waveCount !== undefined || state.sparkSubset === true) && sparkLast > sparkFirst;
     gl.uniform1f(this.splatUSparkRadius, sparkOn ? this.sparkRadius! : -1.0);
     gl.uniform1i(this.splatUSparkFirst, sparkFirst);
     gl.uniform1i(this.splatUSparkLast, sparkLast);

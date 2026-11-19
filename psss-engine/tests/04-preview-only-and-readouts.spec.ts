@@ -1494,7 +1494,9 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
    */
   const PERIOD_CASES = [
     { preset: 'Aliens DNA', expected: ['repeats every 120 s', 'repeats every 12 s', 'repeats every 8 s'] },
-    { preset: 'Radar', expected: ['1.7 s', '2.9 s', '1.6 s'] },
+    // ⚠️ 107i decided 2026-11-18: the readout FOLLOWS Speed, and Radar ships speedFactor 5 — so 1.7 / 2.9 / 1.6 s at the
+    // stored rate are 0.343 / 0.571 / 0.312 s on screen (computed with the model's own functions).
+    { preset: 'Radar', expected: ['0.343 s', '0.571 s', '0.312 s'] },
   ] as const;
 
   for (const c of PERIOD_CASES) {
@@ -1507,8 +1509,9 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
       const texts = await composer.readoutTexts();
       for (let n = 0; n < 3; n++) {
         expect(texts[n], `${c.preset} slot ${n} must contain ${JSON.stringify(c.expected[n])}. The seconds are `
-          + '`(360/rate)/(60·waveSpeed)` — an invariant-10 units claim, and a converter that drops `waveSpeed` '
-          + 'is right on nearly every preset and wrong by 10× on four.').toContain(c.expected[n]);
+          + '`(360/rate)/(60·waveSpeed·speedFactor)` — an invariant-10 units claim, and a converter that drops '
+          + '`waveSpeed` is right on nearly every preset and wrong by 10× on four; one that drops `speedFactor` '
+          + '(the 107i defect) is wrong on every preset shipping a Speed other than 1×.').toContain(c.expected[n]);
       }
     });
   }
@@ -1596,11 +1599,12 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
       // of the assertion — the two phrasings are separate measured properties of the same readout (16.20).
       expect(fast[0], '`Firestorm` Body did not print `slowest cycle 62.5 s`. At its stored `waveSpeed` of 0.12 '
         + 'that is the arithmetic; a converter hardcoding the library\'s modal 0.05 prints 150 s here — right on '
-        + '375 of 399 presets and wrong on this one.').toContain('slowest cycle 62.5 s');
-      expect(fast[1], '`Firestorm` Structure did not print `slowest cycle 50 s` (0.05 would print 120 s).')
-        .toContain('slowest cycle 50 s');
-      expect(fast[2], '`Firestorm` Detail did not print `slowest cycle 100 s` (0.05 would print 240 s).')
+        + '375 of 399 presets and wrong on this one. ⚠️ Since 107i (2026-11-18) the readout also folds in its Speed '
+        + '0.5×, so the 62.5 s of the stored rate reads 125 s.').toContain('slowest cycle 125 s');
+      expect(fast[1], '`Firestorm` Structure did not print `slowest cycle 100 s` (50 s at the stored rate, at Speed 0.5×).')
         .toContain('slowest cycle 100 s');
+      expect(fast[2], '`Firestorm` Detail did not print `slowest cycle 200 s` (100 s at the stored rate, at Speed 0.5×).')
+        .toContain('slowest cycle 200 s');
 
       // ---- the same figure at a different stored rate ----
       await composer.loadPreset('Ember Storm');
@@ -1617,11 +1621,12 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
         + '`Firestorm`\'s and its stored `waveSpeed` is 0.10 rather than 0.12, so the label must differ by '
         + 'exactly that ratio and by nothing else. A label that did not move means the readout is not '
         + 'recomputed when a figure arrives — a description of the PREVIOUS figure, this phase\'s signature '
-        + 'defect.').toContain('slowest cycle 75 s');
-      expect(slow[1], '`Ember Storm` Structure did not print `slowest cycle 60 s`.')
-        .toContain('slowest cycle 60 s');
-      expect(slow[2], '`Ember Storm` Detail did not print `slowest cycle 120 s`.')
-        .toContain('slowest cycle 120 s');
+        + 'defect. ⚠️ Since 107i the label also folds in each preset\'s Speed (Ember Storm 0.75×), so 75 s at the '
+        + 'stored rate reads 100 s.').toContain('slowest cycle 100 s');
+      expect(slow[1], '`Ember Storm` Structure did not print `slowest cycle 80 s` (60 s stored, at Speed 0.75×).')
+        .toContain('slowest cycle 80 s');
+      expect(slow[2], '`Ember Storm` Detail did not print `slowest cycle 160 s` (120 s stored, at Speed 0.75×).')
+        .toContain('slowest cycle 160 s');
 
       // ⚠️ The pair must actually DIFFER, or every clause above could be satisfied by a frozen readout printing
       // one preset's labels forever. An equality check on the two arrays is the cheapest thing that can see it.
@@ -1657,16 +1662,15 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
    * where the truth is 3000 s. So the clause checks the LOAD case too, on the worst preset, and that half is a
    * plain assertion about a measured number rather than a prediction.
    */
-  test('step 107i — PREDICTED FAILURE: the period readout ignores `speedFactor` (a GREEN here means the defect '
-    + 'is still present)', async ({ composer }) => {
+  /*
+   * ⚠️⚠️ **107i IS DECIDED (owner, 2026-11-18: "make the readout follow Speed, since that's what we see") AND THIS IS
+   * NO LONGER AN EXPECTED FAILURE.** It shipped as `test.fail()` over the undecided defect; the owner chose the first of
+   * the two non-equivalent fixes — fold `speedFactor` into the seconds — over saying NOMINAL in the copy. The
+   * assertion below is unchanged: it always asserted the truth.
+   */
+  test('step 107i — the period readout FOLLOWS Speed: at 2× the figure comes back round in half the time',
+    async ({ composer }) => {
       test.slow();
-      test.fail(true, 'Known defect, measured before the test plan was written and deliberately NOT patched: '
-        + 'the period is derived from the stored `waveSpeed` alone, so `speedFactor` — since 2026-09-10 the ONLY '
-        + 'speed control the user has — does not reach it. The honest fix is either folding `speedFactor` into '
-        + 'the seconds or saying NOMINAL '
-        + 'in the copy, and the two are NOT equivalent, so the choice is the owner\'s. This clause asserts the '
-        + 'CORRECT behaviour and is expected to fail; if it ever PASSES, the fix landed and both this test and '
-        + 'step 107i must be rewritten.');
 
       await composer.bootWithHook();
       await composer.loadPreset('Aliens DNA');
@@ -1676,7 +1680,10 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
       expect(before[0], 'CALIBRATION: Body must open at `repeats every 120 s` for the doubling below to be '
         + 'meaningful.').toContain('repeats every 120 s');
 
-      const speed = await composer.dragSpeedTo(1.0);
+      // ⚠️⚠️ POSITION 1.0 IS 5× on the current track (`SPEED_MAX` 5, `v = min + (max − min)·p²`), so this calibration
+      // FAILED for as long as the test was a `test.fail()` — the expected-failure wrapper hid its own broken
+      // calibration (found 2026-11-18, the first run after 107i was decided). 2× is position √((2 − 0.01)/4.99).
+      const speed = await composer.dragSpeedTo(Math.sqrt((2 - 0.01) / 4.99));
       expect(speed, 'CALIBRATION: the Speed slider did not reach 2× — the defect claim below needs the engine '
         + 'to actually be running at twice the rate.').toBeCloseTo(2.0, 1);
 
@@ -1698,7 +1705,7 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
    * second `test.fail()` would hide a real regression: if the printed number ever stops being 600 s, either the
    * fix landed or the preset changed, and both need a human.
    */
-  test('step 107i (load half) — Deep Thought2 prints 600 s where the truth is 3000 s, with no slider touched',
+  test('step 107i (load half) — Deep Thought2 (speedFactor 0.2) prints the TRUE 3000 s, with no slider touched',
     async ({ composer }) => {
       test.slow();
       await composer.bootWithHook();
@@ -1711,12 +1718,10 @@ test.describe('§A14 · The two readouts — steps 107a–107i', () => {
         .toBeCloseTo(0.2, 2);
 
       const [body] = await composer.readoutTexts();
-      // ⚠️ Asserting the CURRENT, WRONG value on purpose: 600 s is `Sweep rate` alone; 3000 s is the truth
-      // once `speedFactor` 0.2 is applied. A change in either direction needs a human, which is why this is
-      // a normal test and not a second `test.fail()`.
-      expect(body, 'the printed period is no longer 600 s. Either 107i\'s defect was fixed (in which case say '
-        + 'WHICH of the two one-line fixes was chosen, and rewrite step 107i and the expected-failure clause '
-        + 'above) or the preset was retuned. Both need a human — the truth at speedFactor 0.2 is 3000 s.')
-        .toContain('600 s');
+      // ⚠️ 107i decided 2026-11-18: the readout folds speedFactor in, so 600 s (the stored rate alone) × 5 = 3000 s.
+      // This was written to PASS on the wrong 600 s and to need a human the day it changed — that day was this one.
+      expect(body, 'the printed period is not 3000 s. At speedFactor 0.2 the stored-rate 600 s takes five times as '
+        + 'long; 600 s here means the readout stopped reading Speed (the 107i defect is back), anything else that '
+        + 'the preset was retuned.').toContain('3000 s');
     });
 });

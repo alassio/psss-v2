@@ -1673,6 +1673,59 @@ console.log('\n=== AE. v8 Phase 45 — Arrange copies: the panel, the exact coun
   await ctxAE.close();
 }
 
+console.log('\n=== AF. v8 Phase 46 — the Mystery Curve entries in Stack ▾: the figure, the count, History ===\n');
+/*
+ * The entry through the USER's route — the Stack dropdown — read back through the app's own Export. ⚠️ The phases are
+ * asserted as the engine's EFFECTIVE phase (stored × winding, mod 360), because the stored number is divided by the
+ * winding and a clause on the stored value would pass on a figure the engine draws differently.
+ */
+{
+  const ctxAF = await browser.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+  const pAF = await ctxAF.newPage();
+  const afErrs = [];
+  pAF.on('pageerror', (e) => afErrs.push(String(e)));
+  const baseAF = process.env.DEMO_URL ?? 'http://localhost:5190/';
+  const exportedAF = async () => {
+    const [dl] = await Promise.all([pAF.waitForEvent('download', { timeout: 30000 }),
+      pAF.locator('button', { hasText: /^Export$/ }).first().click()]);
+    const fs = await import('node:fs');
+    return JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  };
+  await pAF.goto(`${baseAF}?testhook=1&preset=${encodeURIComponent('Cylinder Viviani')}`, { waitUntil: 'load' });
+  await pAF.locator('button.pg-mode-btn', { hasText: 'Lab' }).first().click({ timeout: 120000 });
+  await pAF.locator('.sl-tab-btn[data-tab="history"]').click(); await pAF.waitForTimeout(500);
+  const h0 = await pAF.locator('.sl-history-tile:visible').count();
+  await pAF.locator('.sl-tab-btn[data-tab="composer"]').click({ timeout: 120000 });
+  await pAF.waitForTimeout(1200);
+  const tab = pAF.locator('.tab-content[data-tab="composer"]');
+  const stack = tab.locator('select.sl-composer-stack');
+  const labels = await stack.locator('optgroup option').allTextContents();
+  chk('Stack ▾ carries a Mystery Curve group, 2- to 7-fold, Farris\'s 5-fold named', labels.length === 6 && labels.some((l) => /5-fold \(Farris\)/.test(l)), labels.join(' | '));
+  await stack.selectOption('mystery:5');
+  await pAF.waitForTimeout(1200);
+  const e = await exportedAF();
+  const w = e.generators.waves;
+  const eff = (a) => ((((a.phase * a.fm.base) % 360) + 360) % 360);
+  const windings = w.map((x) => [x.axes[0].fm.base, x.axes[1].fm.base]);
+  const phases = w.map((x) => [eff(x.axes[0]), eff(x.axes[1])].map((v) => Math.round(v)));
+  chk('picking "5-fold (Farris)" exports three waves of windings 1, 6, 14 on X and Y', JSON.stringify(windings) === '[[1,1],[6,6],[14,14]]', JSON.stringify(windings));
+  chk('...with X a quarter turn ahead and the third term reversed (effective phases 90/0, 90/0, 90/180)', JSON.stringify(phases) === '[[90,0],[90,0],[90,180]]', JSON.stringify(phases));
+  chk('...sizes 1 : ½ : ⅓, Z silent, no Pulse or Wobble', Math.abs(w[1].axes[0].am.base / w[0].axes[0].am.base - 0.5) < 1e-9 && Math.abs(w[2].axes[0].am.base / w[0].axes[0].am.base - 1 / 3) < 1e-9
+    && w.every((x) => x.axes[2].am.base === 0 && x.axes.every((a) => a.am.amplitude === 0 && a.fm.amplitude === 0)));
+  chk('...and Particle Number a multiple of 5 in the export', e.generators.particleCount % 5 === 0, String(e.generators.particleCount));
+  await stack.selectOption('mystery:7'); await pAF.waitForTimeout(1200);
+  const e7 = await exportedAF();
+  chk('picking "7-fold" replaces it (windings 1, 8, 6; N a multiple of 7)', JSON.stringify(e7.generators.waves.map((x) => x.axes[0].fm.base)) === '[1,8,6]' && e7.generators.particleCount % 7 === 0,
+    `${JSON.stringify(e7.generators.waves.map((x) => x.axes[0].fm.base))}, N ${e7.generators.particleCount}`);
+  chk('...the dropdown returns to "Stack ▾" after each pick', (await stack.inputValue()) === '');
+  await pAF.locator('.sl-tab-btn[data-tab="history"]').click(); await pAF.waitForTimeout(500);
+  const h1 = await pAF.locator('.sl-history-tile:visible').count();
+  const hl = await pAF.locator('.sl-history-tile:visible .sl-history-tile-label').allTextContents();
+  chk('each pick left ONE History snapshot of the figure before, captioned with the preset name', h1 === h0 + 2 && hl.some((l) => /^Cylinder Viviani — before Mystery Curve — 5-fold/.test(l)), `${h0} -> ${h1}`);
+  chk('...with no page error across the section', afErrs.length === 0, afErrs[0] ?? 'none');
+  await ctxAF.close();
+}
+
 console.log(`\n  page errors: ${errs.length ? [...new Set(errs)].slice(0, 3).join(' | ') : 'none'}`);
 console.log(`\n${fail === 0 && errs.length === 0 ? 'PASS' : 'FAIL'}  ui: ${pass} passed, ${fail} failed`);
 await browser.close();

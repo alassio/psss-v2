@@ -271,6 +271,8 @@ const EXTRA_SHOTS = [
   { tab: 'composer', file: 'lab-composer-editas', preset: 'Plant Sprig', scrollTo: 'Rule' },
   // v8 Phase 45 — the Arrange copies panel, opened on a demo that already holds an arrangement (its status line reads it).
   { tab: 'composer', file: 'lab-composer-copies', preset: 'Copies Saddle' },
+  // v8 Phase 46 — a Mystery Curve in the Composer: the top of the tab, where the Shape diagram shows the 5-fold rosette.
+  { tab: 'composer', file: 'lab-composer-mystery', preset: 'Mystery Curve 5' },
   /*
    * v8 Phase 39 Stage C — the Customize editor. ⚠️ `Curve Rosette Chain` is the one preset AUTHORED under Customize,
    * so it opens WITH the editor and needs no option pick; `Curve Weave` is Moore, and picking Customize there shows

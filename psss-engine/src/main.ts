@@ -1556,6 +1556,11 @@ async function init() {
   let subsetDep = new Float32Array(0);
   let subsetVel = new Float32Array(0);
   let subsetFrozen = new Uint8Array(0);
+  // v8 Phase 28 re-test (2026-11-18) — the per-particle arrays a SUBSET draw must carry too (see `drawParticleSubset`).
+  let subsetTemp = new Float32Array(0);
+  let subsetLife = new Float32Array(0);
+  let subsetVelDir = new Float32Array(0);
+  let subsetChan = new Float32Array(0);
   let sparkIdx = new Int32Array(0);
 
   // Render mode runtime state (separate from preset so it can be changed live without full reinit)
@@ -3745,7 +3750,7 @@ async function init() {
      * `ribbonRenderer.getPointIndices()` returns its own persistent `number[]`. Hence the explicit `n` —
      * a grow-only scratch is longer than its live prefix, so `idx.length` is not the count.
      */
-    const drawParticleSubset = (idx: ArrayLike<number>, n: number): void => {
+    const drawParticleSubset = (idx: ArrayLike<number>, n: number, isSparkBlock = false): void => {
       if (n === 0) return;
       if (subsetPos.length < n * 3) {
         subsetPos = new Float32Array(n * 3);
@@ -3759,6 +3764,27 @@ async function init() {
       // already drew — that would put a glowing dot inside its own faceted ice.
       const wantFrozen = state.frozen !== undefined;
       if (wantFrozen && subsetFrozen.length < n) subsetFrozen = new Uint8Array(n);
+      /*
+       * ⚠️⚠️ v8 Phase 28 re-test (2026-11-18) — **THE FOURTH "SPARKS VANISH" DOOR: the subset used to drop every
+       * per-particle array but these five.** Under Neon Lines and Ribbon the spark block is drawn through HERE, and with
+       * no `temperatures` the splat path falls back to zeros — a fire material's sparks drew at temperature 0, which is
+       * BLACK on its ramp: invisible with the figure hidden, lost in the figure's own flicker with it shown. Measured
+       * (`p99zy-sparks-noise.mjs`, figure hidden): sparks added +1.20 lit points on plain splat but +0.14 under neon and
+       * −0.01 under ribbon, against a run-to-run spread of 0.12–0.42. The three earlier doors (neon drawing only trail
+       * geometry, the ribbon point pass for `hybrid` alone, the figure cull in an early-returning branch) are in
+       * `hdr-particle.ts`. ⚠️ **An array is carried only when it COVERS every index in the subset** — a short array
+       * (`lifetimes` is only `particleCount` long) is treated exactly like a missing one, which is the renderer's own rule,
+       * so a subset gets the same fallback the full draw gets. Strides: 1, 1, 2 (`velocityDirs`), 3 (`channels`).
+       */
+      let maxIdx = -1;
+      for (let i = 0; i < n; i++) if (idx[i]! > maxIdx) maxIdx = idx[i]!;
+      const covers = (a: ArrayLike<number> | undefined, stride: number): boolean => a !== undefined && a.length >= (maxIdx + 1) * stride;
+      const wantTemp = covers(state.temperatures, 1), wantLife = covers(state.lifetimes, 1);
+      const wantVelDir = covers(state.velocityDirs, 2), wantChan = covers(state.channels, 3);
+      if (wantTemp && subsetTemp.length < n) subsetTemp = new Float32Array(n);
+      if (wantLife && subsetLife.length < n) subsetLife = new Float32Array(n);
+      if (wantVelDir && subsetVelDir.length < n * 2) subsetVelDir = new Float32Array(n * 2);
+      if (wantChan && subsetChan.length < n * 3) subsetChan = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
         const pi = idx[i]!;
         subsetPos[i * 3] = state.positions[pi * 3]!;
@@ -3770,6 +3796,10 @@ async function init() {
         subsetDep[i] = state.depths[pi]!;
         subsetVel[i] = state.velocities[pi]!;
         if (wantFrozen) subsetFrozen[i] = state.frozen![pi]!;
+        if (wantTemp) subsetTemp[i] = state.temperatures![pi]!;
+        if (wantLife) subsetLife[i] = state.lifetimes![pi]!;
+        if (wantVelDir) { subsetVelDir[i * 2] = state.velocityDirs![pi * 2]!; subsetVelDir[i * 2 + 1] = state.velocityDirs![pi * 2 + 1]!; }
+        if (wantChan) { subsetChan[i * 3] = state.channels![pi * 3]!; subsetChan[i * 3 + 1] = state.channels![pi * 3 + 1]!; subsetChan[i * 3 + 2] = state.channels![pi * 3 + 2]!; }
       }
       gl.blendFunc(renderer.isAdditiveBlend() ? gl.ONE : gl.SRC_ALPHA,
                    renderer.isAdditiveBlend() ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
@@ -3781,6 +3811,12 @@ async function init() {
         positions: subsetPos.subarray(0, n * 3), colors: subsetCol.subarray(0, n * 3),
         depths: subsetDep.subarray(0, n), velocities: subsetVel.subarray(0, n), count: n,
         ...(wantFrozen ? { frozen: subsetFrozen.subarray(0, n) } : {}),
+        ...(wantTemp ? { temperatures: subsetTemp.subarray(0, n) } : {}),
+        ...(wantLife ? { lifetimes: subsetLife.subarray(0, n) } : {}),
+        ...(wantVelDir ? { velocityDirs: subsetVelDir.subarray(0, n * 2) } : {}),
+        ...(wantChan ? { channels: subsetChan.subarray(0, n * 3) } : {}),
+        // ⚠️ only the spark block says so — see `GeneratorState.sparkSubset` (Ribbon's hybrid subset is wave particles)
+        ...(isSparkBlock ? { sparkSubset: true } : {}),
       }, target);
       perfHud?.end('particles');
     };
@@ -3821,7 +3857,7 @@ async function init() {
     /** `drawParticleSubset` over the spark block. Two-step so the grown `sparkIdx` is read, not a stale one. */
     const drawSparkSubset = (): void => {
       const n = fillSparkIndices();
-      drawParticleSubset(sparkIdx, n);
+      drawParticleSubset(sparkIdx, n, true);
     };
 
     // Draw the crystals BEFORE the renderer branch below.

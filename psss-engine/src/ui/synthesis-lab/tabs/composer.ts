@@ -212,6 +212,7 @@ import {
   SEED_WINDING, SEED_SIZE, SEED_PARTICLE_COUNT, SEED_WAVE_SPEED,
   COPY_LAYOUTS, COPY_LAYOUT_BY_KEY, COPIES_RANGE, COPIES_SPREAD_RANGE, COPIES_ASPECT_RANGE, COPIES_CYCLES_RANGE,
   DEFAULT_COPIES_SETTINGS, arrangeCopies, detectCopies, removeCopies,
+  MYSTERY_CURVES, mysteryCurveWaves, mysteryParticleCount,
 } from '../composer-model.ts';
 import type {
   FigureModel, AxisCell, SlotModel, CopiesSettings, CopiesState, CopyLayoutKey, CopyMorphAxis,
@@ -1527,7 +1528,8 @@ export class ComposerTab implements TabModule {
     sec.appendChild(this.framingRow('Speed', TAB_TIPS['composer.speed']!, {
       min: 0, max: 1, step: SPEED_STEP,
       get: () => this.controls.getSpeedFactor(),
-      set: v => this.controls.setSpeedFactor(v),
+      // ⚠️ `sync()` after: the period readout now reads Speed (107i), and `setSpeedFactor` does not notify.
+      set: v => { this.controls.setSpeedFactor(v); this.sync(); },
       toPos: SPEED_TRACK.toPos, fromPos: SPEED_TRACK.fromPos, fmt: fmtSpeed,
       settleOnRelease: true,
     }));
@@ -1908,7 +1910,28 @@ export class ComposerTab implements TabModule {
       o.textContent = s.label;
       stack.appendChild(o);
     });
+    /*
+     * v8 Phase 46 — **the Mystery Curve entries, an `<optgroup>` of their own** because they do something the stacks
+     * above do not: they REPLACE the figure (all three slots — windings, sizes, phases — and Particle Number), like
+     * `New Figure`, rather than re-wind it. Values are `mystery:<fold>` so they cannot collide with a stack index.
+     */
+    const mysteryGroup = document.createElement('optgroup');
+    mysteryGroup.label = 'Mystery Curve (Farris) — a new figure';
+    for (const c of MYSTERY_CURVES) {
+      const o = document.createElement('option');
+      o.value = `mystery:${c.fold}`;
+      o.textContent = c.label;
+      o.title = TAB_TIPS['composer.mystery']!;
+      mysteryGroup.appendChild(o);
+    }
+    stack.appendChild(mysteryGroup);
     stack.addEventListener('change', () => {
+      if (stack.value.startsWith('mystery:')) {
+        const fold = Number(stack.value.slice('mystery:'.length));
+        stack.value = '';
+        this.applyMysteryCurve(fold);
+        return;
+      }
       const i = Number(stack.value);
       if (!stack.value || !this.model) return;
       // ⚠️ Idempotent by construction — multiples apply to the BODY winding, never to the current value.
@@ -1940,6 +1963,31 @@ export class ComposerTab implements TabModule {
      */
 
     return group;
+  }
+
+  /**
+   * v8 Phase 46 — **replace the figure with an m-fold Mystery Curve** (`MYSTERY_CURVES`). The `New Figure` route —
+   * waves written into `workingPreset`, mutes reset, the model rebuilt from it, every slot body re-rendered, then
+   * `commit()` — plus a History snapshot of the figure BEFORE (as Arrange copies does) and Particle Number moved to the
+   * nearest multiple of the fold, through `setParticleCount` (which keeps the engine and `workingPreset` equal).
+   * ⚠️ Body's size is `SEED_SIZE`, the New Figure seed's; the wave speed is the figure's own. Render mode, material and
+   * look are left alone, as `New Figure` leaves them.
+   */
+  private applyMysteryCurve(fold: number): void {
+    const p = this.state?.workingPreset;
+    const curve = MYSTERY_CURVES.find((c) => c.fold === fold);
+    if (!p || !curve || this.liveFigureType() !== 'lissajous') return;
+    const before = structuredClone(p);
+    before.generators.particleCount = this.controls.getParticleCount();
+    this.state?.pushSnapshot(`${p.metadata.name} — before ${curve.label}`, before);
+    const speed = p.generators.waves?.[0]?.speed ?? p.generators.waveSpeed ?? SEED_WAVE_SPEED;
+    p.generators.waves = mysteryCurveWaves(curve, SEED_SIZE, speed);
+    this.controls.setParticleCount(mysteryParticleCount(this.controls.getParticleCount(), fold));
+    p.generators.particleCount = this.controls.getParticleCount();
+    this.resetMutes();
+    this.rebuildModel();
+    for (let w = 0; w < MAX_WAVES; w++) this.renderSlotBody(w);
+    this.commit('composer-mystery-curve');
   }
 
   private buildSlotSection(slot: number): HTMLElement {
@@ -3773,7 +3821,14 @@ export class ComposerTab implements TabModule {
            * and each of the three rejected placeholders is a number or a dash the reader could take for a value.
            * This is `syncBreatheCells`' own rule for an empty seconds field, applied to prose.
            */
-          const secs = slowestModulatorSeconds(slot, this.model.waveSpeed);
+          /*
+           * ⚠️⚠️ v8 107i — DECIDED BY THE OWNER 2026-11-18 (*"make the readout follow Speed, since that's what we
+           * see"*): the seconds fold in `speedFactor`, because the engine advances `waveSpeed × speedFactor` per
+           * frame and Speed is the only speed the user can change. At Speed 0 the product is 0 and the readout prints
+           * nothing — the figure never comes back round. ⚠️ **The breathe "s" fields do NOT follow Speed**: they are
+           * INPUTS that author the stored rate, and a typed value must not depend on where Speed happens to sit.
+           */
+          const secs = slowestModulatorSeconds(slot, this.model.waveSpeed * this.controls.getSpeedFactor());
           if (secs !== null) parts.push(periodPhrase(secs));
           readout.textContent = parts.join(' · ');
         }

@@ -631,7 +631,7 @@ count at all, only the one the wobble gives it at that instant.
 
 **Periodicity.** The whole wave is periodic only if the live rates are commensurate — in which case the
 Composer prints `repeats every N s`. If they are not, there is no single period and it prints
-`slowest cycle N s` instead. This matters for any readout that samples one instant of a periodic
+`slowest cycle N s` instead. Both are wall-clock seconds at the current Speed: the engine advances by `waveSpeed × speedFactor` per frame, so the readout divides by that product (the Pulse/Wobble seconds inputs, which author the stored rate, use `waveSpeed` alone). This matters for any readout that samples one instant of a periodic
 quantity, which is why the Score's envelope traces exist.
 
 #### Copies — one wave as the layout for the others
@@ -677,6 +677,25 @@ figure is sampled at `N` and regrouped copy by copy (`copyDrawOrder`: `r, r + M,
 the working preset, a separate object. The Composer's `commit()` re-reads the count from the working preset before
 writing the figure back, so a figure edit never restores an older count. The exact Particle Number field (Visual FX
 Figure row, Composer Framing row; one builder) writes any whole number 1–50 000 unsnapped; the slider snaps to 100.
+
+#### Rotational symmetry — the Mystery Curve
+
+Write the figure's X/Y projection as one complex number `x + iy`. A wave slot with winding `n` on both axes, size `a`
+on both, X phase 90° and Y phase 0° contributes `a·(cos nθ + i sin nθ) = a·e^{inθ}`; Y phase 180° gives `a·e^{−inθ}`.
+The cross terms cancel exactly, so **one ordinary slot is one rotating term**, and three slots give Farris's
+`f(θ) = a₁e^{in₁θ} + a₂e^{in₂θ} + a₃e^{in₃θ}`. By his Theorem 4 the curve has **m-fold** rotational symmetry when
+`n₁ ≡ n₂ ≡ n₃ (mod m)` with the common residue coprime to `m`: `f(θ + 2π/m) = e^{2πir/m}·f(θ)`. The order is the gcd of
+the pairwise frequency differences.
+
+`MYSTERY_CURVES` holds one entry per fold, 2 to 7 (5: frequencies 1, 6, −14, Farris's own; weights 1, ½, ⅓).
+`mysteryCurveWaves` writes them with each phase divided by its winding (`phaseForTarget`, since the engine multiplies a
+phase by its winding), Z silent, no modulation; Particle Number goes to the nearest multiple of `m`
+(`mysteryParticleCount`), because the symmetry maps particle `i` onto particle `i + N/m`, which must exist.
+
+**What keeps it:** any size or common phase per slot (they only scale or turn a term), Pulse applied to a slot's X and
+Y alike. **What breaks it:** Wobble (the winding is then not an integer at almost every instant), a slot whose X and Y
+differ in size or in the quarter-turn phase relation (the term becomes elliptical, which is a sum of `e^{inθ}` and
+`e^{−inθ}`), or windings whose differences no longer share the factor.
 
 ### 1.3 Model-space operators
 
@@ -819,16 +838,18 @@ the liquid surface's occlusion all read differently under it.
 ⚠️ **It ships because the measurement licensed it, and the measurement replaced a falsified bound.** A bare
 10 % depth-inversion bound condemns the engine's own 90° pose rotation on every strong-z body, so it is not
 a shipping gate. The discriminating property is inversion **with no change to the projected image** — which
-is what the removed z box-fold was, at 67 % inversion and 0 % image change. Measured over 174 strong-z
-bodies at three instants, full-strength inversion trips that rule on 31 bodies while the shipped pose
-rotations trip it on 39 and 65. It is the loudest operator in the stage, not the quietest: 19.6 % mean
-depth inversion against a mean image change of 102.6 % of the figure's own width.
+is what the removed z box-fold was, at 66 % inversion and 0 % image change. Measured through the engine over
+195 strong-z bodies at three instants, full-strength inversion at radius 1 trips that rule on 39 bodies — as
+many as the shipped 90° pose rotation (39) and fewer than the 45° one (66). It is the loudest operator in the
+stage, not the quietest: 43 % mean depth inversion against a mean image change of 118 % of the figure's own
+width.
 
-⚠️ **The amount lerp is the only control that bounds the depth effect** — at 0.3 no body fails the rule.
-Restricting the map to an outer shell, which the study proposed for exactly this purpose, was measured
-failing the discriminator on the same 31 bodies as no restriction at all: a figure spanning the design
-extent has most of its particles outside any such shell. **A control whose rationale is falsified is
-worse than no control**, so the amount is the one that carries the guarantee.
+⚠️ **No setting makes it depth-safe, and the radius matters more than the amount.** At amount 0.3 it still
+trips the rule on 15 bodies (most of them marginally); at radius 0.5 on 57, where some bodies reverse most
+of their depth while the picture barely moves — the silent kind of reversal; at radius 2 on 27. Judge a
+preset that uses it by eye, in a depth-reading mode, rather than trusting a setting to keep its depth order.
+Restricting the map to an outer shell, which the study proposed as a safety control, does not work: a figure
+spanning the design extent has most of its particles outside any such shell, so it was not built.
 
 #### Fractal Fold
 

@@ -169,6 +169,15 @@ export default defineConfig(({ command }) => ({
     fs: {
       allow: ['..'],
     },
+    /*
+     * ⚠️ **THE SCREENSAVER'S .NET BUILD OUTPUT IS NOT WATCHED (2026-11-18).** `npm run build:all` publishes the
+     * `.scr` through `screensaver/obj/` and `screensaver/bin/`, where MSBuild holds temp files open; the watcher
+     * stat-ed one, got `EBUSY`, and the uncaught error KILLED every running dev server (5173 and 5174 together, in
+     * one build). Nothing the dev server serves lives there.
+     */
+    watch: {
+      ignored: ['**/screensaver/obj/**', '**/screensaver/bin/**'],
+    },
   },
   build: {
     target: 'es2022',

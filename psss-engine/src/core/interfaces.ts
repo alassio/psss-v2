@@ -63,6 +63,14 @@ export interface GeneratorState {
    */
   channels?: Float32Array;
   /**
+   * v8 Phase 28 re-test (2026-11-18) — **this state is a SUBSET that consists of the spark block and nothing else**
+   * (`drawSparkSubset()` in `main.ts`, the Neon Lines / Ribbon path). A subset carries no `waveCount` — that absence is
+   * what keeps the figure cull and the full-figure branches off it — so the splat pass cannot find the spark range by
+   * index; this marker tells it the WHOLE draw is sparks, so they draw at `sparks.splatRadius` and not the material's.
+   * ⚠️ Never set on any other subset: Ribbon's `hybrid` point subset is WAVE particles and must keep the material size.
+   */
+  sparkSubset?: boolean;
+  /**
    * Per-SLOT crystal flag: 1 = this slot is a crystal, 0 = it is a wave particle or a spark.
    * Absent means the crystal pool is empty and every renderer takes its existing paths unchanged.
    *

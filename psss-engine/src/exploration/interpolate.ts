@@ -165,15 +165,17 @@ export function interpolatePreset(
     if (liveA !== undefined && liveB !== undefined) {
       // Both decks carry a curve: blend it. `rule` snaps with the type for the same reason.
       const lerpMV = (x: ModulatedValue, y: ModulatedValue): ModulatedValue => ({
-        base: x.base + (y.base - x.base) * t,
-        amplitude: x.amplitude + (y.amplitude - x.amplitude) * t,
-        frequency: x.frequency + (y.frequency - x.frequency) * t,
+        // ⚠️ `a·(1 − t) + b·t`, never `a + (b − a)·t`: only this form is EXACT at both ends of the crossfader
+        // (`mixercheck` §C's endpoint oracle — the inexact form missed deck B by a rounding error, 2026-11-18/19).
+        base: x.base * (1 - t) + y.base * t,
+        amplitude: x.amplitude * (1 - t) + y.amplitude * t,
+        frequency: x.frequency * (1 - t) + y.frequency * t,
       });
       // GEOMETRIC on `descend` -- see the header. Guarded because a non-positive base has no log.
       const geoMV = (x: ModulatedValue, y: ModulatedValue): ModulatedValue => ({
-        base: x.base > 0 && y.base > 0 ? x.base * Math.pow(y.base / x.base, t) : x.base + (y.base - x.base) * t,
-        amplitude: x.amplitude + (y.amplitude - x.amplitude) * t,
-        frequency: x.frequency + (y.frequency - x.frequency) * t,
+        base: x.base > 0 && y.base > 0 ? x.base * Math.pow(y.base / x.base, t) : x.base * (1 - t) + y.base * t,
+        amplitude: x.amplitude * (1 - t) + y.amplitude * t,
+        frequency: x.frequency * (1 - t) + y.frequency * t,
       });
       // v8 `39.A8` — an optional key survives the blend unless the deck lacking it is at its own endpoint.
       const oneSidedKeep = (x: unknown, y: unknown, w: number): boolean =>
@@ -193,7 +195,7 @@ export function interpolatePreset(
         pitch: lerpMV(liveA.pitch, liveB.pitch),
         roll: lerpMV(liveA.roll, liveB.roll),
         descend: geoMV(liveA.descend, liveB.descend),
-        smoothness: liveA.smoothness + (liveB.smoothness - liveA.smoothness) * t,
+        smoothness: liveA.smoothness * (1 - t) + liveB.smoothness * t,
         centre: (t < 0.5 ? liveA : liveB).centre.slice(),
         /*
          * v8 `39.A8` — **`twist` and `stretch` LERP**, each side read at its IDENTITY when absent (`?? 0`,
@@ -223,13 +225,13 @@ export function interpolatePreset(
         ...(ruleWinner.growth !== undefined ? { growth: ruleWinner.growth } : {}),
         ...(ruleWinner.seed !== undefined ? { seed: ruleWinner.seed } : {}),
         ...(oneSidedKeep(liveA.growthTime, liveB.growthTime, t) ? {
-          growthTime: (liveA.growthTime ?? 12) + ((liveB.growthTime ?? 12) - (liveA.growthTime ?? 12)) * t,
+          growthTime: (liveA.growthTime ?? 12) * (1 - t) + (liveB.growthTime ?? 12) * t,
         } : {}),
         ...(oneSidedKeep(liveA.growthPause, liveB.growthPause, t) ? {
-          growthPause: (liveA.growthPause ?? 4) + ((liveB.growthPause ?? 4) - (liveA.growthPause ?? 4)) * t,
+          growthPause: (liveA.growthPause ?? 4) * (1 - t) + (liveB.growthPause ?? 4) * t,
         } : {}),
         ...(oneSidedKeep(liveA.taper, liveB.taper, t) ? {
-          taper: (liveA.taper ?? 0) + ((liveB.taper ?? 0) - (liveA.taper ?? 0)) * t,
+          taper: (liveA.taper ?? 0) * (1 - t) + (liveB.taper ?? 0) * t,
         } : {}),
       };
     } else {
@@ -839,7 +841,7 @@ function mixTransMapChain(a: UnifiedPreset, b: UnifiedPreset, t: number): Partia
 function mixDispersion(a: UnifiedPreset, b: UnifiedPreset, t: number): Partial<OverlayState> {
   const da = a.overlay?.transMapDispersion ?? 0;
   const db = b.overlay?.transMapDispersion ?? 0;
-  const disp = da + (db - da) * t;
+  const disp = da * (1 - t) + db * t;
   return disp > 0 ? { transMapDispersion: disp } : {};
 }
 
@@ -896,7 +898,7 @@ function mixForceGate(a: UnifiedPreset, b: UnifiedPreset, t: number): Partial<Ov
   if (gateBy === 'none') return {};
   const ga = a.overlay?.transMapForceGateAmount ?? 0;
   const gb = b.overlay?.transMapForceGateAmount ?? 0;
-  const amount = ga + (gb - ga) * t;
+  const amount = ga * (1 - t) + gb * t;
   if (amount <= 0) return {};
   const out: Partial<OverlayState> = { transMapForceGateBy: gateBy, transMapForceGateAmount: amount };
   if (gateWinner.overlay?.transMapForceGateInvert) out.transMapForceGateInvert = true;
@@ -906,7 +908,7 @@ function mixForceGate(a: UnifiedPreset, b: UnifiedPreset, t: number): Partial<Ov
     // collapse to zero at any nonzero age.
     const ha = a.overlay?.transMapForceGateHalfLife ?? 2.0;
     const hb = b.overlay?.transMapForceGateHalfLife ?? 2.0;
-    const half = ha + (hb - ha) * t;
+    const half = ha * (1 - t) + hb * t;
     if (half !== 2.0) out.transMapForceGateHalfLife = half;
   }
   return out;
@@ -1079,7 +1081,10 @@ function lerpArr(a: number[], b: number[], t: number): number[] {
   for (let i = 0; i < len; i++) {
     const va = a[i] ?? 0;
     const vb = b[i] ?? 0;
-    result.push(va + (vb - va) * t);
+    // ⚠️ `(1 − t)·a + t·b`, NOT `a + (b − a)·t`: only this form is exact at BOTH endpoints. The other missed deck B at
+    // t = 1 by an ulp (`mixercheck` §C, 2026-11-18: Multiple × Flying Zebras, colorFreq 0.003 → 0.0029999999999290594),
+    // and the endpoint oracle's law is that the crossfade IS deck B there. `interpolateWaves` already uses this form.
+    result.push(va * (1 - t) + vb * t);
   }
   return result;
 }

@@ -1372,8 +1372,8 @@ export const TAB_TIPS: Record<string, string> = {
     + 'the Body wave, the phase shift actually applied where that differs from the number you typed, which axes '
     + 'have no size to show their winding, and how long its slowest breathing takes. It reads “repeats every N s” '
     + 'only when every modulator on the wave lines up with that cycle; otherwise it names the slowest cycle alone, '
-    + 'because the wave itself comes back round much later. Nothing here is stored — it all describes the numbers '
-    + 'above it.',
+    + 'because the wave itself comes back round much later. The time includes Speed, so it is the time you watch. '
+    + 'Nothing here is stored — it all describes the numbers above it.',
   /*
    * ⚠️ **THE PANE CAPTION DELIBERATELY MAKES THE WEAKER CLAIM AND THIS TOOLTIP IS WHERE THE CAUSE IS ALLOWED TO
    * LIVE.** The caption on the canvas says only that the projection is empty; naming a cause there would be wrong
@@ -1416,7 +1416,12 @@ export const TAB_TIPS: Record<string, string> = {
     + 'render mode, material and film look alone.',
   'composer.stack': 'Set the Structure and Detail windings as whole multiples of the Body wave’s, which is '
     + 'where the library’s variety actually lives. Multiples apply to the Body value, never to the current '
-    + 'one, so re-applying the same stack changes nothing.',
+    + 'one, so re-applying the same stack changes nothing. The Mystery Curve entries at the bottom are different: '
+    + 'each replaces the whole figure with a rosette of that symmetry.',
+  'composer.mystery': 'Replace the figure with a Mystery Curve (Frank Farris, Creating Symmetry): three waves whose '
+    + 'frequencies are spaced by the same number, so the curve repeats exactly that many times around its centre. '
+    + 'Particle Number moves to a multiple of it. Wobble breaks the symmetry; Pulse keeps it only if a wave’s X and Y '
+    + 'pulse alike. Undo with History.',
   // ⚠️ **`composer.repair` IS DELETED (16.15) WITH ITS BUTTON, AND WHAT IT WAS FOR IS NOT SOLVED — the
   // Randomiser can still leave a figure that never closes.** The remedy, if wanted, belongs in `randomize.ts`;
   // see `composer-model.ts`'s note where `repairFigure` used to be.
@@ -1534,7 +1539,8 @@ export const TAB_TIPS: Record<string, string> = {
   'composer.speed': 'Master time multiplier: scales wave motion AND every rotation rate together, so the figure '
     + 'keeps its shape and only its tempo changes. At 0 it freezes in its current pose, which is the way to study '
     + 'a still frame. ⚠️ The seconds on the Pulse and Wobble rows are quoted at the figure’s own stored rate, and '
-    + 'this multiplies them — at 0.5× every one of those labels really takes twice as long.',
+    + 'this multiplies them — at 0.5× every one of those labels really takes twice as long. The readout line under '
+    + 'each wave already includes Speed.',
   'composer.copiesToggle': 'Show or hide Arrange copies: turn Detail into a path that places several copies of the '
     + 'figure Body and Structure draw.',
   'composer.copiesLayout': 'The path the copies sit on. Ellipse / Circle, Figure Eight, Pretzel, Saddle Ring and '

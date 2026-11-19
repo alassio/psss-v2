@@ -1955,7 +1955,9 @@ console.log('\n=== K. the force gate defaults to a no-op, and dies with its buff
     && /transMapForceGateBy: gateBy/.test(interp),
     'a lerp between two ForceGateSource strings is not even expressible');
   chk('...interpolates the amount, which has a real neutral (absent === 0 === ungated)',
-    /const amount = ga \+ \(gb - ga\) \* t/.test(interp));
+    // ⚠️ re-pointed 2026-11-19: the Mixer's blends are now the endpoint-EXACT form `a·(1 − t) + b·t` (mixercheck §C);
+    // the property is unchanged — the amount is interpolated between the decks, not snapped
+    /const amount = ga \* \(1 - t\) \+ gb \* t/.test(interp));
   chk('...defaults the half-life to the engine\'s 2.0 on BOTH sides before interpolating',
     /transMapForceGateHalfLife \?\? 2\.0[\s\S]{0,160}transMapForceGateHalfLife \?\? 2\.0/.test(interp),
     'a 0 on the missing side would collapse the gate to zero at any nonzero age');
@@ -3352,6 +3354,38 @@ console.log('\n=== O. the liquid iso-surface: an ON-CURVE reference, count-indep
       + 'sparks through. And volume needs the guard rather than the cull, because its own accumulation '
       + 'program cannot see `uHideBelowIndex` at all, so without it Show Figure is silently inert there');
 
+    /*
+     * ⚠️⚠️ **THE FOURTH DOOR (2026-11-18), found by the owed `28.5` re-test, `verify` GREEN over it.** With the figure
+     * hidden, sparks still added nothing under Neon / Ribbon (+0.14 / −0.01 lit points against +1.20 on plain splat,
+     * run-to-run spread 0.12–0.42 — `p99zy-sparks-noise.mjs`). Two causes, one per half below: `drawParticleSubset()`
+     * dropped `temperatures`, so a fire material drew the sparks at temperature 0 (black), and — once that was carried —
+     * the splat pass sized a subset at the MATERIAL radius (its spark override keyed on `waveCount`, which a subset never
+     * has), ~7× the lit area. After both: +2.04 / +2.48. ⚠️ **This population keeps getting lost because no trajectory
+     * renderer draws it: every path that re-packs it must carry what the full draw reads.**
+     */
+    const doorFour = (m, h) =>
+      // half 1: the subset carries each per-particle array the renderer reads, only where the source covers the subset
+      /\.\.\.\(wantTemp \? \{ temperatures: subsetTemp\.subarray\(0, n\) \} : \{\}\)/.test(m)
+      && /\.\.\.\(wantLife \? \{ lifetimes: subsetLife\.subarray\(0, n\) \} : \{\}\)/.test(m)
+      && /\.\.\.\(wantVelDir \? \{ velocityDirs: subsetVelDir\.subarray\(0, n \* 2\) \} : \{\}\)/.test(m)
+      && /\.\.\.\(wantChan \? \{ channels: subsetChan\.subarray\(0, n \* 3\) \} : \{\}\)/.test(m)
+      && /const wantTemp = covers\(state\.temperatures, 1\)/.test(m)
+      // half 2: only the SPARK block says so, and the splat override honours it
+      && /drawParticleSubset\(sparkIdx, n, true\);/.test(m)
+      && /drawParticleSubset\(pts, pts\.length\);/.test(m)
+      && /const sparkFirst = state\.sparkSubset \? 0 : \(state\.waveCount \?\? 0\);/.test(h)
+      && /\(state\.waveCount !== undefined \|\| state\.sparkSubset === true\)/.test(h);
+    chk('28.5 re-test: the spark SUBSET carries temperatures/lifetimes/directions/channels AND draws at the spark radius',
+      doorFour(mainTsDye, hdrSrc),
+      'under Neon / Ribbon the spark block is drawn ONLY through drawParticleSubset(): without the temperatures a fire '
+      + 'material draws it black, and without the spark marker the splat pass sizes it like the figure');
+    chk('...SEEDED: the subset without `temperatures` makes that clause FAIL (the first half of the door)',
+      !doorFour(mainTsDye.replace(/\.\.\.\(wantTemp \? \{ temperatures: subsetTemp\.subarray\(0, n\) \} : \{\}\),/, ''), hdrSrc),
+      'a clause that passes over the removed carry is the one that was green over the shipped defect');
+    chk('...SEEDED: the spark subset NOT marked (`drawParticleSubset(sparkIdx, n)`) makes it FAIL (the second half)',
+      !doorFour(mainTsDye.replace('drawParticleSubset(sparkIdx, n, true);', 'drawParticleSubset(sparkIdx, n);'), hdrSrc),
+      'the unmarked subset drew sparks at the material radius — visible, but the wrong size, so a visual check passes it');
+
     chk('28.4: the ramp source reads its OWN name and NEVER material.colourRamp',
       /function dyeOwnRamp\(\): Uint8Array \| null \{/.test(mainTsDye)
       && /const name = currentDye\.ramp \?\? DEFAULT_DYE_CONFIG\.ramp \?\? '';/.test(mainTsDye)
@@ -4502,7 +4536,9 @@ console.log('\n=== Q. the liquid FIELD pool: the four-site partition, the lag, t
       'neon draws trail geometry and never a single particle, so anything it drops must be picked up by the '
       + 'caller\'s drawSparkSubset() — check that pairing before narrowing either bound');
     chk('the splat shader\'s `uSparkLast` subtracts BOTH, because gl_InstanceID there is a SLOT index',
-      /const sparkLast = state\.count - \(state\.crystalCount \?\? 0\) - \(state\.liquidCount \?\? 0\);/.test(lqHdr),
+      // ⚠️ re-pointed 2026-11-18: the FULL-state half now follows the spark SUBSET's branch (the fourth door's fix);
+      // the property is unchanged — on a full state the range still subtracts BOTH tail blocks
+      /const sparkLast = state\.sparkSubset \? state\.count : state\.count - \(state\.crystalCount \?\? 0\) - \(state\.liquidCount \?\? 0\);/.test(lqHdr),
       'a range reaching into the pool would size pool particles at `sparks.splatRadius` — 2-4 px against a '
       + 'material 3-14 px, i.e. the spark-size defect fixed on 2026-08-29 reintroduced on a new block');
     chk('ribbon `updateHistory()` subtracts ONLY crystals — its count also bounds the hybrid POINT pass',

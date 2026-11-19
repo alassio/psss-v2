@@ -640,6 +640,9 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       'Copies Morph Ring',
       'Earth at Night',
       'Dancing Lovers',
+      'Mystery Curve 3',
+      'Mystery Curve 5',
+      'Mystery Curve 7',
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,
@@ -667,7 +670,7 @@ export const BUILT_IN_REELS: readonly Reel[] = [
   },
   {
     name: 'Materials',
-    // GENERATED (98) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
+    // GENERATED (101) — "all presets using materials". Rule: `overlay.material.preset` is set and is not
     // `'None'` (invariant 18: a material's inactive state is the STRING `'None'`, not absence).
     presets: [
       "Anima Electrica",
@@ -768,6 +771,9 @@ export const BUILT_IN_REELS: readonly Reel[] = [
       "Plant Flowering",
       "Plant Custom Bloom",
       "Copies Saddle",
+      "Mystery Curve 3",
+      "Mystery Curve 5",
+      "Mystery Curve 7",
     ],
     playMode: 'random',
     playSeconds: REEL_DEFAULT_SECONDS,

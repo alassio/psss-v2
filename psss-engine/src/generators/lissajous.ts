@@ -3062,22 +3062,28 @@ export class LissajousGenerator implements Generator {
      *
      * ⚠️⚠️ **WHY IT SHIPS, GIVEN `31.9` FALSIFIED THE BOUND THAT GATED IT.** `32.6` re-ran the corrected
      * discriminator — *inversion WITH NO CHANGE TO THE PROJECTED IMAGE*, calibrated against the removed
-     * `boxFoldZ` — over 174 strong-z bodies. Full-strength inversion trips the rule on **31** bodies; the
-     * engine's own `angle: [0, 90, 0]` trips it on **39** and `[45, 0, 0]` on **65**. **A rule that
+     * `boxFoldZ`. ⚠️⚠️ **RE-MEASURED THROUGH THIS STAGE 2026-11-18** (`MEASUREMENT-phase32-inversion-engine.mjs`;
+     * the original instrument inverted SCREEN coordinates because the operator did not exist yet): over 195
+     * strong-z bodies full-strength inversion at radius 1 trips the rule on **39**; the engine's own
+     * `angle: [0, 90, 0]` trips it on **39** and `[45, 0, 0]` on **66**. **A rule that
      * refuses a candidate less often than it refuses the oldest correct control in the engine has not
-     * refused the candidate.** What the rule catches is SILENT reversal: `boxFoldZ` scored 67.3 % depth at
-     * 0.0 % image change; inversion scores 19.6 % depth at **102.6 %** image change — it moves the
-     * projection further than the figure's own width. It is the loudest operator measured.
+     * refused the candidate.** What the rule catches is SILENT reversal: `boxFoldZ` scores 65.8 % depth at
+     * 0.0 % image change; inversion scores 43 % depth at **118 %** image change — it moves the projection
+     * further than the figure's own width. It is the loudest operator measured. ⚠️ **But the margin is thin
+     * and the RADIUS is the variable:** radius 0.5 trips 57 (below the 45° pose's 66, above the 90° pose's
+     * 39), with genuinely silent reversals among them (`Disco Terror` 80 % depth at 1.6 % image).
      *
      * ⚠⚠ **A SHELL PARAMETER WAS SPECIFIED, MEASURED, AND REMOVED THE SAME DAY. DO NOT RE-PROPOSE
      * IT AS A SAFETY MECHANISM.** It restricted the map to `r > shell`, on the study's suggestion that
      * protecting the core would protect depth ordering. Measured: **31 bodies either way** — identically
      * to no shell — because a figure spanning the design extent has most of its particles outside it.
-     * Halving the radius did nothing either. **The effective safety control is the amount lerp, which
-     * passes 0 of 174 bodies at 0.3.**
+     * ⚠️⚠️ **AND THE AMOUNT IS NOT A SAFETY CONTROL EITHER** — the screen-space licence measured 0 of 174
+     * failing at 0.3 and "halving the radius did nothing"; through the engine 0.3 fails **15** of 195 and
+     * radius 0.5 fails **57**. No setting of this stage is depth-safe.
      *
-     * ⚠️ **The instrument is `MEASUREMENT-phase32-inversion.mjs` and it is the authoritative basis** —
-     * kept beside Phase 30's and 31's, because a verdict with no surviving instrument cannot be re-derived.
+     * ⚠️ **The instrument is `MEASUREMENT-phase32-inversion-engine.mjs` and it is the authoritative basis**
+     * (the original `MEASUREMENT-phase32-inversion.mjs` is kept as the record of the screen-space licence) —
+     * a verdict with no surviving instrument cannot be re-derived.
      */
     const invAmt = this.invertAmount;
     if (invAmt > 0) {
